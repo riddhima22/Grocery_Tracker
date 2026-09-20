@@ -1,9 +1,10 @@
 import os
 import json
 import logging
+import time
+from PIL import Image, ImageOps
 from django.conf import settings
 from django.utils import timezone
-from PIL import Image
 
 import warnings
 
@@ -106,16 +107,24 @@ class GeminiClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
         self.api_key = getattr(settings, 'GEMINI_API_KEY', '')
         self.enabled = bool(self.api_key and genai is not None)
         
-        self.scan_model_name = getattr(settings, 'GEMINI_MODEL_NAME', 'gemini-3.6-flash')
-        self.recipe_model_name = getattr(settings, 'GEMINI_RECIPE_MODEL_NAME', 'gemini-3.6-flash')
+        self.scan_model_name = getattr(settings, 'GEMINI_MODEL_NAME', 'gemini-3.5-flash-lite')
+        self.recipe_model_name = getattr(settings, 'GEMINI_RECIPE_MODEL_NAME', 'gemini-3.5-flash-lite')
+        self.fallback_models = getattr(
+            settings,
+            'GEMINI_FALLBACK_MODELS',
+            ['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.8-flash']
+        )
+        self.timeout_seconds = getattr(settings, 'GEMINI_TIMEOUT_SECONDS', 25)
 
         self.client = None
         if self.enabled:
             try:
-                import os
                 os.environ['GOOGLE_API_USE_REST'] = '1'
                 if GENAI_NEW_SDK and hasattr(genai, 'Client'):
-                    self.client = genai.Client(api_key=self.api_key)
+                    client_kwargs = {'api_key': self.api_key}
+                    if types and hasattr(types, 'HttpOptions'):
+                        client_kwargs['http_options'] = types.HttpOptions(timeout=self.timeout_seconds * 1000)
+                    self.client = genai.Client(**client_kwargs)
                 else:
                     try:
                         genai.configure(api_key=self.api_key, transport='rest')
@@ -129,7 +138,7 @@ class GeminiClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
 
     def _prepare_image(self, image_or_path, max_dim: int = 1568) -> Image.Image:
         """
-        Loads and downscales an image if its longest side exceeds max_dim,
+        Loads, auto-orients (EXIF), and downscales an image if its longest side exceeds max_dim,
         maintaining aspect ratio with Image.LANCZOS resampling.
         Ensures dimensions never fall below the 150x150 minimum.
         """
@@ -137,6 +146,14 @@ class GeminiClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
             img = Image.open(image_or_path)
         else:
             img = image_or_path.copy()
+
+        try:
+            img = ImageOps.exif_transpose(img)
+        except Exception:
+            pass
+
+        if img.mode not in ('RGB', 'L'):
+            img = img.convert('RGB')
 
         img.load()
         width, height = img.size
@@ -213,167 +230,249 @@ class GeminiClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
                 text = '\n'.join(lines[1:-1])
         return text.strip()
 
+    def _get_candidate_models(self, primary_model: str) -> list:
+        """Constructs ordered list of models: primary model first, followed by fallbacks without duplicates."""
+        models = [primary_model]
+        for m in self.fallback_models:
+            if m not in models:
+                models.append(m)
+        return models
+
     def analyze_grocery_images(self, image_paths: list, ocr_context: str = None) -> dict:
         if not self.enabled:
             logger.warning("Gemini Client is disabled. Returning empty results.")
             return {"items": []}
 
+        images = []
+        for path in image_paths:
+            size_kb = (os.path.getsize(path) / 1024) if os.path.exists(path) else 0
+            logger.info(f"Loading and preparing image for Gemini: {path} ({size_kb:.1f} KB)")
+            images.append(self._prepare_image(path))
+
+        current_date_str = timezone.now().date().isoformat()
+        prompt = GROCERY_SCAN_PROMPT.format(
+            ocr_text=ocr_context or "No packaging text extracted.",
+            current_date=current_date_str
+        )
+        contents = [prompt] + images
+
+        candidate_models = self._get_candidate_models(self.scan_model_name)
+        overall_start = time.time()
+        last_exception = None
         raw_text = None
-        try:
-            images = []
-            for path in image_paths:
-                logger.info(f"Loading and preparing image for Gemini: {path}")
-                images.append(self._prepare_image(path))
 
-            current_date_str = timezone.now().date().isoformat()
-            prompt = GROCERY_SCAN_PROMPT.format(
-                ocr_text=ocr_context or "No packaging text extracted.",
-                current_date=current_date_str
-            )
+        for model_name in candidate_models:
+            attempt_start = time.time()
+            logger.info(f"AI analysis started with Gemini model '{model_name}'...")
+            try:
+                if self.client:
+                    config_kwargs = {
+                        "system_instruction": SYSTEM_INSTRUCTION,
+                        "response_mime_type": "application/json",
+                        "response_schema": GROCERY_SCAN_SCHEMA,
+                    }
+                    if types and hasattr(types, 'HttpOptions'):
+                        config_kwargs["http_options"] = types.HttpOptions(timeout=self.timeout_seconds * 1000)
+                    
+                    config = types.GenerateContentConfig(**config_kwargs) if types else config_kwargs
+                    response = self.client.models.generate_content(
+                        model=model_name,
+                        contents=contents,
+                        config=config
+                    )
+                else:
+                    model = genai.GenerativeModel(
+                        model_name=model_name,
+                        system_instruction=SYSTEM_INSTRUCTION
+                    )
+                    response = model.generate_content(
+                        contents,
+                        generation_config={
+                            "response_mime_type": "application/json",
+                            "response_schema": GROCERY_SCAN_SCHEMA
+                        }
+                    )
 
-            logger.info(f"Calling Gemini ({self.scan_model_name}) for scan analysis...")
-            contents = [prompt] + images
-
-            if self.client:
-                config = types.GenerateContentConfig(
-                    system_instruction=SYSTEM_INSTRUCTION,
-                    response_mime_type="application/json",
-                    response_schema=GROCERY_SCAN_SCHEMA
-                ) if types else {"response_mime_type": "application/json", "response_schema": GROCERY_SCAN_SCHEMA}
-                response = self.client.models.generate_content(
-                    model=self.scan_model_name,
-                    contents=contents,
-                    config=config
+                raw_text = self._validate_response(response, f"scan analysis ({model_name})")
+                text_response = self._clean_json_text(raw_text)
+                data = json.loads(text_response)
+                items = data.get('items', [])
+                
+                attempt_elapsed = time.time() - attempt_start
+                total_elapsed = time.time() - overall_start
+                logger.info(
+                    f"AI analysis completed with model '{model_name}' in {attempt_elapsed:.2f}s "
+                    f"(total elapsed: {total_elapsed:.2f}s). Detected {len(items)} items."
                 )
-            else:
-                model = genai.GenerativeModel(
-                    model_name=self.scan_model_name,
-                    system_instruction=SYSTEM_INSTRUCTION
+                return data
+
+            except AIContentBlockedError as blocked_err:
+                logger.warning(f"Gemini model '{model_name}' content blocked: {blocked_err}")
+                raise
+            except Exception as e:
+                attempt_elapsed = time.time() - attempt_start
+                last_exception = e
+                logger.warning(
+                    f"Gemini model '{model_name}' failed after {attempt_elapsed:.2f}s: {e}. "
+                    f"Attempting fallback model..."
                 )
-                response = model.generate_content(contents, generation_config={
-                    "response_mime_type": "application/json",
-                    "response_schema": GROCERY_SCAN_SCHEMA
-                })
 
-            raw_text = self._validate_response(response, "scan analysis")
-            text_response = self._clean_json_text(raw_text)
-            data = json.loads(text_response)
-            logger.info(f"Gemini successfully scanned and returned {len(data.get('items', []))} items.")
-            return data
-
-        except AIContentBlockedError:
-            raise
-        except Exception as e:
-            msg = translate_gemini_error(e, raw_text=raw_text, stage_name="scan analysis")
-            logger.error(f"Gemini scan analysis failed: {e} -> {msg}", exc_info=True)
-            raise RuntimeError(msg) from e
+        total_elapsed = time.time() - overall_start
+        msg = translate_gemini_error(last_exception, raw_text=raw_text, stage_name="scan analysis")
+        logger.error(
+            f"All Gemini scan models {candidate_models} failed after {total_elapsed:.2f}s. "
+            f"Last error: {last_exception} -> {msg}",
+            exc_info=True
+        )
+        raise RuntimeError(msg) from last_exception
 
     def generate_recipes(self, available_items: list, preferences: dict) -> dict:
         if not self.enabled:
             logger.warning("Gemini Client is disabled. Recipe generation skipped.")
             return {"recipes": []}
 
+        items_str = json.dumps(available_items, indent=2)
+        prompt = RECIPE_GENERATION_PROMPT.format(
+            available_items=items_str,
+            diet_type=preferences.get('diet_type', 'any'),
+            cuisine_pref=preferences.get('cuisine_pref', 'Indian'),
+            allergens=json.dumps(preferences.get('allergies', [])),
+            household_size=preferences.get('household_size', 1),
+            max_prep_time_mins=preferences.get('max_prep_time_mins', 60),
+            meal_type=preferences.get('meal_type', 'any')
+        )
+
+        candidate_models = self._get_candidate_models(self.recipe_model_name)
+        overall_start = time.time()
+        last_exception = None
         raw_text = None
-        try:
-            items_str = json.dumps(available_items, indent=2)
 
-            prompt = RECIPE_GENERATION_PROMPT.format(
-                available_items=items_str,
-                diet_type=preferences.get('diet_type', 'any'),
-                cuisine_pref=preferences.get('cuisine_pref', 'Indian'),
-                allergens=json.dumps(preferences.get('allergies', [])),
-                household_size=preferences.get('household_size', 1),
-                max_prep_time_mins=preferences.get('max_prep_time_mins', 60),
-                meal_type=preferences.get('meal_type', 'any')
-            )
+        for model_name in candidate_models:
+            attempt_start = time.time()
+            logger.info(f"Recipe generation started with Gemini model '{model_name}'...")
+            try:
+                if self.client:
+                    config_kwargs = {
+                        "system_instruction": SYSTEM_INSTRUCTION,
+                        "response_mime_type": "application/json",
+                        "response_schema": RECIPE_GENERATION_SCHEMA,
+                    }
+                    if types and hasattr(types, 'HttpOptions'):
+                        config_kwargs["http_options"] = types.HttpOptions(timeout=self.timeout_seconds * 1000)
+                    
+                    config = types.GenerateContentConfig(**config_kwargs) if types else config_kwargs
+                    response = self.client.models.generate_content(
+                        model=model_name,
+                        contents=prompt,
+                        config=config
+                    )
+                else:
+                    model = genai.GenerativeModel(
+                        model_name=model_name,
+                        system_instruction=SYSTEM_INSTRUCTION
+                    )
+                    response = model.generate_content(
+                        prompt,
+                        generation_config={
+                            "response_mime_type": "application/json",
+                            "response_schema": RECIPE_GENERATION_SCHEMA
+                        }
+                    )
 
-            logger.info(f"Calling Gemini ({self.recipe_model_name}) for recipe generation...")
+                raw_text = self._validate_response(response, f"recipe generation ({model_name})")
+                text_response = self._clean_json_text(raw_text)
+                data = json.loads(text_response)
+                recipes = data.get('recipes', [])
+                
+                attempt_elapsed = time.time() - attempt_start
+                logger.info(f"Gemini successfully generated {len(recipes)} recipes with '{model_name}' in {attempt_elapsed:.2f}s.")
+                return data
 
-            if self.client:
-                config = types.GenerateContentConfig(
-                    system_instruction=SYSTEM_INSTRUCTION,
-                    response_mime_type="application/json",
-                    response_schema=RECIPE_GENERATION_SCHEMA
-                ) if types else {"response_mime_type": "application/json", "response_schema": RECIPE_GENERATION_SCHEMA}
-                response = self.client.models.generate_content(
-                    model=self.recipe_model_name,
-                    contents=prompt,
-                    config=config
-                )
-            else:
-                model = genai.GenerativeModel(
-                    model_name=self.recipe_model_name,
-                    system_instruction=SYSTEM_INSTRUCTION
-                )
-                response = model.generate_content(prompt, generation_config={
-                    "response_mime_type": "application/json",
-                    "response_schema": RECIPE_GENERATION_SCHEMA
-                })
+            except AIContentBlockedError as blocked_err:
+                logger.warning(f"Gemini recipe generation blocked with '{model_name}': {blocked_err}")
+                raise
+            except Exception as e:
+                attempt_elapsed = time.time() - attempt_start
+                last_exception = e
+                logger.warning(f"Gemini model '{model_name}' failed recipe generation after {attempt_elapsed:.2f}s: {e}")
 
-            raw_text = self._validate_response(response, "recipe generation")
-            text_response = self._clean_json_text(raw_text)
-            data = json.loads(text_response)
-            logger.info(f"Gemini successfully generated {len(data.get('recipes', []))} recipes.")
-            return data
-
-        except AIContentBlockedError:
-            raise
-        except Exception as e:
-            msg = translate_gemini_error(e, raw_text=raw_text, stage_name="recipe generation")
-            logger.error(f"Gemini recipe generation failed: {e} -> {msg}", exc_info=True)
-            raise RuntimeError(msg) from e
+        total_elapsed = time.time() - overall_start
+        msg = translate_gemini_error(last_exception, raw_text=raw_text, stage_name="recipe generation")
+        logger.error(f"All Gemini recipe models failed after {total_elapsed:.2f}s: {last_exception} -> {msg}")
+        raise RuntimeError(msg) from last_exception
 
     def infer_meal_ingredients(self, image_path: str, text_description: str, available_pantry_items: list) -> dict:
         if not self.enabled:
             logger.warning("Gemini Client is disabled. Meal inference skipped.")
             return {"meal_name": "Unknown", "description": "", "ingredients": []}
 
+        items_str = json.dumps(available_pantry_items, indent=2)
+        prompt = MEAL_INFERENCE_PROMPT.format(
+            available_items=items_str,
+            text_description=text_description or "None"
+        )
+        contents = [prompt]
+        if image_path:
+            size_kb = (os.path.getsize(image_path) / 1024) if os.path.exists(image_path) else 0
+            logger.info(f"Loading and preparing image for Gemini Meal Inference: {image_path} ({size_kb:.1f} KB)")
+            contents.append(self._prepare_image(image_path))
+
+        candidate_models = self._get_candidate_models(self.scan_model_name)
+        overall_start = time.time()
+        last_exception = None
         raw_text = None
-        try:
-            items_str = json.dumps(available_pantry_items, indent=2)
-            prompt = MEAL_INFERENCE_PROMPT.format(
-                available_items=items_str,
-                text_description=text_description or "None"
-            )
 
-            contents = [prompt]
-            if image_path:
-                logger.info(f"Loading and preparing image for Gemini Meal Inference: {image_path}")
-                contents.append(self._prepare_image(image_path))
+        for model_name in candidate_models:
+            attempt_start = time.time()
+            logger.info(f"Meal inference started with Gemini model '{model_name}'...")
+            try:
+                if self.client:
+                    config_kwargs = {
+                        "system_instruction": SYSTEM_INSTRUCTION,
+                        "response_mime_type": "application/json",
+                        "response_schema": MEAL_INFERENCE_SCHEMA,
+                    }
+                    if types and hasattr(types, 'HttpOptions'):
+                        config_kwargs["http_options"] = types.HttpOptions(timeout=self.timeout_seconds * 1000)
+                    
+                    config = types.GenerateContentConfig(**config_kwargs) if types else config_kwargs
+                    response = self.client.models.generate_content(
+                        model=model_name,
+                        contents=contents,
+                        config=config
+                    )
+                else:
+                    model = genai.GenerativeModel(
+                        model_name=model_name,
+                        system_instruction=SYSTEM_INSTRUCTION
+                    )
+                    response = model.generate_content(
+                        contents,
+                        generation_config={
+                            "response_mime_type": "application/json",
+                            "response_schema": MEAL_INFERENCE_SCHEMA
+                        }
+                    )
 
-            logger.info(f"Calling Gemini ({self.scan_model_name}) for meal inference...")
+                raw_text = self._validate_response(response, f"meal inference ({model_name})")
+                text_response = self._clean_json_text(raw_text)
+                data = json.loads(text_response)
+                ingredients = data.get('ingredients', [])
+                
+                attempt_elapsed = time.time() - attempt_start
+                logger.info(f"Gemini successfully inferred {len(ingredients)} ingredients with '{model_name}' in {attempt_elapsed:.2f}s.")
+                return data
 
-            if self.client:
-                config = types.GenerateContentConfig(
-                    system_instruction=SYSTEM_INSTRUCTION,
-                    response_mime_type="application/json",
-                    response_schema=MEAL_INFERENCE_SCHEMA
-                ) if types else {"response_mime_type": "application/json", "response_schema": MEAL_INFERENCE_SCHEMA}
-                response = self.client.models.generate_content(
-                    model=self.scan_model_name,
-                    contents=contents,
-                    config=config
-                )
-            else:
-                model = genai.GenerativeModel(
-                    model_name=self.scan_model_name,
-                    system_instruction=SYSTEM_INSTRUCTION
-                )
-                response = model.generate_content(contents, generation_config={
-                    "response_mime_type": "application/json",
-                    "response_schema": MEAL_INFERENCE_SCHEMA
-                })
+            except AIContentBlockedError as blocked_err:
+                logger.warning(f"Gemini meal inference blocked with '{model_name}': {blocked_err}")
+                raise
+            except Exception as e:
+                attempt_elapsed = time.time() - attempt_start
+                last_exception = e
+                logger.warning(f"Gemini model '{model_name}' failed meal inference after {attempt_elapsed:.2f}s: {e}")
 
-            raw_text = self._validate_response(response, "meal inference")
-            text_response = self._clean_json_text(raw_text)
-            data = json.loads(text_response)
-            logger.info(f"Gemini successfully inferred {len(data.get('ingredients', []))} ingredients.")
-            return data
-
-        except AIContentBlockedError:
-            raise
-        except Exception as e:
-            msg = translate_gemini_error(e, raw_text=raw_text, stage_name="meal inference")
-            logger.error(f"Gemini meal inference failed: {e} -> {msg}", exc_info=True)
-            raise RuntimeError(msg) from e
+        total_elapsed = time.time() - overall_start
+        msg = translate_gemini_error(last_exception, raw_text=raw_text, stage_name="meal inference")
+        logger.error(f"All Gemini meal inference models failed after {total_elapsed:.2f}s: {last_exception} -> {msg}")
+        raise RuntimeError(msg) from last_exception
 

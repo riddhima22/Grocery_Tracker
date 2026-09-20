@@ -1,18 +1,38 @@
 import 'package:flutter/material.dart';
 import '../../../data/models/grocery_model.dart';
 import '../../../data/repositories/grocery_repository.dart';
+import '../../../data/local/cache_manager.dart';
 import '../../../core/utils/app_logger.dart';
 import '../../../core/services/notification_service.dart';
 
 class KitchenProvider extends ChangeNotifier {
   final GroceryRepository _groceryRepository = GroceryRepository();
+  final CacheManager _cacheManager = CacheManager();
 
   List<GroceryModel> _items = [];
   bool _isLoading = false;
+  bool _isFetching = false;
   String? _errorMessage;
+
+  KitchenProvider() {
+    _loadInitialCachedItems();
+  }
+
+  Future<void> _loadInitialCachedItems() async {
+    try {
+      final cached = await _cacheManager.getCachedGroceries();
+      if (cached.isNotEmpty && _items.isEmpty) {
+        _items = cached;
+        notifyListeners();
+      }
+    } catch (e) {
+      AppLogger.error('Failed to load initial cached groceries', e);
+    }
+  }
 
   List<GroceryModel> get items => _items;
   bool get isLoading => _isLoading;
+  bool get isFetching => _isFetching;
   String? get errorMessage => _errorMessage;
 
   int get totalItems => _items.length;
@@ -30,23 +50,57 @@ class KitchenProvider extends ChangeNotifier {
   List<GroceryModel> get basketItems => _getItemsByZone('basket');
   List<GroceryModel> get spiceItems => _getItemsByZone('spice');
 
-  Future<void> fetchKitchenItems() async {
-    _isLoading = true;
-    _errorMessage = null;
-    notifyListeners();
+  /// Fetches kitchen items using a fast cache-first / stale-while-revalidate strategy.
+  /// If cached data exists, it renders immediately (0ms) and refreshes in the background.
+  Future<void> fetchKitchenItems({bool forceRefresh = false}) async {
+    // 1. Immediately hydrate from cache if in-memory state is empty
+    if (_items.isEmpty) {
+      final cached = await _cacheManager.getCachedGroceries();
+      if (cached.isNotEmpty) {
+        _items = cached;
+        _isLoading = false;
+        notifyListeners();
+      } else {
+        _isLoading = true;
+        _errorMessage = null;
+        notifyListeners();
+      }
+    }
 
+    // 2. Prevent concurrent duplicate requests
+    if (_isFetching) return;
+
+    // 3. Skip redundant network fetch if data is present and fresh (< 3 mins), unless forced
+    if (!forceRefresh && _items.isNotEmpty) {
+      final isStale = await _cacheManager.isGroceriesCacheStale(maxAge: const Duration(minutes: 3));
+      if (!isStale) {
+        return;
+      }
+    }
+
+    _isFetching = true;
     try {
-      _items = await _groceryRepository.getGroceries();
+      final remoteItems = await _groceryRepository.getGroceries();
+      _items = remoteItems;
+      _errorMessage = null;
       _isLoading = false;
-      
+
+      // Update cache asynchronously
+      _cacheManager.saveGroceries(_items);
+
       // Automatically schedule local notifications for expiring items
       NotificationService().scheduleExpiryAlertsForItems(_items);
     } catch (e) {
-      _errorMessage = e.toString();
+      AppLogger.error('Failed to load kitchen items from network', e);
+      // If we already have items displayed from cache, do NOT block user with error screen
+      if (_items.isEmpty) {
+        _errorMessage = e.toString();
+      }
+    } finally {
       _isLoading = false;
-      AppLogger.error('Failed to load kitchen items', e);
+      _isFetching = false;
+      notifyListeners();
     }
-    notifyListeners();
   }
 
   List<GroceryModel> _getItemsByZone(String zone) {
@@ -63,6 +117,7 @@ class KitchenProvider extends ChangeNotifier {
         } else {
           _items[index] = updated;
         }
+        _cacheManager.saveGroceries(_items);
         notifyListeners();
       }
       return true;
@@ -82,6 +137,7 @@ class KitchenProvider extends ChangeNotifier {
         } else {
           _items[index] = updated;
         }
+        _cacheManager.saveGroceries(_items);
         notifyListeners();
       }
       return true;
@@ -101,6 +157,7 @@ class KitchenProvider extends ChangeNotifier {
         } else {
           _items[index] = updated;
         }
+        _cacheManager.saveGroceries(_items);
         notifyListeners();
       }
       return true;
@@ -114,6 +171,7 @@ class KitchenProvider extends ChangeNotifier {
     try {
       await _groceryRepository.deleteGrocery(id);
       _items.removeWhere((i) => i.id == id);
+      _cacheManager.saveGroceries(_items);
       notifyListeners();
       return true;
     } catch (e) {
@@ -128,6 +186,7 @@ class KitchenProvider extends ChangeNotifier {
     try {
       final newItem = await _groceryRepository.createGrocery(data);
       _items.add(newItem);
+      _cacheManager.saveGroceries(_items);
     } catch (e) {
       _errorMessage = e.toString();
       AppLogger.error('Add manual item failed', e);
@@ -143,6 +202,7 @@ class KitchenProvider extends ChangeNotifier {
       final index = _items.indexWhere((i) => i.id == id);
       if (index != -1) {
         _items[index] = updated;
+        _cacheManager.saveGroceries(_items);
         notifyListeners();
       }
       return true;
@@ -152,4 +212,3 @@ class KitchenProvider extends ChangeNotifier {
     }
   }
 }
-

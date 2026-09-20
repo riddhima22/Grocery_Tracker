@@ -17,10 +17,17 @@ class ImagePickerService {
       return null;
     }
     try {
-      return await _picker.pickImage(
+      final file = await _picker.pickImage(
         source: ImageSource.camera,
-        imageQuality: 85,
+        maxWidth: 1920,
+        maxHeight: 1920,
+        imageQuality: 80,
       );
+      if (file != null) {
+        final bytes = await file.length();
+        AppLogger.info('Captured photo: ${file.name} (${(bytes / 1024).toStringAsFixed(1)} KB)');
+      }
+      return file;
     } catch (e, stack) {
       AppLogger.error('Failed to capture photo', e, stack);
       return null;
@@ -29,10 +36,17 @@ class ImagePickerService {
 
   Future<XFile?> selectImageFromGallery() async {
     try {
-      return await _picker.pickImage(
+      final file = await _picker.pickImage(
         source: ImageSource.gallery,
-        imageQuality: 85,
+        maxWidth: 1920,
+        maxHeight: 1920,
+        imageQuality: 80,
       );
+      if (file != null) {
+        final bytes = await file.length();
+        AppLogger.info('Selected gallery image: ${file.name} (${(bytes / 1024).toStringAsFixed(1)} KB)');
+      }
+      return file;
     } catch (e, stack) {
       AppLogger.error('Failed to pick gallery image', e, stack);
       return null;
@@ -41,7 +55,15 @@ class ImagePickerService {
 
   Future<List<XFile>> selectMultipleImagesFromGallery() async {
     try {
-      final List<XFile> images = await _picker.pickMultiImage(imageQuality: 85);
+      final List<XFile> images = await _picker.pickMultiImage(
+        maxWidth: 1920,
+        maxHeight: 1920,
+        imageQuality: 80,
+      );
+      for (final file in images) {
+        final bytes = await file.length();
+        AppLogger.info('Selected multi-image: ${file.name} (${(bytes / 1024).toStringAsFixed(1)} KB)');
+      }
       return images;
     } catch (e, stack) {
       AppLogger.error('Failed to pick multi-images from gallery', e, stack);

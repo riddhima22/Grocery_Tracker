@@ -84,6 +84,13 @@ def process_scan_session_task(self, session_id=None):
     if session_id is None and isinstance(self, (str, int)):
         session_id = self
 
+    import time
+    from django.db import connection
+
+    # Ensure clean database connection in thread context
+    connection.close_if_unusable_or_obsolete()
+
+    start_time = time.time()
     logger.info(f"Starting scan processing task for session {session_id}")
     try:
         session = ScanSession.objects.get(id=session_id)
@@ -121,12 +128,24 @@ def process_scan_session_task(self, session_id=None):
 
         # 3. Create ScanCandidate objects inside a transaction
         with transaction.atomic():
+            def safe_str(val, default=''):
+                if val is None:
+                    return default
+                return str(val).strip()
+
             def parse_date_str(d_str):
                 if not d_str:
                     return None
+                d_str = str(d_str).strip()
+                for fmt in ('%Y-%m-%d', '%d/%m/%Y', '%d-%m-%Y', '%m/%d/%Y', '%Y/%m/%d'):
+                    try:
+                        return datetime.datetime.strptime(d_str[:10], fmt).date()
+                    except (ValueError, TypeError):
+                        pass
                 try:
-                    return datetime.datetime.strptime(d_str, '%Y-%m-%d').date()
-                except ValueError:
+                    from dateutil import parser as date_parser
+                    return date_parser.parse(d_str).date()
+                except Exception:
                     return None
 
             # Map items to source images. The AI may return a 'source_image_index'
@@ -135,7 +154,7 @@ def process_scan_session_task(self, session_id=None):
             for idx, item_data in enumerate(items):
                 # Use AI-provided source_image_index if available, else distribute evenly
                 source_idx = item_data.get('source_image_index')
-                if source_idx is not None and 0 <= source_idx < len(image_list):
+                if source_idx is not None and isinstance(source_idx, int) and 0 <= source_idx < len(image_list):
                     source_image = image_list[source_idx]
                 elif len(image_list) == 1:
                     source_image = image_list[0]
@@ -152,44 +171,51 @@ def process_scan_session_task(self, session_id=None):
                 except (ValueError, TypeError):
                     pass
 
-                unit = item_data.get('unit', 'pcs').strip().lower()
+                unit = safe_str(item_data.get('unit'), 'pcs').lower()
                 allowed_units = ['kg', 'g', 'l', 'ml', 'pcs', 'pack', 'bottle', 'box', 'dozen', 'bunch', 'packet']
                 if unit not in allowed_units:
-                    if unit == 'liter' or unit == 'liters':
+                    if unit in ('liter', 'liters', 'l'):
                         unit = 'l'
-                    elif unit == 'gram' or unit == 'grams':
+                    elif unit in ('gram', 'grams', 'g'):
                         unit = 'g'
                     else:
                         unit = 'pcs'
 
-                zone = item_data.get('storage_zone', 'pantry').strip().lower()
+                zone = safe_str(item_data.get('storage_zone'), 'pantry').lower()
                 allowed_zones = ['fridge', 'freezer', 'pantry', 'counter', 'cabinet', 'basket', 'spice']
                 if zone not in allowed_zones:
                     zone = 'pantry'
 
+                raw_icon = safe_str(item_data.get('icon_key'), 'grocery').lower()
+                allowed_icons = ['vegetables', 'fruits', 'dairy', 'grains', 'beverage', 'spices', 'grocery']
+                icon_key = raw_icon if raw_icon in allowed_icons else 'grocery'
+
+                warnings_list = item_data.get('warnings')
+                if not isinstance(warnings_list, list):
+                    warnings_list = []
+
                 ScanCandidate.objects.create(
                     scan_session=session,
                     source_image=source_image,
-                    name=item_data.get('name', 'Unknown Item').strip(),
-                    brand=item_data.get('brand', '').strip(),
-                    description=item_data.get('description', '').strip(),
-                    icon_key=item_data.get('icon_key', 'grocery').strip(),
-                    category=item_data.get('category', 'Vegetables').strip(),
+                    name=safe_str(item_data.get('name'), 'Unknown Item')[:150],
+                    brand=safe_str(item_data.get('brand'), '')[:100],
+                    description=safe_str(item_data.get('description'), ''),
+                    icon_key=icon_key[:50],
+                    category=safe_str(item_data.get('category'), 'Vegetables')[:100],
                     quantity=quantity,
-                    unit=unit,
-                    storage_zone=zone,
+                    unit=unit[:20],
+                    storage_zone=zone[:20],
                     expiry_date=parse_date_str(item_data.get('expiry_date')),
                     manufacturing_date=parse_date_str(item_data.get('manufacturing_date')),
                     packed_date=parse_date_str(item_data.get('packed_date')),
                     best_before_date=parse_date_str(item_data.get('best_before_date')),
-                    date_type=item_data.get('date_type', 'unknown'),
-                    date_source=item_data.get('date_source', 'unknown'),
-                    date_confidence=item_data.get('date_confidence', 'Low'),
-                    raw_date_text=item_data.get('raw_date_text', ''),
-                    storage_reason=item_data.get('storage_reason', ''),
-                    shelf_life_guidance=item_data.get('shelf_life_guidance', ''),
-                    confidence=item_data.get('confidence', 'High'),
-                    validation_warnings=item_data.get('warnings', [])
+                    date_type=safe_str(item_data.get('date_type'), 'unknown')[:30],
+                    date_source=safe_str(item_data.get('date_source'), 'unknown')[:30],
+                    date_confidence=safe_str(item_data.get('date_confidence'), 'Low')[:20],
+                    raw_date_text=safe_str(item_data.get('raw_date_text'), ''),
+                    storage_reason=safe_str(item_data.get('storage_reason'), ''),
+                    shelf_life_guidance=safe_str(item_data.get('shelf_life_guidance'), ''),
+                    confidence=safe_str(item_data.get('confidence'), 'High')[:20],
                 )
                 candidate_count += 1
 
@@ -201,35 +227,34 @@ def process_scan_session_task(self, session_id=None):
 
     except Exception as e:
         logger.error(f"Error processing images for session {session_id}: {str(e)}", exc_info=True)
-        if is_transient_error(e) and self is not None and getattr(self, 'request', None) is not None:
-            try:
-                countdown = 10 * (self.request.retries + 1)
-                logger.warning(
-                    f"Transient error detected for scan session {session_id} ({e}). "
-                    f"Retrying in {countdown}s (retry {self.request.retries + 1}/{self.max_retries})..."
-                )
-                raise self.retry(exc=e, countdown=countdown)
-            except MaxRetriesExceededError:
-                logger.error(f"Max retries ({self.max_retries}) exceeded for scan session {session_id}.")
-
+        # Directly mark images failed and record error message so client receives error immediately
         for scan_image in images:
             scan_image.status = ScanImage.Statuses.FAILED
             scan_image.error_message = str(e)
             scan_image.save(update_fields=['status', 'error_message'])
             failed_count += 1
 
-    # Update session status
-    session.successful_image_count = successful_count
-    session.failed_image_count = failed_count
-    session.candidate_count = candidate_count
-    
-    if failed_count == 0 and successful_count > 0:
-        session.status = ScanSession.Statuses.COMPLETED
-    elif successful_count > 0 and failed_count > 0:
-        session.status = ScanSession.Statuses.PARTIAL
-    else:
-        session.status = ScanSession.Statuses.FAILED
+    finally:
+        # Update session status
+        session.successful_image_count = successful_count
+        session.failed_image_count = failed_count
+        session.candidate_count = candidate_count
         
-    session.completed_at = timezone.now()
-    session.save(update_fields=['status', 'successful_image_count', 'failed_image_count', 'candidate_count', 'completed_at'])
+        if failed_count == 0 and successful_count > 0:
+            session.status = ScanSession.Statuses.COMPLETED
+        elif successful_count > 0 and failed_count > 0:
+            session.status = ScanSession.Statuses.PARTIAL
+        else:
+            session.status = ScanSession.Statuses.FAILED
+            
+        session.completed_at = timezone.now()
+        session.save(update_fields=['status', 'successful_image_count', 'failed_image_count', 'candidate_count', 'completed_at'])
+        
+        elapsed = time.time() - start_time
+        logger.info(
+            f"Completed scan processing task for session {session_id} in {elapsed:.2f}s: "
+            f"status={session.status}, candidates={candidate_count}, failed_images={failed_count}"
+        )
+        connection.close_if_unusable_or_obsolete()
+
     return True

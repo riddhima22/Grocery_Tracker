@@ -14,6 +14,7 @@ import '../../../core/widgets/grocery_item_card.dart';
 import '../../../core/extensions/responsive_context_extension.dart';
 import '../../../core/services/ai_service.dart';
 import '../../../core/services/ai_search_service.dart';
+import '../../../data/local/cache_manager.dart';
 import '../../kitchen/views/kitchen_item_detail_view.dart';
 import '../../meals/views/meal_log_view.dart';
 
@@ -29,6 +30,7 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
   late AnimationController _chartController;
   final TextEditingController _searchController = TextEditingController();
   final IAIService _aiService = AIServiceImpl();
+  final CacheManager _cacheManager = CacheManager();
 
   List<String> _insights = [];
   double _wasteRisk = 0.0;
@@ -51,11 +53,91 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
 
     _chartController.forward();
     
-    // Proactively fetch items and insights
+    // 1. Immediately hydrate cached insights (0ms)
+    _loadCachedInsights();
+
+    // 2. Proactively fetch items and remote insights in background
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<KitchenProvider>().fetchKitchenItems();
+      final kitchen = context.read<KitchenProvider>();
+      // Trigger cache-first fetch for kitchen items
+      kitchen.fetchKitchenItems();
+      
+      // If we don't have insights yet, generate instant client-side insights
+      if (_insights.isEmpty) {
+        _applyInstantClientInsights(kitchen);
+      }
+      
+      // Fetch fresh remote insights in background
       _loadAIInsights();
     });
+  }
+
+  Future<void> _loadCachedInsights() async {
+    try {
+      final cached = await _cacheManager.getCachedAIInsights();
+      if (cached != null && mounted) {
+        setState(() {
+          _insights = List<String>.from(cached['insights'] ?? []);
+          _wasteRisk = double.tryParse(cached['waste_risk']?.toString() ?? '0.0') ?? 0.0;
+          _freshnessScore = cached['freshness_score'] ?? 100;
+        });
+      }
+    } catch (_) {}
+  }
+
+  void _applyInstantClientInsights(KitchenProvider kitchen) {
+    final expiring = kitchen.expiringItems;
+    final expired = kitchen.expiredItems;
+    final items = kitchen.items;
+
+    final List<String> generated = [];
+
+    if (expiring.isNotEmpty) {
+      final names = expiring.take(3).map((e) => e.name).join(', ');
+      if (expiring.length > 3) {
+        generated.add('You have ${expiring.length} items expiring soon, including $names, and others.');
+      } else {
+        generated.add('You have items expiring soon: $names.');
+      }
+    }
+
+    if (expired.isNotEmpty) {
+      generated.add('Warning: ${expired.length} items have expired. Please clear them to keep your kitchen fresh.');
+    }
+
+    final categories = items.map((e) => e.category.toLowerCase()).toSet();
+    if (categories.contains('fruits') || categories.contains('fruit')) {
+      generated.add('Keeping bananas separate from other fruits prevents ethylene gas from ripening them too quickly.');
+    }
+    if (categories.contains('vegetables') || categories.contains('vegetable')) {
+      generated.add('Store leafy greens with a dry paper towel inside a sealed bag to absorb excess moisture.');
+    }
+    if (categories.contains('dairy')) {
+      generated.add('Avoid storing milk in the refrigerator door; shelf temperatures are much more stable.');
+    }
+
+    if (generated.isEmpty) {
+      generated.addAll([
+        'Your kitchen is in healthy shape! Keep logging items to track freshness.',
+        'Storage temperature control is the easiest way to prevent grocery wastage.',
+        'Planning meals around expiring items saves money and reduces waste.'
+      ]);
+    }
+
+    final wasteVal = expiring.length * 65.0;
+    int avgScore = 100;
+    if (items.isNotEmpty) {
+      final sum = items.fold<int>(0, (prev, el) => prev + el.freshnessScore);
+      avgScore = (sum / items.length).round();
+    }
+
+    if (mounted) {
+      setState(() {
+        _insights = generated;
+        _wasteRisk = wasteVal;
+        _freshnessScore = avgScore;
+      });
+    }
   }
 
   @override
@@ -66,16 +148,28 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
     super.dispose();
   }
 
-  Future<void> _loadAIInsights() async {
-    if (mounted) setState(() => _isLoadingInsights = true);
-    final data = await _aiService.fetchAIInsights();
-    if (mounted) {
-      setState(() {
-        _insights = List<String>.from(data['insights'] ?? []);
-        _wasteRisk = double.tryParse(data['waste_risk']?.toString() ?? '0.0') ?? 0.0;
-        _freshnessScore = data['freshness_score'] ?? 100;
-        _isLoadingInsights = false;
-      });
+  Future<void> _loadAIInsights({bool force = false}) async {
+    if (_insights.isEmpty && mounted) {
+      setState(() => _isLoadingInsights = true);
+    }
+    
+    try {
+      final data = await _aiService.fetchAIInsights();
+      if (mounted) {
+        final newInsights = List<String>.from(data['insights'] ?? []);
+        if (newInsights.isNotEmpty) {
+          setState(() {
+            _insights = newInsights;
+            _wasteRisk = double.tryParse(data['waste_risk']?.toString() ?? '0.0') ?? _wasteRisk;
+            _freshnessScore = data['freshness_score'] ?? _freshnessScore;
+            _isLoadingInsights = false;
+          });
+          // Cache in background
+          _cacheManager.saveAIInsights(data);
+        }
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingInsights = false);
     }
   }
 
@@ -99,19 +193,21 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
     return AppScaffold(
       body: kitchen.isLoading && kitchen.items.isEmpty
           ? _buildShimmerLoading()
-          : kitchen.errorMessage != null
+          : kitchen.errorMessage != null && kitchen.items.isEmpty
                ? AppRetryState(
                    errorMessage: kitchen.errorMessage!,
                    onRetry: () {
-                     kitchen.fetchKitchenItems();
-                     _loadAIInsights();
+                     kitchen.fetchKitchenItems(forceRefresh: true);
+                     _loadAIInsights(force: true);
                    },
                  )
                : RefreshIndicator(
                    color: AppColors.primary,
                    onRefresh: () async {
-                     await kitchen.fetchKitchenItems();
-                     await _loadAIInsights();
+                     await Future.wait([
+                       kitchen.fetchKitchenItems(forceRefresh: true),
+                       _loadAIInsights(force: true),
+                     ]);
                    },
                    child: CustomScrollView(
                      slivers: [
@@ -400,7 +496,7 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
   }
 
   Widget _buildAIInsightsCarousel() {
-    if (_isLoadingInsights) {
+    if (_isLoadingInsights && _insights.isEmpty) {
       return Shimmer.fromColors(
         baseColor: AppColors.card,
         highlightColor: AppColors.surface,

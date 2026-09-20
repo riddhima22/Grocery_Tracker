@@ -179,10 +179,14 @@ CELERY_TASK_EAGER_PROPAGATES = True
 
 # Gemini configuration
 GEMINI_API_KEY = env('GEMINI_API_KEY', default='')
-# Check https://ai.google.dev/gemini-api/docs/models for latest stable GA Flash releases
-GEMINI_MODEL_NAME = env('GEMINI_MODEL_NAME', default='gemini-3.6-flash')
-# Check https://ai.google.dev/gemini-api/docs/models for latest stable GA Flash releases
-GEMINI_RECIPE_MODEL_NAME = env('GEMINI_RECIPE_MODEL_NAME', default='gemini-3.6-flash')
+# gemini-3.5-flash-lite provides fast (~2s) responses without high-demand 503 errors
+GEMINI_MODEL_NAME = env('GEMINI_MODEL_NAME', default='gemini-3.5-flash-lite')
+GEMINI_RECIPE_MODEL_NAME = env('GEMINI_RECIPE_MODEL_NAME', default='gemini-3.5-flash-lite')
+GEMINI_FALLBACK_MODELS = env.list(
+    'GEMINI_FALLBACK_MODELS',
+    default=['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.8-flash']
+)
+GEMINI_TIMEOUT_SECONDS = env.int('GEMINI_TIMEOUT_SECONDS', default=25)
 
 # OpenAI configuration
 OPENAI_API_KEY = env('OPENAI_API_KEY', default='')

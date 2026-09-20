@@ -75,9 +75,9 @@ class _ScanViewState extends State<ScanView> with SingleTickerProviderStateMixin
   Widget _buildUIStateBody(ScanProvider scan) {
     switch (scan.uiState) {
       case ScanUIState.uploading:
-        return _buildStageProgress('Uploading images securely...', 0.3);
+        return _buildStageProgress(scan.scanStageMessage, scan.scanProgress);
       case ScanUIState.analyzing:
-        return _buildStageProgress('AI is identifying groceries and reading package details...', 0.7);
+        return _buildStageProgress(scan.scanStageMessage, scan.scanProgress);
       case ScanUIState.review:
         return _buildReviewList(scan);
       case ScanUIState.success:

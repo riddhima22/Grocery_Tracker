@@ -237,10 +237,21 @@ class ModelRouter:
                 # Expiry bounds safety check and fallback shelf-life prediction
                 if item.get("expiry_date"):
                     try:
-                        exp = timezone.datetime.strptime(item["expiry_date"], "%Y-%m-%d").date()
-                        if exp < timezone.now().date():
-                            item["warnings"].append("Detected date has already expired.")
-                    except ValueError:
+                        exp = None
+                        d_str = str(item["expiry_date"]).strip()
+                        for fmt in ('%Y-%m-%d', '%d/%m/%Y', '%d-%m-%Y', '%m/%d/%Y', '%Y/%m/%d'):
+                            try:
+                                exp = timezone.datetime.strptime(d_str[:10], fmt).date()
+                                break
+                            except (ValueError, TypeError):
+                                pass
+                        if exp:
+                            item["expiry_date"] = exp.isoformat()
+                            if exp < timezone.now().date():
+                                item["warnings"].append("Detected date has already expired.")
+                        else:
+                            item["expiry_date"] = None
+                    except Exception:
                         item["expiry_date"] = None
 
                 # Fallback to algorithmic shelf-life prediction if date is still missing

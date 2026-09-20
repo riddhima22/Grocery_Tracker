@@ -6,13 +6,22 @@ import '../models/scan_session_model.dart';
 import '../models/scan_candidate_model.dart';
 import '../models/grocery_model.dart';
 
+import '../../core/utils/app_logger.dart';
+
 class ScanRepository {
   final ApiClient _apiClient = ApiClient();
 
   Future<ScanSessionModel> createScanSession(List<XFile> images) async {
+    final stopwatch = Stopwatch()..start();
     final List<MultipartFile> multipartFiles = [];
+    int totalBytes = 0;
+
     for (var image in images) {
       final bytes = await image.readAsBytes();
+      totalBytes += bytes.length;
+      AppLogger.info(
+        'Preparing image for upload: ${image.name} (${(bytes.length / 1024).toStringAsFixed(1)} KB)',
+      );
       multipartFiles.add(
         MultipartFile.fromBytes(
           bytes,
@@ -20,6 +29,10 @@ class ScanRepository {
         ),
       );
     }
+
+    AppLogger.info(
+      'Starting upload of ${images.length} image(s) (${(totalBytes / 1024).toStringAsFixed(1)} KB total) to ${ApiEndpoints.scanSessions}...',
+    );
 
     final formData = FormData.fromMap({
       'images': multipartFiles,
@@ -29,6 +42,13 @@ class ScanRepository {
       ApiEndpoints.scanSessions,
       data: formData,
       options: Options(contentType: 'multipart/form-data'),
+    );
+
+    stopwatch.stop();
+    final sessionData = response.data['data'];
+    final sessionId = sessionData != null ? sessionData['id'] : 'unknown';
+    AppLogger.info(
+      'Image upload completed in ${stopwatch.elapsedMilliseconds}ms. Created scan session: $sessionId',
     );
 
     return ScanSessionModel.fromJson(response.data['data']);

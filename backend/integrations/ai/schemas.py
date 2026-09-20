@@ -9,34 +9,34 @@ GROCERY_SCAN_SCHEMA = {
                 "type": "OBJECT",
                 "properties": {
                     "name": {"type": "STRING"},
-                    "brand": {"type": "STRING"},
-                    "description": {"type": "STRING"},
+                    "brand": {"type": "STRING", "nullable": True},
+                    "description": {"type": "STRING", "nullable": True},
                     "category": {"type": "STRING"},
                     "icon_key": {"type": "STRING"},
                     "quantity": {"type": "NUMBER"},
                     "unit": {
                         "type": "STRING",
-                        "enum": ["kg", "g", "L", "ml", "pcs", "pack", "bottle", "box", "dozen", "bunch", "packet"]
+                        "enum": ["kg", "g", "l", "L", "ml", "pcs", "pack", "bottle", "box", "dozen", "bunch", "packet"]
                     },
-                    "expiry_date": {"type": "STRING"}, # YYYY-MM-DD format
-                    "manufacturing_date": {"type": "STRING"}, # YYYY-MM-DD format
-                    "packed_date": {"type": "STRING"}, # YYYY-MM-DD format
-                    "best_before_date": {"type": "STRING"}, # YYYY-MM-DD format
+                    "expiry_date": {"type": "STRING", "nullable": True}, # YYYY-MM-DD format
+                    "manufacturing_date": {"type": "STRING", "nullable": True}, # YYYY-MM-DD format
+                    "packed_date": {"type": "STRING", "nullable": True}, # YYYY-MM-DD format
+                    "best_before_date": {"type": "STRING", "nullable": True}, # YYYY-MM-DD format
                     "date_type": {
                         "type": "STRING",
-                        "enum": ["expiry", "best_before", "use_by", "manufacturing", "packed", "unknown"]
+                        "enum": ["expiry", "best_before", "use_by", "manufacturing", "packed", "estimated", "unknown"]
                     },
                     "date_source": {
                         "type": "STRING",
-                        "enum": ["ocr_verified", "vision_detected", "calculated_from_packaging", "user_entered", "unknown"]
+                        "enum": ["ocr_verified", "vision_detected", "calculated_from_packaging", "calculated_shelf_life", "user_entered", "unknown"]
                     },
-                    "raw_date_text": {"type": "STRING"},
+                    "raw_date_text": {"type": "STRING", "nullable": True},
                     "storage_zone": {
                         "type": "STRING",
                         "enum": ["fridge", "freezer", "pantry", "counter", "cabinet", "basket", "spice"]
                     },
-                    "storage_reason": {"type": "STRING"},
-                    "shelf_life_guidance": {"type": "STRING"},
+                    "storage_reason": {"type": "STRING", "nullable": True},
+                    "shelf_life_guidance": {"type": "STRING", "nullable": True},
                     "confidence": {
                         "type": "STRING",
                         "enum": ["High", "Medium", "Low"]
@@ -51,7 +51,7 @@ GROCERY_SCAN_SCHEMA = {
                         "items": {"type": "STRING"}
                     }
                 },
-                "required": ["name", "brand", "description", "category", "icon_key", "quantity", "unit", "storage_zone", "confidence", "warnings"]
+                "required": ["name", "category", "icon_key", "quantity", "unit", "storage_zone", "confidence", "warnings"]
             }
         }
     },

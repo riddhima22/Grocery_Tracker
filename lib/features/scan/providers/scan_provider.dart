@@ -15,6 +15,8 @@ class ScanProvider extends ChangeNotifier {
   final List<XFile> _selectedImages = [];
   ScanUIState _uiState = ScanUIState.idle;
   String? _errorMessage;
+  String _scanStageMessage = 'Uploading image...';
+  double _scanProgress = 0.2;
   
   ScanSessionModel? _currentSession;
   List<ScanCandidateModel> _candidates = [];
@@ -26,6 +28,8 @@ class ScanProvider extends ChangeNotifier {
   List<XFile> get selectedImages => _selectedImages;
   ScanUIState get uiState => _uiState;
   String? get errorMessage => _errorMessage;
+  String get scanStageMessage => _scanStageMessage;
+  double get scanProgress => _scanProgress;
   ScanSessionModel? get currentSession => _currentSession;
   List<ScanCandidateModel> get candidates => _candidates;
   Map<String, bool> get candidateSelection => _candidateSelection;
@@ -43,31 +47,40 @@ class ScanProvider extends ChangeNotifier {
   }
 
   void clearImages() {
+    _stopPolling();
     _selectedImages.clear();
     _candidates.clear();
     _candidateSelection.clear();
-    _uiState = ScanUIState.idle;
+    _currentSession = null;
     _errorMessage = null;
-    _stopPolling();
+    _scanStageMessage = 'Uploading image...';
+    _scanProgress = 0.0;
+    _uiState = ScanUIState.idle;
     notifyListeners();
   }
 
   Future<void> startAnalysis() async {
     if (_selectedImages.isEmpty) return;
     
+    _stopPolling();
     _uiState = ScanUIState.uploading;
     _errorMessage = null;
+    _scanStageMessage = 'Uploading image...';
+    _scanProgress = 0.25;
     notifyListeners();
 
     try {
-      // 1. Upload files to Django and start session
+      // 1. Upload files to backend and create session
       _currentSession = await _scanRepository.createScanSession(_selectedImages);
       _uiState = ScanUIState.analyzing;
+      _scanStageMessage = 'Analyzing image...';
+      _scanProgress = 0.50;
       notifyListeners();
 
       // 2. Start polling session progress status
       _startPolling();
-    } catch (e) {
+    } catch (e, stack) {
+      AppLogger.error('Failed to start scan analysis', e, stack);
       _errorMessage = e.toString();
       _uiState = ScanUIState.error;
       notifyListeners();
@@ -78,7 +91,7 @@ class ScanProvider extends ChangeNotifier {
     _stopPolling();
     
     int attempts = 0;
-    const maxAttempts = 60; // Max 120 seconds (2s interval)
+    const maxAttempts = 45; // Max 90 seconds (2s interval)
     
     _pollingTimer = Timer.periodic(const Duration(seconds: 2), (timer) async {
       if (_currentSession == null) {
@@ -87,9 +100,21 @@ class ScanProvider extends ChangeNotifier {
       }
       
       attempts++;
+
+      // Update progressive UI messages based on elapsed time
+      if (attempts == 3) {
+        _scanStageMessage = 'Identifying items...';
+        _scanProgress = 0.70;
+        notifyListeners();
+      } else if (attempts == 7) {
+        _scanStageMessage = 'Almost done...';
+        _scanProgress = 0.88;
+        notifyListeners();
+      }
+
       if (attempts > maxAttempts) {
         timer.cancel();
-        _errorMessage = "Analysis timed out. Please try again.";
+        _errorMessage = "Analysis is taking longer than expected. Please try again.";
         _uiState = ScanUIState.error;
         notifyListeners();
         return;
@@ -101,8 +126,11 @@ class ScanProvider extends ChangeNotifier {
         
         if (session.status == 'completed' || session.status == 'partial_success' || session.status == 'partial') {
           timer.cancel();
-          // Load candidates
+          _scanProgress = 1.0;
+          
+          // Load detected candidates
           _candidates = await _scanRepository.getCandidates(session.id);
+          AppLogger.info('Scan completed for session ${session.id}: found ${_candidates.length} item(s)');
           
           // Default all candidates to selected
           for (var c in _candidates) {
@@ -117,13 +145,16 @@ class ScanProvider extends ChangeNotifier {
             (img) => img.errorMessage.isNotEmpty,
             orElse: () => const ScanImageModel(id: '', status: '', errorMessage: ''),
           ).errorMessage;
-          _errorMessage = firstError.isNotEmpty ? firstError : "Image analysis failed. Please try a clearer picture.";
+          
+          _errorMessage = firstError.isNotEmpty 
+              ? firstError 
+              : "Analysis could not identify grocery items. Please try a clearer picture.";
           _uiState = ScanUIState.error;
           notifyListeners();
         }
       } catch (e) {
-        // Log error but keep polling until timeout
-        AppLogger.error('Error polling session status', e);
+        // Log error but keep polling until max attempts
+        AppLogger.warning('Polling session status attempt $attempts error: $e');
       }
     });
   }

@@ -30,6 +30,10 @@ class ScanSessionViewSet(viewsets.ReadOnlyModelViewSet):
 
         # Validate total request size
         total_size = sum(img.size for img in images_files)
+        import logging
+        logging.getLogger('freshtrack.scans.views').info(
+            f"Received scan upload request with {len(images_files)} image(s) ({total_size / 1024:.1f} KB total) from user {request.user}"
+        )
         if total_size > 20 * 1024 * 1024: # 20MB limit
             return Response({"success": False, "error": "Total upload size exceeds 20MB limit."}, status=400)
 
@@ -76,13 +80,13 @@ class ScanSessionViewSet(viewsets.ReadOnlyModelViewSet):
         task_logger = logging.getLogger('freshtrack.scans.views')
         try:
             threading.Thread(
-                target=process_scan_session_task,
-                args=(str(session.id),),
+                target=process_scan_session_task.apply,
+                kwargs={'args': (str(session.id),)},
                 daemon=True
             ).start()
         except Exception as thread_err:
             task_logger.error(f"Thread start failed for session {session.id}: {thread_err}")
-            process_scan_session_task(str(session.id))
+            process_scan_session_task.apply(args=(str(session.id),))
 
         return Response({
             "success": True,

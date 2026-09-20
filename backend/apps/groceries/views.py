@@ -308,38 +308,43 @@ class GroceryItemViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='ai-insights')
     def ai_insights(self, request):
-        from django.db.models import Avg
         user = request.user
-        items = GroceryItem.objects.filter(user=user).exclude(quantity=0)
+        # Single efficient database query fetching only required fields
+        items = list(
+            GroceryItem.objects.filter(user=user)
+            .exclude(quantity=0)
+            .only('name', 'status', 'category', 'freshness_score')
+        )
         
         insights = []
         
+        # In-memory partitioning to eliminate 8+ redundant DB network queries
+        expiring_items = [item for item in items if item.status == 'expiring']
+        expired_items = [item for item in items if item.status == 'expired']
+        categories = {item.category.lower() for item in items if item.category}
+        
         # 1. Check expiring soon
-        expiring = items.filter(status='expiring')
-        if expiring.exists():
-            names = [item.name for item in expiring[:3]]
-            if len(expiring) > 3:
-                insights.append(f"You have {expiring.count()} items expiring soon, including {', '.join(names)}, and others.")
+        if expiring_items:
+            names = [item.name for item in expiring_items[:3]]
+            if len(expiring_items) > 3:
+                insights.append(f"You have {len(expiring_items)} items expiring soon, including {', '.join(names)}, and others.")
             else:
                 insights.append(f"You have items expiring soon: {', '.join(names)}.")
         
         # 2. Check expired
-        expired = items.filter(status='expired')
-        if expired.exists():
-            insights.append(f"Warning: {expired.count()} items have already expired. Please clear them out to keep your kitchen clean.")
+        if expired_items:
+            insights.append(f"Warning: {len(expired_items)} items have already expired. Please clear them out to keep your kitchen clean.")
         
         # 3. Dynamic conservation advice
-        categories = items.values_list('category', flat=True).distinct()
-        cat_lower = [c.lower() for c in categories]
-        if 'fruits' in cat_lower or 'fruit' in cat_lower:
+        if 'fruits' in categories or 'fruit' in categories:
             insights.append("Keeping bananas separate from other fruits prevents ethylene gas from ripening them too quickly.")
-        if 'vegetables' in cat_lower or 'vegetable' in cat_lower:
+        if 'vegetables' in categories or 'vegetable' in categories:
             insights.append("Store leafy greens with a paper towel inside a sealed bag in the crisper drawer to absorb excess moisture.")
-        if 'dairy' in cat_lower:
+        if 'dairy' in categories:
             insights.append("Avoid storing milk in the refrigerator door; temperature fluctuations there accelerate spoilage.")
 
         # 4. Wastage estimate
-        total_expiring = expiring.count()
+        total_expiring = len(expiring_items)
         estimated_waste_value = total_expiring * 65  # Mock ₹65 per expiring item
         if estimated_waste_value > 0:
             insights.append(f"You may waste ₹{estimated_waste_value} worth of groceries this week if they are not consumed.")
@@ -351,8 +356,10 @@ class GroceryItemViewSet(viewsets.ModelViewSet):
                 "Planning meals around your expiring list saves money and reduces waste."
             ]
 
-        avg_freshness = items.aggregate(avg=Avg('freshness_score'))['avg']
-        freshness_score = int(avg_freshness) if avg_freshness is not None else 100
+        if items:
+            freshness_score = int(sum(item.freshness_score for item in items) / len(items))
+        else:
+            freshness_score = 100
 
         return Response({
             "success": True,
