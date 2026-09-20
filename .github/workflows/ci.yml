@@ -60,6 +60,7 @@ jobs:
           REDIS_URL: redis://localhost:6379/0
         run: |
           cd backend
+          python manage.py migrate --settings=config.settings.development
           python manage.py test --settings=config.settings.development
 
   flutter-test:
