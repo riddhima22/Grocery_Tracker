@@ -1,4 +1,5 @@
 import io
+import os
 import logging
 from django.conf import settings
 from google.cloud import vision
@@ -11,6 +12,13 @@ class GoogleCloudVisionOCR(OCRService):
         self.enabled = getattr(settings, 'OCR_ENABLED', True)
         self.client = None
         if self.enabled:
+            # Check if credentials file actually exists before attempting ADC initialization
+            creds_file = getattr(settings, 'GOOGLE_APPLICATION_CREDENTIALS', None) or os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
+            if not creds_file or not os.path.exists(creds_file):
+                logger.info("GOOGLE_APPLICATION_CREDENTIALS not configured or file not found. OCR skipped.")
+                self.enabled = False
+                return
+
             try:
                 # Initializes client using GOOGLE_APPLICATION_CREDENTIALS automatically from env
                 self.client = vision.ImageAnnotatorClient()

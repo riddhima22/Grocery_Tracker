@@ -214,7 +214,11 @@ class _LoginViewState extends State<LoginView> {
                   AppGap.sm(context),
 
                   // Sign In Button
-                  AppButton(text: 'Sign In', onPressed: _submit),
+                  AppButton(
+                    text: 'Sign In',
+                    isLoading: auth.isLoading,
+                    onPressed: auth.isLoading ? null : _submit,
+                  ),
                   AppGap.md(context),
 
                   // Divider
@@ -238,7 +242,8 @@ class _LoginViewState extends State<LoginView> {
                   // Third-party buttons
                   AppButton(
                     text: 'Continue with Google',
-                    onPressed: _handleGoogleSignIn,
+                    isLoading: auth.isLoading,
+                    onPressed: auth.isLoading ? null : _handleGoogleSignIn,
                     style: AppButtonStyle.secondary,
                     icon: Icons.g_mobiledata_rounded,
                   ),

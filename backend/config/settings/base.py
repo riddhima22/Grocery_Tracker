@@ -80,6 +80,8 @@ ASGI_APPLICATION = 'config.asgi.application'
 DATABASES = {
     'default': env.db('DATABASE_URL', default=f'sqlite:///{BASE_DIR}/db.sqlite3')
 }
+# Enable persistent DB connections to reduce latency on remote PostgreSQL (Neon/Render)
+DATABASES['default']['CONN_MAX_AGE'] = env.int('DB_CONN_MAX_AGE', default=600)
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -172,6 +174,8 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
+CELERY_TASK_ALWAYS_EAGER = env.bool('CELERY_TASK_ALWAYS_EAGER', default=True)
+CELERY_TASK_EAGER_PROPAGATES = True
 
 # Gemini configuration
 GEMINI_API_KEY = env('GEMINI_API_KEY', default='')

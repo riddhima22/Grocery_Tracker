@@ -79,8 +79,12 @@ def is_transient_error(exc: Exception) -> bool:
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=10)
-def process_scan_session_task(self, session_id):
-    logger.info(f"Starting Celery scan processing task for session {session_id}")
+def process_scan_session_task(self, session_id=None):
+    # Support both task.delay(session_id) and direct thread execution
+    if session_id is None and isinstance(self, (str, int)):
+        session_id = self
+
+    logger.info(f"Starting scan processing task for session {session_id}")
     try:
         session = ScanSession.objects.get(id=session_id)
     except ScanSession.DoesNotExist:

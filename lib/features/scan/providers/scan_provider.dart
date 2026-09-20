@@ -78,7 +78,7 @@ class ScanProvider extends ChangeNotifier {
     _stopPolling();
     
     int attempts = 0;
-    const maxAttempts = 30; // Max 60 seconds (2s interval)
+    const maxAttempts = 60; // Max 120 seconds (2s interval)
     
     _pollingTimer = Timer.periodic(const Duration(seconds: 2), (timer) async {
       if (_currentSession == null) {

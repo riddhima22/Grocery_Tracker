@@ -67,32 +67,22 @@ class ScanSessionViewSet(viewsets.ReadOnlyModelViewSet):
                     status=ScanImage.Statuses.PENDING
                 )
 
-        # Spawn background task.
-        # Uses Celery if available, and gracefully falls back to a daemon thread
+        # Spawn background processing task.
+        # Run directly in a daemon thread so it succeeds on single-service deployments
+        # like Render without requiring a separate Celery worker container.
         import threading
         import logging
-        from django.conf import settings
         
         task_logger = logging.getLogger('freshtrack.scans.views')
-
-        if getattr(settings, 'CELERY_TASK_ALWAYS_EAGER', False):
+        try:
             threading.Thread(
                 target=process_scan_session_task,
                 args=(str(session.id),),
                 daemon=True
             ).start()
-        else:
-            try:
-                process_scan_session_task.delay(str(session.id))
-            except Exception as celery_err:
-                task_logger.warning(
-                    f"Celery queue unavailable ({celery_err}). Falling back to daemon thread for scan session {session.id}."
-                )
-                threading.Thread(
-                    target=process_scan_session_task,
-                    args=(str(session.id),),
-                    daemon=True
-                ).start()
+        except Exception as thread_err:
+            task_logger.error(f"Thread start failed for session {session.id}: {thread_err}")
+            process_scan_session_task(str(session.id))
 
         return Response({
             "success": True,

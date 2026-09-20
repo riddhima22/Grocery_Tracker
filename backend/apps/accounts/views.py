@@ -132,6 +132,7 @@ class ResendVerificationView(APIView):
 class GoogleLoginView(APIView):
     authentication_classes = ()
     permission_classes = (AllowAny,)
+    throttle_classes = ()
 
     def post(self, request):
         token = request.data.get('token')
@@ -146,7 +147,7 @@ class GoogleLoginView(APIView):
             try:
                 import firebase_admin
                 from firebase_admin import auth as firebase_auth
-                if firebase_admin._apps:
+                if getattr(firebase_admin, '_apps', None):
                     decoded_token = firebase_auth.verify_id_token(token)
                     email = decoded_token.get('email', email)
                     name = decoded_token.get('name', name)
@@ -175,7 +176,7 @@ class GoogleLoginView(APIView):
         user, created = User.objects.get_or_create(
             email=email,
             defaults={
-                'display_name': name,
+                'display_name': name or 'Google User',
                 'email_verified': True,
             }
         )
@@ -197,6 +198,7 @@ class GoogleLoginView(APIView):
 class AppleLoginView(APIView):
     authentication_classes = ()
     permission_classes = (AllowAny,)
+    throttle_classes = ()
 
     def post(self, request):
         token = request.data.get('token')

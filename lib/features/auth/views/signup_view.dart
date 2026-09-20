@@ -222,7 +222,8 @@ class _SignupViewState extends State<SignupView> {
                   
                   AppButton(
                     text: 'Create Account',
-                    onPressed: _submit,
+                    isLoading: auth.isLoading,
+                    onPressed: auth.isLoading ? null : _submit,
                   ),
                   
                   AppGap.sm(context),

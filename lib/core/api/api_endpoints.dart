@@ -3,6 +3,9 @@ import '../../config/app_config.dart';
 class ApiEndpoints {
   static const String baseUrl = AppConfig.baseUrl;
 
+  // Health check & warm-up
+  static const String health = '/health/';
+
   // Authentication
   static const String register = '/auth/register/';
   static const String login = '/auth/login/';

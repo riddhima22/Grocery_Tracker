@@ -18,8 +18,9 @@ class ApiClient {
     _dio = Dio(
       BaseOptions(
         baseUrl: ApiEndpoints.baseUrl,
-        connectTimeout: const Duration(seconds: 30),
-        receiveTimeout: const Duration(seconds: 45),
+        connectTimeout: const Duration(seconds: 90),
+        receiveTimeout: const Duration(seconds: 90),
+        sendTimeout: const Duration(seconds: 60),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -32,8 +33,22 @@ class ApiClient {
     ]);
   }
 
+  /// Asynchronously pre-warms the backend (e.g. waking it from Render free-tier sleep)
+  /// without blocking the UI.
+  Future<void> warmUp() async {
+    try {
+      await _dio.get(
+        ApiEndpoints.health,
+        options: Options(validateStatus: (status) => status != null && status < 500),
+      );
+    } catch (_) {
+      // Best effort background wakeup ping
+    }
+  }
+
   static bool _isPublicEndpoint(String path) {
     final publicEndpoints = [
+      ApiEndpoints.health,
       ApiEndpoints.login,
       ApiEndpoints.register,
       ApiEndpoints.refresh,
@@ -57,21 +72,47 @@ class ApiClient {
           handler.next(options);
         },
         onError: (err, handler) async {
-          final path = err.requestOptions.path;
-          // Only trigger token refresh on authenticated endpoints (not public login/register)
+          final options = err.requestOptions;
+          final path = options.path;
+
+          // 1. Cold start / server timeout auto-retry (e.g. Render waking up)
+          final isTimeoutOrNetworkError =
+              err.type == DioExceptionType.receiveTimeout ||
+              err.type == DioExceptionType.connectionTimeout ||
+              err.type == DioExceptionType.connectionError ||
+              (err.response?.statusCode != null &&
+                  [502, 503, 504].contains(err.response!.statusCode));
+
+          if (isTimeoutOrNetworkError && options.extra['isColdStartRetry'] != true) {
+            options.extra['isColdStartRetry'] = true;
+            AppLogger.warning(
+              'Server latency or cold start on $path (${err.type}). Retrying request in 2s...',
+            );
+            await Future.delayed(const Duration(seconds: 2));
+            try {
+              final response = await _dio.fetch(options);
+              return handler.resolve(response);
+            } catch (retryErr) {
+              if (retryErr is DioException) {
+                return handler.next(retryErr);
+              }
+            }
+          }
+
+          // 2. Token refresh on 401
           if (err.response?.statusCode == 401 &&
               !_isPublicEndpoint(path) &&
-              err.requestOptions.extra['isRetry'] != true) {
+              options.extra['isRetry'] != true) {
             AppLogger.warning('Received 401 Unauthorized on $path. Attempting token refresh...');
-            err.requestOptions.extra['isRetry'] = true;
+            options.extra['isRetry'] = true;
             
             try {
               final newAccessToken = await TokenRefreshManager().refreshAccessToken();
               if (newAccessToken != null) {
                 // Update Authorization header with the new token
-                err.requestOptions.headers['Authorization'] = 'Bearer $newAccessToken';
+                options.headers['Authorization'] = 'Bearer $newAccessToken';
                 // Clone and retry request
-                final response = await _dio.fetch(err.requestOptions);
+                final response = await _dio.fetch(options);
                 return handler.resolve(response);
               }
             } catch (e) {
