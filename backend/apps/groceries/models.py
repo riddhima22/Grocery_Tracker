@@ -104,11 +104,22 @@ class GroceryItem(models.Model):
         ]
 
     def save(self, *args, **kwargs):
+        import datetime
+        # Ensure all calendar DateFields are pure datetime.date instances (not datetime.datetime)
+        for date_field in (
+            'expiry_date', 'manufacturing_date', 'packed_date',
+            'best_before_date', 'purchase_date', 'predicted_expiry',
+            'recommended_consumption_date'
+        ):
+            val = getattr(self, date_field, None)
+            if isinstance(val, datetime.datetime):
+                setattr(self, date_field, val.date())
+
         # Calculate status server-side
         if self.expiry_date is None:
             self.status = 'fresh'
         else:
-            days_left = (self.expiry_date - timezone.now().date()).days
+            days_left = (self.expiry_date - timezone.localdate()).days
             if days_left < 0:
                 self.status = 'expired'
             elif days_left <= 3:

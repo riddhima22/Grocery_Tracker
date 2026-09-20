@@ -17,6 +17,7 @@ import '../../../core/services/ai_search_service.dart';
 import '../../../data/local/cache_manager.dart';
 import '../../kitchen/views/kitchen_item_detail_view.dart';
 import '../../meals/views/meal_log_view.dart';
+import '../widgets/dashboard_analytics_section.dart';
 
 class DashboardView extends StatefulWidget {
   const DashboardView({super.key});
@@ -35,7 +36,6 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
   List<String> _insights = [];
   double _wasteRisk = 0.0;
   int _freshnessScore = 100;
-  bool _isLoadingInsights = false;
   String _searchQuery = '';
 
   @override
@@ -149,10 +149,6 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
   }
 
   Future<void> _loadAIInsights({bool force = false}) async {
-    if (_insights.isEmpty && mounted) {
-      setState(() => _isLoadingInsights = true);
-    }
-    
     try {
       final data = await _aiService.fetchAIInsights();
       if (mounted) {
@@ -162,15 +158,12 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
             _insights = newInsights;
             _wasteRisk = double.tryParse(data['waste_risk']?.toString() ?? '0.0') ?? _wasteRisk;
             _freshnessScore = data['freshness_score'] ?? _freshnessScore;
-            _isLoadingInsights = false;
           });
           // Cache in background
           _cacheManager.saveAIInsights(data);
         }
       }
-    } catch (_) {
-      if (mounted) setState(() => _isLoadingInsights = false);
-    }
+    } catch (_) {}
   }
 
   String _getGreeting() {
@@ -270,13 +263,20 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
                                AppGap.sm(context),
                              ],
 
-                             // AI Natural Language Insights Panel
-                             _buildAIInsightsCarousel(),
-                             AppGap.md(context),
-
-                             // Stats Grid & Utilization Chart
-                             _buildDashboardAnalyticsSection(kitchen),
-                             AppGap.md(context),
+                              // AI Dashboard Analytics & Smart Insights Suite
+                              AnimatedBuilder(
+                                animation: _chartController,
+                                builder: (context, _) {
+                                  return DashboardAnalyticsSection(
+                                    kitchen: kitchen,
+                                    insights: _insights,
+                                    wasteRisk: _wasteRisk,
+                                    freshnessScore: _freshnessScore,
+                                    animation: _chartController,
+                                  );
+                                },
+                              ),
+                              AppGap.md(context),
 
                              // Upcoming Expiry (Filtered by AI search query)
                              AppSectionHeader(
@@ -495,170 +495,6 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
     );
   }
 
-  Widget _buildAIInsightsCarousel() {
-    if (_isLoadingInsights && _insights.isEmpty) {
-      return Shimmer.fromColors(
-        baseColor: AppColors.card,
-        highlightColor: AppColors.surface,
-        child: Container(
-          height: 110,
-          decoration: BoxDecoration(
-            color: AppColors.card,
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      );
-    }
-
-    if (_insights.isEmpty) return const SizedBox();
-
-    return Container(
-      padding: EdgeInsets.all(AppSpacing.md(context)),
-      decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(AppRadius.card(context)),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.15)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.insights, color: AppColors.primary, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                'AI Smart Insights',
-                style: AppTextStyles.labelMedium(context).copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          SizedBox(
-            height: context.scaleHeight(75.0),
-            child: PageView.builder(
-              itemCount: _insights.length,
-              itemBuilder: (context, index) {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    child: Text(
-                      _insights[index],
-                      style: AppTextStyles.bodyMedium(context).copyWith(height: 1.3),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-          Align(
-            alignment: Alignment.bottomRight,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Swipe for more',
-                  style: AppTextStyles.caption(context).copyWith(color: AppColors.primary, fontSize: 10),
-                ),
-                const SizedBox(width: 4),
-                const Icon(Icons.arrow_forward, size: 10, color: AppColors.primary),
-              ],
-            ),
-          )
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDashboardAnalyticsSection(KitchenProvider kitchen) {
-    return Container(
-      padding: EdgeInsets.all(AppSpacing.md(context)),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(AppRadius.card(context)),
-        border: Border.all(color: AppColors.cardBorder),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Storage Health & Analytics', style: AppTextStyles.labelMedium(context)),
-          AppGap.md(context),
-
-          // Side-by-side circular charts and metrics
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final availableWidth = constraints.maxWidth;
-              final healthSize = availableWidth * 0.35;
-              final utilWidth = availableWidth * 0.45;
-              final utilHeight = healthSize;
-              return Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  // Custom Canvas Storage health circular chart
-                  Flexible(
-                    flex: 3,
-                    child: CustomPaint(
-                      size: Size(healthSize, healthSize),
-                      painter: _StorageHealthPainter(
-                        fresh: kitchen.totalItems - kitchen.expiringCount - kitchen.expiredCount,
-                        expiring: kitchen.expiringCount,
-                        expired: kitchen.expiredCount,
-                        animationValue: _chartController.value,
-                      ),
-                    ),
-                  ),
-                  
-                  // Custom Canvas Storage utilization bar chart
-                  Flexible(
-                    flex: 4,
-                    child: CustomPaint(
-                      size: Size(utilWidth, utilHeight),
-                      painter: _StorageUtilizationPainter(
-                        fridge: kitchen.fridgeItems.length,
-                        freezer: kitchen.freezerItems.length,
-                        pantry: kitchen.pantryItems.length,
-                        animationValue: _chartController.value,
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-          AppGap.md(context),
-
-          // Metrics row (Money saved, Freshness score, Waste risk)
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _buildAnalyticsMetric('Freshness', '$_freshnessScore%', AppColors.success),
-              _buildAnalyticsMetric('Saved', '₹${kitchen.items.length * 40}', AppColors.primary),
-              _buildAnalyticsMetric('Waste Risk', '₹${_wasteRisk.toInt()}', AppColors.danger),
-            ],
-          )
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAnalyticsMetric(String label, String value, Color color) {
-    return Column(
-      children: [
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Text(
-            value,
-            style: AppTextStyles.headingLarge(context).copyWith(color: color, fontSize: 18.0),
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          label,
-          style: AppTextStyles.caption(context).copyWith(color: AppColors.textSecondary),
-        ),
-      ],
-    );
-  }
 
   Widget _buildShimmerLoading() {
     return Shimmer.fromColors(
@@ -678,145 +514,4 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
       ),
     );
   }
-}
-
-// Custom painter to render animated storage health ring
-class _StorageHealthPainter extends CustomPainter {
-  final int fresh;
-  final int expiring;
-  final int expired;
-  final double animationValue;
-
-  _StorageHealthPainter({
-    required this.fresh,
-    required this.expiring,
-    required this.expired,
-    required this.animationValue,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final double center = size.width / 2;
-    final double radius = (size.width - 12) / 2;
-    final Rect rect = Rect.fromCircle(center: Offset(center, center), radius: radius);
-    const double strokeWidth = 8.0;
-
-    final Paint bgPaint = Paint()
-      ..color = AppColors.cardBorder
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth;
-
-    canvas.drawCircle(Offset(center, center), radius, bgPaint);
-
-    final int total = fresh + expiring + expired;
-    if (total == 0) return;
-
-    double startAngle = -1.57; // start top
-
-    final double freshSweep = (fresh / total) * 6.28 * animationValue;
-    final double expiringSweep = (expiring / total) * 6.28 * animationValue;
-    final double expiredSweep = (expired / total) * 6.28 * animationValue;
-
-    if (fresh > 0) {
-      final Paint freshPaint = Paint()
-        ..color = AppColors.success
-        ..style = PaintingStyle.stroke
-        ..strokeCap = StrokeCap.round
-        ..strokeWidth = strokeWidth;
-      canvas.drawArc(rect, startAngle, freshSweep, false, freshPaint);
-      startAngle += freshSweep;
-    }
-
-    if (expiring > 0) {
-      final Paint expiringPaint = Paint()
-        ..color = AppColors.warning
-        ..style = PaintingStyle.stroke
-        ..strokeCap = StrokeCap.round
-        ..strokeWidth = strokeWidth;
-      canvas.drawArc(rect, startAngle, expiringSweep, false, expiringPaint);
-      startAngle += expiringSweep;
-    }
-
-    if (expired > 0) {
-      final Paint expiredPaint = Paint()
-        ..color = AppColors.danger
-        ..style = PaintingStyle.stroke
-        ..strokeCap = StrokeCap.round
-        ..strokeWidth = strokeWidth;
-      canvas.drawArc(rect, startAngle, expiredSweep, false, expiredPaint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
-}
-
-// Custom painter to render animated storage utilization bars
-class _StorageUtilizationPainter extends CustomPainter {
-  final int fridge;
-  final int freezer;
-  final int pantry;
-  final double animationValue;
-
-  _StorageUtilizationPainter({
-    required this.fridge,
-    required this.freezer,
-    required this.pantry,
-    required this.animationValue,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final double W = size.width;
-    final double H = size.height;
-    
-    final int maxVal = [fridge, freezer, pantry, 1].reduce((a, b) => a > b ? a : b);
-
-    final double fridgeHeight = (fridge / maxVal) * (H - 20) * animationValue;
-    final double freezerHeight = (freezer / maxVal) * (H - 20) * animationValue;
-    final double pantryHeight = (pantry / maxVal) * (H - 20) * animationValue;
-
-    final double barWidth = W / 5;
-    final double spacing = W / 10;
-
-    final Paint barPaint = Paint()
-      ..color = AppColors.primary
-      ..style = PaintingStyle.fill;
-
-    // Draw fridge bar
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(spacing, H - 15 - fridgeHeight, barWidth, fridgeHeight),
-        const Radius.circular(4),
-      ),
-      barPaint..color = AppColors.primary,
-    );
-
-    // Draw freezer bar
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(spacing * 2 + barWidth, H - 15 - freezerHeight, barWidth, freezerHeight),
-        const Radius.circular(4),
-      ),
-      barPaint..color = const Color(0xFF29B6F6),
-    );
-
-    // Draw pantry bar
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(spacing * 3 + barWidth * 2, H - 15 - pantryHeight, barWidth, pantryHeight),
-        const Radius.circular(4),
-      ),
-      barPaint..color = const Color(0xFFFFA726),
-    );
-
-    // Draw baseline
-    final Paint linePaint = Paint()
-      ..color = AppColors.cardBorder
-      ..strokeWidth = 1.5;
-    canvas.drawLine(Offset(0, H - 15), Offset(W, H - 15), linePaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }

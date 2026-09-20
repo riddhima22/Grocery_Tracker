@@ -50,6 +50,19 @@ class KitchenProvider extends ChangeNotifier {
   List<GroceryModel> get basketItems => _getItemsByZone('basket');
   List<GroceryModel> get spiceItems => _getItemsByZone('spice');
 
+  /// Immediately injects newly confirmed groceries from scan into state and cache
+  void addConfirmedGroceries(List<GroceryModel> newItems) {
+    if (newItems.isEmpty) return;
+    final existingIds = _items.where((e) => e.id.isNotEmpty).map((e) => e.id).toSet();
+    final toAdd = newItems.where((e) => e.id.isEmpty || !existingIds.contains(e.id)).toList();
+    if (toAdd.isNotEmpty) {
+      _items.insertAll(0, toAdd);
+      _cacheManager.saveGroceries(_items);
+      NotificationService().scheduleExpiryAlertsForItems(_items);
+      notifyListeners();
+    }
+  }
+
   /// Fetches kitchen items using a fast cache-first / stale-while-revalidate strategy.
   /// If cached data exists, it renders immediately (0ms) and refreshes in the background.
   Future<void> fetchKitchenItems({bool forceRefresh = false}) async {

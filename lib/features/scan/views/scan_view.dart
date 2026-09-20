@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'dart:io';
 import '../providers/scan_provider.dart';
 import '../../kitchen/providers/kitchen_provider.dart';
+import '../../home/views/home_shell.dart';
 import '../../../data/models/scan_candidate_model.dart';
 import '../../../core/services/image_picker_service.dart';
 import '../../../config/app_colors.dart';
@@ -342,6 +343,31 @@ class _ScanViewState extends State<ScanView> with SingleTickerProviderStateMixin
             ],
           ),
         ),
+        if (scan.errorMessage != null && scan.errorMessage!.isNotEmpty)
+          Container(
+            margin: EdgeInsets.symmetric(
+              horizontal: AppSpacing.md(context),
+              vertical: AppSpacing.xs(context),
+            ),
+            padding: EdgeInsets.all(AppSpacing.sm(context)),
+            decoration: BoxDecoration(
+              color: AppColors.danger.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(AppRadius.card(context) * 0.7),
+              border: Border.all(color: AppColors.danger.withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.error_outline_rounded, color: AppColors.danger, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    scan.errorMessage!,
+                    style: AppTextStyles.bodySmall(context).copyWith(color: AppColors.danger),
+                  ),
+                ),
+              ],
+            ),
+          ),
         const Divider(),
         
         Expanded(
@@ -361,6 +387,11 @@ class _ScanViewState extends State<ScanView> with SingleTickerProviderStateMixin
                 onQuantityChanged: (qty) {
                   scan.updateCandidate(candidate.id, {'quantity': qty});
                 },
+                onExpiryChanged: (date) {
+                  scan.updateCandidate(candidate.id, {
+                    'expiry_date': date.toIso8601String().substring(0, 10),
+                  });
+                },
                 onEdit: () {
                   _showEditCandidateDialog(candidate);
                 },
@@ -379,8 +410,8 @@ class _ScanViewState extends State<ScanView> with SingleTickerProviderStateMixin
             onPressed: () async {
               final success = await scan.confirmSelectedCandidates(context);
               if (success && mounted) {
-                // Fetch kitchen items to update list
-                context.read<KitchenProvider>().fetchKitchenItems();
+                // Fetch kitchen items with forceRefresh to update list & UI counts
+                context.read<KitchenProvider>().fetchKitchenItems(forceRefresh: true);
               }
             },
           ),
@@ -394,48 +425,97 @@ class _ScanViewState extends State<ScanView> with SingleTickerProviderStateMixin
     final brandController = TextEditingController(text: candidate.brand);
     final descController = TextEditingController(text: candidate.description);
     final zoneController = TextEditingController(text: candidate.storageZone);
+    DateTime? selectedExpiry = candidate.expiryDate;
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.card(ctx)),
-          side: const BorderSide(color: AppColors.cardBorder),
-        ),
-        title: Text('Edit Candidate Details', style: AppTextStyles.headingMedium(ctx)),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AppTextField(controller: nameController, label: 'Item Name'),
-              AppGap.sm(ctx),
-              AppTextField(controller: brandController, label: 'Brand Name'),
-              AppGap.sm(ctx),
-              AppTextField(controller: descController, label: 'Description', maxLines: 2),
-              AppGap.sm(ctx),
-              AppTextField(controller: zoneController, label: 'Storage Zone (fridge, pantry, basket etc.)'),
-            ],
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: AppColors.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.card(ctx)),
+            side: const BorderSide(color: AppColors.cardBorder),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('Cancel', style: AppTextStyles.labelMedium(ctx).copyWith(color: AppColors.textSecondary)),
+          title: Text('Edit Candidate Details', style: AppTextStyles.headingMedium(ctx)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AppTextField(controller: nameController, label: 'Item Name'),
+                AppGap.sm(ctx),
+                AppTextField(controller: brandController, label: 'Brand Name'),
+                AppGap.sm(ctx),
+                AppTextField(controller: descController, label: 'Description', maxLines: 2),
+                AppGap.sm(ctx),
+                AppTextField(controller: zoneController, label: 'Storage Zone (fridge, pantry, basket etc.)'),
+                AppGap.sm(ctx),
+                Text('Expiry Date', style: AppTextStyles.labelMedium(ctx)),
+                const SizedBox(height: 6),
+                InkWell(
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: selectedExpiry ?? DateTime.now().add(const Duration(days: 7)),
+                      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                      lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
+                    );
+                    if (picked != null) {
+                      setDialogState(() {
+                        selectedExpiry = picked;
+                      });
+                    }
+                  },
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: AppColors.card,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.cardBorder),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          selectedExpiry != null 
+                              ? selectedExpiry!.toIso8601String().substring(0, 10) 
+                              : 'Select Expiry Date',
+                          style: AppTextStyles.bodyMedium(ctx).copyWith(
+                            color: selectedExpiry != null ? AppColors.textPrimary : AppColors.textSecondary,
+                          ),
+                        ),
+                        const Icon(Icons.calendar_month, color: AppColors.primary, size: 20),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-          TextButton(
-            onPressed: () {
-              context.read<ScanProvider>().updateCandidate(candidate.id, {
-                'name': nameController.text,
-                'brand': brandController.text,
-                'description': descController.text,
-                'storage_zone': zoneController.text.toLowerCase().trim(),
-              });
-              Navigator.pop(ctx);
-            },
-            child: Text('Save', style: AppTextStyles.labelMedium(ctx).copyWith(color: AppColors.primary)),
-          )
-        ],
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text('Cancel', style: AppTextStyles.labelMedium(ctx).copyWith(color: AppColors.textSecondary)),
+            ),
+            TextButton(
+              onPressed: () {
+                final Map<String, dynamic> updateData = {
+                  'name': nameController.text,
+                  'brand': brandController.text,
+                  'description': descController.text,
+                  'storage_zone': zoneController.text.toLowerCase().trim(),
+                };
+                if (selectedExpiry != null) {
+                  updateData['expiry_date'] = selectedExpiry!.toIso8601String().substring(0, 10);
+                }
+                context.read<ScanProvider>().updateCandidate(candidate.id, updateData);
+                Navigator.pop(ctx);
+              },
+              child: Text('Save', style: AppTextStyles.labelMedium(ctx).copyWith(color: AppColors.primary)),
+            )
+          ],
+        ),
       ),
     );
   }
@@ -468,6 +548,8 @@ class _ScanViewState extends State<ScanView> with SingleTickerProviderStateMixin
               text: 'Go to Kitchen',
               onPressed: () {
                 scan.clearImages();
+                context.read<KitchenProvider>().fetchKitchenItems(forceRefresh: true);
+                HomeShell.switchTab(1);
               },
             ),
           ],

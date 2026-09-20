@@ -191,6 +191,10 @@ class _KitchenItemDetailViewState extends State<KitchenItemDetailView> with Sing
                 _buildHeaderPanel(freshnessColor),
                 AppGap.md(context),
 
+                // Description card
+                _buildDescriptionCard(),
+                AppGap.md(context),
+
                 // Freshness circular progress meter
                 _buildFreshnessMeter(freshnessColor),
                 AppGap.md(context),
@@ -305,6 +309,42 @@ class _KitchenItemDetailViewState extends State<KitchenItemDetailView> with Sing
               ],
             ),
           )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDescriptionCard() {
+    final desc = _currentItem.description.isNotEmpty 
+        ? _currentItem.description 
+        : 'Smart tracked ${_currentItem.category.toLowerCase()} item stored in ${_currentItem.storageZone.toLowerCase()} zone.';
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(AppSpacing.md(context)),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(AppRadius.card(context)),
+        border: Border.all(color: AppColors.cardBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.description_outlined, size: 16, color: AppColors.primary),
+              const SizedBox(width: 6),
+              Text(
+                'Description',
+                style: AppTextStyles.labelMedium(context).copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            desc,
+            style: AppTextStyles.bodyMedium(context).copyWith(height: 1.4),
+          ),
         ],
       ),
     );

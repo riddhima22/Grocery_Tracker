@@ -27,6 +27,8 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
       title: Text(
         title,
         style: AppTextStyles.headingMedium(context).copyWith(fontWeight: FontWeight.bold),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
       ),
       leading: showBackButton
           ? IconButton(

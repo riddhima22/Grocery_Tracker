@@ -68,6 +68,18 @@ class GroceryItemCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ],
+                    if (item.description.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        item.description,
+                        style: AppTextStyles.caption(context).copyWith(
+                          color: AppColors.textSecondary.withValues(alpha: 0.85),
+                          fontSize: 11,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                     const SizedBox(height: 4),
                     Text(
                       '${item.quantity} ${item.unit} • ${item.storageZone.toUpperCase()}',

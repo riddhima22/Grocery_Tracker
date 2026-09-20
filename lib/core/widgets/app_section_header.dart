@@ -20,9 +20,13 @@ class AppSectionHeader extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Text(
-          title,
-          style: AppTextStyles.headingMedium(context),
+        Expanded(
+          child: Text(
+            title,
+            style: AppTextStyles.headingMedium(context),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
         if (actionText != null && onActionPressed != null)
           TextButton(

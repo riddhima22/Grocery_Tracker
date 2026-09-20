@@ -32,25 +32,29 @@ class QuantityStepper extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        GestureDetector(
-          onTap: quantity <= min
-              ? null
-              : () {
-                  final val = (quantity - step).clamp(min, max);
-                  onChanged(double.parse(val.toStringAsFixed(2)));
-                },
-          behavior: HitTestBehavior.opaque,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 8.0),
-            child: Icon(
-              Icons.remove_circle_outline, 
-              size: AppIconSizes.md(context),
-              color: quantity <= min ? AppColors.textHint : AppColors.primary,
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(20),
+            onTap: quantity <= min
+                ? null
+                : () {
+                    final val = (quantity - step).clamp(min, max);
+                    onChanged(double.parse(val.toStringAsFixed(2)));
+                  },
+            child: Padding(
+              padding: const EdgeInsets.all(6.0),
+              child: Icon(
+                Icons.remove_circle_outline, 
+                size: AppIconSizes.md(context),
+                color: quantity <= min ? AppColors.textHint : AppColors.primary,
+              ),
             ),
           ),
         ),
         AppGap.xs(context),
-        GestureDetector(
+        InkWell(
+          borderRadius: BorderRadius.circular(AppRadius.chip(context) * 0.75),
           onTap: () => _showManualInputDialog(context),
           child: Container(
             padding: EdgeInsets.symmetric(horizontal: paddingH, vertical: paddingV),
@@ -66,20 +70,23 @@ class QuantityStepper extends StatelessWidget {
           ),
         ),
         AppGap.xs(context),
-        GestureDetector(
-          onTap: quantity >= max
-              ? null
-              : () {
-                  final val = (quantity + step).clamp(min, max);
-                  onChanged(double.parse(val.toStringAsFixed(2)));
-                },
-          behavior: HitTestBehavior.opaque,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 8.0),
-            child: Icon(
-              Icons.add_circle_outline, 
-              size: AppIconSizes.md(context),
-              color: quantity >= max ? AppColors.textHint : AppColors.primary,
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(20),
+            onTap: quantity >= max
+                ? null
+                : () {
+                    final val = (quantity + step).clamp(min, max);
+                    onChanged(double.parse(val.toStringAsFixed(2)));
+                  },
+            child: Padding(
+              padding: const EdgeInsets.all(6.0),
+              child: Icon(
+                Icons.add_circle_outline, 
+                size: AppIconSizes.md(context),
+                color: quantity >= max ? AppColors.textHint : AppColors.primary,
+              ),
             ),
           ),
         ),

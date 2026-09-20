@@ -28,8 +28,12 @@ class AppButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool disabled = onPressed == null || isLoading;
-    final double buttonH = context.scaleHeight(AppDimensions.buttonHeight);
+    final double buttonH = context.scaleHeight(AppDimensions.buttonHeight).clamp(46.0, 56.0);
     final double radius = AppRadius.card(context);
+    final EdgeInsets buttonPadding = EdgeInsets.symmetric(
+      horizontal: AppSpacing.sm(context),
+      vertical: AppSpacing.xs(context),
+    );
 
     switch (style) {
       case AppButtonStyle.outline:
@@ -39,6 +43,9 @@ class AppButton extends StatelessWidget {
           child: OutlinedButton(
             onPressed: disabled ? null : onPressed,
             style: OutlinedButton.styleFrom(
+              padding: buttonPadding,
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               side: BorderSide(
                 color: disabled
                     ? AppColors.cardBorder.withValues(alpha: 0.5)
@@ -58,6 +65,9 @@ class AppButton extends StatelessWidget {
           child: ElevatedButton(
             onPressed: disabled ? null : onPressed,
             style: ElevatedButton.styleFrom(
+              padding: buttonPadding,
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               backgroundColor: disabled
                   ? AppColors.danger.withValues(alpha: 0.5)
                   : AppColors.danger,
@@ -75,6 +85,9 @@ class AppButton extends StatelessWidget {
           child: ElevatedButton(
             onPressed: disabled ? null : onPressed,
             style: ElevatedButton.styleFrom(
+              padding: buttonPadding,
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               backgroundColor: disabled
                   ? AppColors.card.withValues(alpha: 0.5)
                   : AppColors.card,
@@ -98,6 +111,9 @@ class AppButton extends StatelessWidget {
           child: ElevatedButton(
             onPressed: disabled ? null : onPressed,
             style: ElevatedButton.styleFrom(
+              padding: buttonPadding,
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               backgroundColor: Colors.transparent,
               shadowColor: Colors.transparent,
               shape: RoundedRectangleBorder(
@@ -120,21 +136,36 @@ class AppButton extends StatelessWidget {
     }
 
     return Center(
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          if (icon != null) ...[
-            Icon(icon, size: AppIconSizes.md(context), color: textColor),
-            AppGap.xs(context),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 2.0),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: AppIconSizes.md(context), color: textColor),
+              SizedBox(width: AppSpacing.xs(context)),
+            ],
+            Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  text,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.labelMedium(
+                    context,
+                  ).copyWith(
+                    color: textColor,
+                    fontSize: context.scaleFont(15.0),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
           ],
-          Text(
-            text,
-            style: AppTextStyles.labelMedium(
-              context,
-            ).copyWith(color: textColor, fontSize: 16),
-          ),
-        ],
+        ),
       ),
     );
   }

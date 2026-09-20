@@ -11,12 +11,37 @@ import '../../../core/widgets/responsive_layout.dart';
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
 
+  static final ValueNotifier<int> activeTabNotifier = ValueNotifier<int>(0);
+  static void switchTab(int index) {
+    activeTabNotifier.value = index;
+  }
+
   @override
   State<HomeShell> createState() => _HomeShellState();
 }
 
 class _HomeShellState extends State<HomeShell> {
   int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    HomeShell.activeTabNotifier.addListener(_onTabNotification);
+  }
+
+  @override
+  void dispose() {
+    HomeShell.activeTabNotifier.removeListener(_onTabNotification);
+    super.dispose();
+  }
+
+  void _onTabNotification() {
+    if (mounted && _currentIndex != HomeShell.activeTabNotifier.value) {
+      setState(() {
+        _currentIndex = HomeShell.activeTabNotifier.value;
+      });
+    }
+  }
 
   final List<Widget> _pages = [
     const DashboardView(),

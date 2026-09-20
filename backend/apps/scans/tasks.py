@@ -194,27 +194,49 @@ def process_scan_session_task(self, session_id=None):
                 if not isinstance(warnings_list, list):
                     warnings_list = []
 
+                item_name = safe_str(item_data.get('name'), 'Unknown Item')[:150]
+                item_category = safe_str(item_data.get('category'), 'Vegetables')[:100]
+
+                # Resolve expiry date: use package date if extracted, otherwise compute realistic shelf life
+                expiry_dt = parse_date_str(item_data.get('expiry_date'))
+                date_type_val = safe_str(item_data.get('date_type'), 'unknown')[:30]
+                date_src_val = safe_str(item_data.get('date_source'), 'unknown')[:30]
+                raw_date_val = safe_str(item_data.get('raw_date_text'), '')
+                date_conf_val = safe_str(item_data.get('date_confidence'), 'Low')[:20]
+                shelf_guidance_val = safe_str(item_data.get('shelf_life_guidance'), '')
+
+                if expiry_dt is None:
+                    from apps.groceries.prediction_engine import calculate_item_shelf_life
+                    real_shelf_days = calculate_item_shelf_life(item_name, item_category, zone)
+                    expiry_dt = timezone.now().date() + datetime.timedelta(days=real_shelf_days)
+                    date_type_val = 'estimated'
+                    date_src_val = 'calculated_shelf_life'
+                    raw_date_val = f"Approx. {real_shelf_days} days shelf life ({zone})"
+                    date_conf_val = 'Medium'
+                    if not shelf_guidance_val:
+                        shelf_guidance_val = f"Estimated {real_shelf_days} days shelf life based on optimal {zone} storage."
+
                 ScanCandidate.objects.create(
                     scan_session=session,
                     source_image=source_image,
-                    name=safe_str(item_data.get('name'), 'Unknown Item')[:150],
+                    name=item_name,
                     brand=safe_str(item_data.get('brand'), '')[:100],
-                    description=safe_str(item_data.get('description'), ''),
+                    description=safe_str(item_data.get('description'), '') or f"Fresh {item_name} stored in {zone}.",
                     icon_key=icon_key[:50],
-                    category=safe_str(item_data.get('category'), 'Vegetables')[:100],
+                    category=item_category,
                     quantity=quantity,
                     unit=unit[:20],
                     storage_zone=zone[:20],
-                    expiry_date=parse_date_str(item_data.get('expiry_date')),
+                    expiry_date=expiry_dt,
                     manufacturing_date=parse_date_str(item_data.get('manufacturing_date')),
                     packed_date=parse_date_str(item_data.get('packed_date')),
                     best_before_date=parse_date_str(item_data.get('best_before_date')),
-                    date_type=safe_str(item_data.get('date_type'), 'unknown')[:30],
-                    date_source=safe_str(item_data.get('date_source'), 'unknown')[:30],
-                    date_confidence=safe_str(item_data.get('date_confidence'), 'Low')[:20],
-                    raw_date_text=safe_str(item_data.get('raw_date_text'), ''),
+                    date_type=date_type_val,
+                    date_source=date_src_val,
+                    date_confidence=date_conf_val,
+                    raw_date_text=raw_date_val,
                     storage_reason=safe_str(item_data.get('storage_reason'), ''),
-                    shelf_life_guidance=safe_str(item_data.get('shelf_life_guidance'), ''),
+                    shelf_life_guidance=shelf_guidance_val,
                     confidence=safe_str(item_data.get('confidence'), 'High')[:20],
                 )
                 candidate_count += 1

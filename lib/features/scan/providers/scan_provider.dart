@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 import '../../../data/models/scan_session_model.dart';
 import '../../../data/models/scan_candidate_model.dart';
+import '../../../data/models/grocery_model.dart';
 import '../../../data/repositories/scan_repository.dart';
 import '../../../core/utils/app_logger.dart';
+import '../../kitchen/providers/kitchen_provider.dart';
 
 enum ScanUIState { idle, selecting, uploading, analyzing, review, success, error }
 
@@ -20,6 +23,7 @@ class ScanProvider extends ChangeNotifier {
   
   ScanSessionModel? _currentSession;
   List<ScanCandidateModel> _candidates = [];
+  List<GroceryModel> _confirmedGroceries = [];
   
   // Selection map for confirming review candidates
   final Map<String, bool> _candidateSelection = {};
@@ -32,6 +36,7 @@ class ScanProvider extends ChangeNotifier {
   double get scanProgress => _scanProgress;
   ScanSessionModel? get currentSession => _currentSession;
   List<ScanCandidateModel> get candidates => _candidates;
+  List<GroceryModel> get confirmedGroceries => _confirmedGroceries;
   Map<String, bool> get candidateSelection => _candidateSelection;
 
   void addImages(List<XFile> files) {
@@ -170,11 +175,43 @@ class ScanProvider extends ChangeNotifier {
   }
 
   Future<void> updateCandidate(String id, Map<String, dynamic> data) async {
+    final index = _candidates.indexWhere((c) => c.id == id);
+    if (index != -1) {
+      final old = _candidates[index];
+      DateTime? newExpiry = old.expiryDate;
+      if (data.containsKey('expiry_date')) {
+        final exp = data['expiry_date'];
+        if (exp is DateTime) {
+          newExpiry = exp;
+        } else if (exp is String) {
+          newExpiry = DateTime.tryParse(exp);
+        } else if (exp == null) {
+          newExpiry = null;
+        }
+      }
+
+      double? newQty = old.quantity;
+      if (data.containsKey('quantity')) {
+        newQty = double.tryParse(data['quantity']?.toString() ?? '') ?? old.quantity;
+      }
+
+      _candidates[index] = old.copyWith(
+        name: data['name']?.toString(),
+        brand: data['brand']?.toString(),
+        description: data['description']?.toString(),
+        storageZone: data['storage_zone']?.toString(),
+        quantity: newQty,
+        expiryDate: newExpiry,
+      );
+      // Immediately notify UI for instant 0ms responsiveness
+      notifyListeners();
+    }
+
     try {
       final updated = await _scanRepository.updateCandidate(id, data);
-      final index = _candidates.indexWhere((c) => c.id == id);
-      if (index != -1) {
-        _candidates[index] = updated;
+      final idx = _candidates.indexWhere((c) => c.id == id);
+      if (idx != -1) {
+        _candidates[idx] = updated;
         notifyListeners();
       }
     } catch (e) {
@@ -191,31 +228,53 @@ class ScanProvider extends ChangeNotifier {
   }
 
   Future<bool> confirmSelectedCandidates(BuildContext context) async {
-    if (_currentSession == null) return false;
+    if (_candidates.isEmpty) return false;
 
-    final selectedIds = _candidates
-        .where((c) => _candidateSelection[c.id] == true)
+    final sessionId = _currentSession?.id ?? _candidates.first.scanSession;
+    if (sessionId.isEmpty) return false;
+
+    // Resolve selected IDs (any item not explicitly false is considered selected)
+    List<String> selectedIds = _candidates
+        .where((c) => (_candidateSelection[c.id] ?? true) == true)
         .map((c) => c.id)
         .toList();
 
-    if (selectedIds.isEmpty) return false;
+    // Fallback: If no candidate was checked, select all available candidates
+    if (selectedIds.isEmpty) {
+      selectedIds = _candidates.map((c) => c.id).toList();
+    }
 
-    _uiState = ScanUIState.uploading; // loading indicator
+    _uiState = ScanUIState.uploading;
+    _scanStageMessage = 'Saving items to your kitchen...';
+    _scanProgress = 0.85;
+    _errorMessage = null;
     notifyListeners();
 
     try {
       final idempotencyKey = const Uuid().v4();
-      await _scanRepository.confirmScan(
-        _currentSession!.id,
+      final confirmed = await _scanRepository.confirmScan(
+        sessionId,
         selectedIds,
         idempotencyKey,
       );
+
+      _confirmedGroceries = confirmed;
       _uiState = ScanUIState.success;
       notifyListeners();
+
+      // Immediately inject confirmed items into KitchenProvider and force refresh
+      if (context.mounted) {
+        final kitchen = context.read<KitchenProvider>();
+        if (confirmed.isNotEmpty) {
+          kitchen.addConfirmedGroceries(confirmed);
+        }
+        await kitchen.fetchKitchenItems(forceRefresh: true);
+      }
       return true;
-    } catch (e) {
-      _errorMessage = e.toString();
-      _uiState = ScanUIState.review; // fallback to review list with banner
+    } catch (e, stack) {
+      AppLogger.error('Failed to confirm scan candidates', e, stack);
+      _errorMessage = 'Failed to save items to kitchen: ${e.toString()}';
+      _uiState = ScanUIState.review;
       notifyListeners();
       return false;
     }

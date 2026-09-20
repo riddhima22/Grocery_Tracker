@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../providers/kitchen_provider.dart';
 import '../widgets/storage_zone_panel.dart';
+import '../widgets/kitchen_category_section.dart';
 import '../../../config/app_colors.dart';
 import '../../../config/app_spacing.dart';
 import '../../../config/app_radius.dart';
@@ -279,19 +280,17 @@ class _KitchenViewState extends State<KitchenView> {
                     ),
                   ),
                   
-                  // Zone summary cards
-                  SliverPadding(
-                    padding: EdgeInsets.all(AppSpacing.md(context)),
-                    sliver: SliverList(
-                      delegate: SliverChildListDelegate([
-                        _buildZoneSummaryRow('Fridge', kitchen.fridgeItems.length, 'fridge', Icons.kitchen_rounded),
-                        _buildZoneSummaryRow('Pantry', kitchen.pantryItems.length, 'pantry', Icons.all_inbox_rounded),
-                        _buildZoneSummaryRow('Basket', kitchen.basketItems.length, 'basket', Icons.shopping_basket_rounded),
-                        _buildZoneSummaryRow('Spices', kitchen.spiceItems.length, 'spice', Icons.grass_rounded),
-                        _buildZoneSummaryRow('Cabinet', kitchen.cabinetItems.length, 'cabinet', Icons.door_sliding_rounded),
-                        _buildZoneSummaryRow('Counter', kitchen.counterItems.length, 'counter', Icons.table_restaurant_rounded),
-                        _buildZoneSummaryRow('Freezer', kitchen.freezerItems.length, 'freezer', Icons.ac_unit_rounded),
-                      ]),
+                  // Redesigned Modern Kitchen Category Grid Section
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.only(
+                        top: AppSpacing.sm(context),
+                        bottom: AppSpacing.xl(context),
+                      ),
+                      child: KitchenCategorySection(
+                        kitchen: kitchen,
+                        onCategoryTap: _openZoneSheet,
+                      ),
                     ),
                   ),
                 ],
@@ -428,45 +427,6 @@ class _KitchenViewState extends State<KitchenView> {
           ),
         ),
       );
-
-  Widget _buildZoneSummaryRow(String label, int count, String zoneKey, IconData icon) {
-    return Card(
-      color: AppColors.card,
-      margin: EdgeInsets.symmetric(vertical: AppSpacing.xxs(context)),
-      child: InkWell(
-        onTap: () => _openZoneSheet(zoneKey),
-        borderRadius: BorderRadius.circular(AppRadius.card(context)),
-        child: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: AppSpacing.md(context),
-            vertical: AppSpacing.sm(context),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Icon(icon, size: AppIconSizes.md(context), color: AppColors.primary),
-                  AppGap.sm(context),
-                  Text(label, style: AppTextStyles.labelMedium(context)),
-                ],
-              ),
-              Row(
-                children: [
-                  Text(
-                    '$count items',
-                    style: AppTextStyles.caption(context).copyWith(color: AppColors.textSecondary),
-                  ),
-                  AppGap.xs(context),
-                  Icon(Icons.arrow_forward_ios_rounded, size: AppIconSizes.sm(context) * 0.7, color: AppColors.textHint),
-                ],
-              )
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 // Tile painter

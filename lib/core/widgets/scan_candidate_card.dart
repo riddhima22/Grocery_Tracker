@@ -16,6 +16,7 @@ class ScanCandidateCard extends StatelessWidget {
   final VoidCallback? onEdit;
   final VoidCallback? onRemove;
   final ValueChanged<double>? onQuantityChanged;
+  final ValueChanged<DateTime>? onExpiryChanged;
 
   const ScanCandidateCard({
     super.key,
@@ -25,6 +26,7 @@ class ScanCandidateCard extends StatelessWidget {
     this.onEdit,
     this.onRemove,
     this.onQuantityChanged,
+    this.onExpiryChanged,
   });
 
   @override
@@ -97,37 +99,101 @@ class ScanCandidateCard extends StatelessWidget {
                 AIConfidenceBadge(confidence: candidate.confidence),
               ],
             ),
-            if (candidate.description.isNotEmpty) ...[
-              AppGap.xs(context),
-              Text(
-                candidate.description,
-                style: AppTextStyles.bodyMedium(context),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+            AppGap.xs(context),
+            Text(
+              candidate.description.isNotEmpty
+                  ? candidate.description
+                  : 'Detected ${candidate.category.toLowerCase()} item for ${candidate.storageZone.toLowerCase()} storage.',
+              style: AppTextStyles.bodyMedium(context).copyWith(
+                color: candidate.description.isNotEmpty ? AppColors.textPrimary : AppColors.textSecondary,
+                fontStyle: candidate.description.isNotEmpty ? FontStyle.normal : FontStyle.italic,
               ),
-            ],
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
             AppGap.sm(context),
             const Divider(),
             AppGap.xxs(context),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Storage: ${candidate.storageZone.toUpperCase()}',
-                      style: AppTextStyles.caption(context).copyWith(color: AppColors.textSecondary),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Expiry: ${candidate.expiryDate != null ? candidate.expiryDate.toString().substring(0, 10) : "Not Visible"}',
-                      style: AppTextStyles.caption(context).copyWith(
-                        color: candidate.expiryDate != null ? AppColors.textPrimary : AppColors.warning,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Storage: ${candidate.storageZone.toUpperCase()}',
+                        style: AppTextStyles.caption(context).copyWith(color: AppColors.textSecondary),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 4),
+                      InkWell(
+                        borderRadius: BorderRadius.circular(4),
+                        onTap: () async {
+                          final initial = candidate.expiryDate ?? DateTime.now().add(const Duration(days: 7));
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: initial,
+                            firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                            lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
+                          );
+                          if (picked != null && onExpiryChanged != null) {
+                            onExpiryChanged!(picked);
+                          }
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 2.0),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.calendar_today_outlined, 
+                                size: 13, 
+                                color: candidate.expiryDate != null ? AppColors.primary : AppColors.warning,
+                              ),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Builder(
+                                  builder: (context) {
+                                    if (candidate.expiryDate == null) {
+                                      return Text(
+                                        'Expiry: Set Date',
+                                        style: AppTextStyles.caption(context).copyWith(
+                                          color: AppColors.warning,
+                                          fontWeight: FontWeight.bold,
+                                          decoration: TextDecoration.underline,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      );
+                                    }
+                                    final daysLeft = candidate.expiryDate!.difference(DateTime.now()).inDays;
+                                    final shelfText = daysLeft <= 0 
+                                        ? 'today' 
+                                        : (daysLeft == 1 ? '~1d' : '~$daysLeft days');
+                                    return Text(
+                                      'Expiry: ${candidate.expiryDate.toString().substring(0, 10)} ($shelfText)',
+                                      style: AppTextStyles.caption(context).copyWith(
+                                        color: AppColors.textPrimary,
+                                        fontWeight: FontWeight.bold,
+                                        decoration: TextDecoration.underline,
+                                        decorationColor: AppColors.primary.withValues(alpha: 0.5),
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+                AppGap.xs(context),
                 if (onQuantityChanged != null)
                   QuantityStepper(
                     quantity: candidate.quantity,

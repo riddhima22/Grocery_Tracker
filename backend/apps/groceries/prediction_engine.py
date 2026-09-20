@@ -170,3 +170,83 @@ class ShelfLifePredictionEngine:
 def math_ceil(val):
     import math
     return int(math.ceil(val))
+
+
+REALISTIC_ITEM_SHELF_LIFE_DAYS = {
+    # Vegetables
+    'tomato': 7, 'tomatoes': 7, 'potato': 45, 'potatoes': 45, 'onion': 35, 'onions': 35,
+    'garlic': 60, 'ginger': 30, 'spinach': 5, 'lettuce': 5, 'coriander': 5, 'cilantro': 5,
+    'mint': 5, 'curry leaves': 7, 'carrot': 18, 'carrots': 18, 'cucumber': 7, 'cucumbers': 7,
+    'capsicum': 9, 'bell pepper': 9, 'chili': 12, 'chillies': 12, 'green chili': 12,
+    'cauliflower': 8, 'cabbage': 14, 'broccoli': 7, 'peas': 6, 'beans': 7, 'mushroom': 5,
+    'mushrooms': 5, 'lemon': 21, 'lemons': 21, 'lime': 21, 'pumpkin': 30, 'eggplant': 6,
+    'brinjal': 6, 'okra': 5, 'lady finger': 5, 'bhindi': 5, 'zucchini': 7, 'radish': 12, 'beetroot': 20,
+
+    # Fruits
+    'banana': 6, 'bananas': 6, 'apple': 25, 'apples': 25, 'orange': 16, 'oranges': 16,
+    'mango': 6, 'mangoes': 6, 'grape': 7, 'grapes': 7, 'strawberry': 4, 'strawberries': 4,
+    'blueberry': 6, 'blueberries': 6, 'watermelon': 8, 'melon': 8, 'papaya': 5, 'pineapple': 6,
+    'pomegranate': 20, 'kiwi': 10, 'pear': 10, 'pears': 10, 'peach': 5, 'guava': 5, 'avocado': 5,
+
+    # Dairy
+    'milk': 6, 'curd': 7, 'yogurt': 10, 'yoghurt': 10, 'dahi': 7, 'paneer': 6,
+    'cheese': 16, 'butter': 45, 'cream': 7, 'egg': 24, 'eggs': 24,
+
+    # Bakery
+    'bread': 5, 'buns': 4, 'pav': 4, 'cake': 4, 'tortilla': 7, 'roti': 3,
+
+    # Meat & Seafood
+    'chicken': 3, 'meat': 4, 'mutton': 4, 'fish': 2, 'prawns': 2, 'shrimp': 2,
+
+    # Grains & Staples
+    'rice': 240, 'wheat': 240, 'atta': 120, 'flour': 120, 'dal': 240, 'lentils': 240,
+    'pasta': 240, 'noodles': 180, 'oats': 180, 'cereal': 180, 'oil': 240, 'ghee': 240,
+
+    # Spices & Condiments
+    'salt': 365, 'sugar': 365, 'turmeric': 365, 'pepper': 365, 'sauce': 90, 'ketchup': 90,
+    'jam': 90, 'honey': 365, 'tea': 240, 'coffee': 240,
+
+    # Snacks & Beverages
+    'biscuit': 90, 'biscuits': 90, 'cookies': 60, 'chips': 60, 'juice': 20, 'soda': 60,
+}
+
+
+def calculate_item_shelf_life(name: str = '', category: str = '', zone: str = '') -> int:
+    name_clean = (name or '').lower().strip()
+    category_clean = (category or '').lower().strip()
+    zone_clean = (zone or '').lower().strip()
+
+    # 1. Match specific item name
+    for keyword, days in REALISTIC_ITEM_SHELF_LIFE_DAYS.items():
+        if keyword in name_clean:
+            if zone_clean == 'freezer':
+                return max(days, 90)
+            return days
+
+    # 2. Match by category
+    category_defaults = {
+        'vegetables': 7,
+        'fruits': 8,
+        'dairy': 7,
+        'bakery': 5,
+        'meat': 3,
+        'fish': 2,
+        'grains': 180,
+        'spices': 365,
+        'snacks': 60,
+        'beverages': 25,
+    }
+    for cat_key, days in category_defaults.items():
+        if cat_key in category_clean or cat_key in name_clean:
+            if zone_clean == 'freezer':
+                return max(days, 90)
+            return days
+
+    # 3. Zone-based fallback
+    if zone_clean == 'freezer':
+        return 90
+    if zone_clean in ['pantry', 'cabinet', 'spice']:
+        return 30
+    if zone_clean == 'basket':
+        return 21
+    return 7

@@ -84,5 +84,13 @@ class ScanCandidate(models.Model):
     selected = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    def save(self, *args, **kwargs):
+        import datetime
+        for date_field in ('expiry_date', 'manufacturing_date', 'packed_date', 'best_before_date'):
+            val = getattr(self, date_field, None)
+            if isinstance(val, datetime.datetime):
+                setattr(self, date_field, val.date())
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"Candidate: {self.name} ({self.quantity} {self.unit})"
