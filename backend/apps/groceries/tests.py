@@ -73,3 +73,119 @@ class GroceryAPITests(APITestCase):
         # POST consume to User 1's item should return 404 Not Found
         response = self.client.post(self.detail_url + 'consume/')
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_barcode_lookup_missing_parameter(self):
+        """Barcode lookup without query parameter should return 400."""
+        self.client.force_authenticate(user=self.user1)
+        response = self.client.get('/api/v1/groceries/barcode-lookup/')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(response.data['success'])
+
+    def test_barcode_lookup_pantry_history_hit(self):
+        """Barcode lookup should return item details from user's pantry history if available."""
+        barcode = '8901030382725'
+        GroceryItem.objects.create(
+            user=self.user1,
+            barcode=barcode,
+            name='Amul Taaza Milk',
+            brand='Amul',
+            category='Dairy',
+            unit='L',
+            calories_per_100g=60,
+            allergens=['Milk'],
+            storage_zone='fridge'
+        )
+
+        self.client.force_authenticate(user=self.user1)
+        response = self.client.get(f'/api/v1/groceries/barcode-lookup/?barcode={barcode}')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['success'])
+        data = response.data['data']
+        self.assertEqual(data['source'], 'pantry_history')
+        self.assertEqual(data['barcode'], barcode)
+        self.assertEqual(data['name'], 'Amul Taaza Milk')
+        self.assertEqual(data['brand'], 'Amul')
+        self.assertEqual(data['category'], 'Dairy')
+        self.assertEqual(data['unit'], 'L')
+        self.assertEqual(data['calories_per_100g'], 60)
+        self.assertEqual(data['allergens'], ['Milk'])
+        self.assertEqual(data['storage_zone'], 'fridge')
+        self.assertTrue(data['found'])
+
+    def test_barcode_lookup_open_food_facts_hit(self):
+        """Barcode lookup should query and parse Open Food Facts if not in pantry history."""
+        from unittest.mock import patch, MagicMock
+
+        barcode = '3017620422003'
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "status": 1,
+            "product": {
+                "product_name": "Nutella Hazelnut Spread",
+                "brands": "Ferrero",
+                "categories": "Sweet spreads, Hazelnut spreads, Chocolate spreads",
+                "quantity": "350 g",
+                "nutriments": {
+                    "energy-kcal_100g": 539.4
+                },
+                "allergens_tags": ["en:milk", "en:soybeans", "en:nuts"]
+            }
+        }
+
+        self.client.force_authenticate(user=self.user1)
+        with patch('requests.get', return_value=mock_response) as mock_get:
+            response = self.client.get(f'/api/v1/groceries/barcode-lookup/?barcode={barcode}')
+
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            self.assertTrue(response.data['success'])
+            data = response.data['data']
+            self.assertEqual(data['source'], 'open_food_facts')
+            self.assertEqual(data['barcode'], barcode)
+            self.assertEqual(data['name'], 'Nutella Hazelnut Spread')
+            self.assertEqual(data['brand'], 'Ferrero')
+            self.assertEqual(data['unit'], 'g')
+            self.assertEqual(data['calories_per_100g'], 539)
+            self.assertEqual(data['allergens'], ['milk', 'soybeans', 'nuts'])
+            self.assertEqual(data['storage_zone'], 'pantry')
+            self.assertTrue(data['found'])
+            mock_get.assert_called_once()
+
+    def test_barcode_lookup_not_found_fallback(self):
+        """Barcode lookup should return 200 with found=False if product is not in history or Open Food Facts."""
+        from unittest.mock import patch, MagicMock
+
+        barcode = '0000000000000'
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "status": 0,
+            "status_verbose": "product not found"
+        }
+
+        self.client.force_authenticate(user=self.user1)
+        with patch('requests.get', return_value=mock_response):
+            response = self.client.get(f'/api/v1/groceries/barcode-lookup/?barcode={barcode}')
+
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            self.assertTrue(response.data['success'])
+            self.assertEqual(response.data['data']['barcode'], barcode)
+            self.assertFalse(response.data['data']['found'])
+            self.assertIn("No product found", response.data['message'])
+
+    def test_barcode_lookup_network_exception_fallback(self):
+        """Barcode lookup should gracefully handle external network errors and return found=False."""
+        from unittest.mock import patch
+        import requests
+
+        barcode = '1111111111111'
+        self.client.force_authenticate(user=self.user1)
+        with patch('requests.get', side_effect=requests.RequestException("Timeout")):
+            response = self.client.get(f'/api/v1/groceries/barcode-lookup/?barcode={barcode}')
+
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            self.assertTrue(response.data['success'])
+            self.assertEqual(response.data['data']['barcode'], barcode)
+            self.assertFalse(response.data['data']['found'])
+

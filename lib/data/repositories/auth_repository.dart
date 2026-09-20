@@ -137,7 +137,8 @@ class AuthRepository {
 
   Future<bool> hasValidToken() async {
     final token = await _secureStorage.getAccessToken();
-    return token != null;
+    final refresh = await _secureStorage.getRefreshToken();
+    return token != null || refresh != null;
   }
 
   Future<UserModel> loginWithGoogle({required String token, String? email, String? name}) async {

@@ -18,8 +18,8 @@ class ApiClient {
     _dio = Dio(
       BaseOptions(
         baseUrl: ApiEndpoints.baseUrl,
-        connectTimeout: const Duration(seconds: 15),
-        receiveTimeout: const Duration(seconds: 20),
+        connectTimeout: const Duration(seconds: 30),
+        receiveTimeout: const Duration(seconds: 45),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -32,23 +32,41 @@ class ApiClient {
     ]);
   }
 
+  static bool _isPublicEndpoint(String path) {
+    final publicEndpoints = [
+      ApiEndpoints.login,
+      ApiEndpoints.register,
+      ApiEndpoints.refresh,
+      ApiEndpoints.googleLogin,
+      ApiEndpoints.appleLogin,
+      ApiEndpoints.forgotPassword,
+      ApiEndpoints.resetPassword,
+    ];
+    return publicEndpoints.any((endpoint) => path.contains(endpoint));
+  }
+
   Interceptor _authInterceptor() => InterceptorsWrapper(
         onRequest: (options, handler) async {
-          final token = await _secureStorage.getAccessToken();
-          if (token != null && !options.headers.containsKey('Authorization')) {
-            options.headers['Authorization'] = 'Bearer $token';
+          // Do NOT attach Authorization header to unauthenticated/public auth endpoints
+          if (!_isPublicEndpoint(options.path)) {
+            final token = await _secureStorage.getAccessToken();
+            if (token != null && !options.headers.containsKey('Authorization')) {
+              options.headers['Authorization'] = 'Bearer $token';
+            }
           }
           handler.next(options);
         },
         onError: (err, handler) async {
-          // Token expired → trigger single-flight refresh and retry exactly once
+          final path = err.requestOptions.path;
+          // Only trigger token refresh on authenticated endpoints (not public login/register)
           if (err.response?.statusCode == 401 &&
+              !_isPublicEndpoint(path) &&
               err.requestOptions.extra['isRetry'] != true) {
-            AppLogger.warning('Received 401 Unauthorized. Attempting token refresh...');
+            AppLogger.warning('Received 401 Unauthorized on $path. Attempting token refresh...');
             err.requestOptions.extra['isRetry'] = true;
             
             try {
-              final newAccessToken = await TokenRefreshManager().refreshAccessToken(_dio);
+              final newAccessToken = await TokenRefreshManager().refreshAccessToken();
               if (newAccessToken != null) {
                 // Update Authorization header with the new token
                 err.requestOptions.headers['Authorization'] = 'Bearer $newAccessToken';
@@ -56,7 +74,9 @@ class ApiClient {
                 final response = await _dio.fetch(err.requestOptions);
                 return handler.resolve(response);
               }
-            } catch (_) {}
+            } catch (e) {
+              AppLogger.error('Token refresh retry failed', e);
+            }
 
             // If refresh fails or returns null, clear state and kick user to login
             AppLogger.error('Token refresh failed. Redirecting to Login screen...');

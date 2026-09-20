@@ -52,3 +52,23 @@ class ModelRouterQualityTests(TestCase):
         errors, warnings, unique = router.run_image_quality_checks(["nonexistent.png"])
         self.assertTrue(any("does not exist" in err for err in errors))
         self.assertEqual(len(unique), 0)
+
+
+class ScanTaskRetryTests(TestCase):
+    def test_is_transient_error_detection(self):
+        from apps.scans.tasks import is_transient_error
+        from integrations.ai.gemini_client import AIContentBlockedError
+
+        # Transient errors
+        self.assertTrue(is_transient_error(Exception("429 Too Many Requests: Rate limit exceeded")))
+        self.assertTrue(is_transient_error(Exception("503 Service Unavailable")))
+        self.assertTrue(is_transient_error(TimeoutError("Request timed out")))
+        self.assertTrue(is_transient_error(ConnectionError("Connection reset by peer")))
+        self.assertTrue(is_transient_error(Exception("ResourceExhausted: Quota exceeded for model")))
+
+        # Permanent errors
+        self.assertFalse(is_transient_error(AIContentBlockedError("Safety blocked")))
+        self.assertFalse(is_transient_error(Exception("Image corrupted or unreadable")))
+        self.assertFalse(is_transient_error(Exception("Image resolution is too low")))
+        self.assertFalse(is_transient_error(Exception("Invalid argument: JSONDecodeError")))
+

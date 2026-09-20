@@ -17,6 +17,7 @@ class RegisterThrottle(UserRateThrottle):
     rate = '5/minute'
 
 class RegisterView(generics.CreateAPIView):
+    authentication_classes = ()
     permission_classes = (AllowAny,)
     serializer_class = UserRegisterSerializer
     throttle_classes = [RegisterThrottle]
@@ -88,6 +89,7 @@ class MeView(APIView):
         })
 
 class ForgotPasswordView(APIView):
+    authentication_classes = ()
     permission_classes = (AllowAny,)
     
     def post(self, request):
@@ -128,6 +130,7 @@ class ResendVerificationView(APIView):
         })
 
 class GoogleLoginView(APIView):
+    authentication_classes = ()
     permission_classes = (AllowAny,)
 
     def post(self, request):
@@ -138,19 +141,36 @@ class GoogleLoginView(APIView):
         if not token and not email:
             return Response({"success": False, "error": "Token or email is required."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # In production with Firebase Admin or Google Auth initialized, verify token payload
-        try:
-            import firebase_admin
-            from firebase_admin import auth as firebase_auth
-            if firebase_admin._apps and token:
-                decoded_token = firebase_auth.verify_id_token(token)
-                email = decoded_token.get('email', email)
-                name = decoded_token.get('name', name)
-        except Exception as e:
-            logger.info(f"Firebase token verification skipped or failed: {str(e)}")
+        # 1. Try verifying as Firebase ID token or decoding Google ID token payload
+        if token:
+            try:
+                import firebase_admin
+                from firebase_admin import auth as firebase_auth
+                if firebase_admin._apps:
+                    decoded_token = firebase_auth.verify_id_token(token)
+                    email = decoded_token.get('email', email)
+                    name = decoded_token.get('name', name)
+            except Exception as e:
+                logger.info(f"Firebase token verification skipped or failed: {str(e)}")
+
+            # Fallback: Parse Google OAuth / OIDC JWT payload if email wasn't extracted
+            if not email and token.count('.') == 2:
+                try:
+                    import base64
+                    import json
+                    payload_part = token.split('.')[1]
+                    # Add padding if needed
+                    padding = '=' * ((4 - len(payload_part) % 4) % 4)
+                    payload_json = base64.urlsafe_b64decode(payload_part + padding).decode('utf-8')
+                    payload_data = json.loads(payload_json)
+                    if payload_data.get('email'):
+                        email = payload_data.get('email')
+                        name = payload_data.get('name') or name
+                except Exception as e:
+                    logger.debug(f"JWT payload decoding fallback skipped: {str(e)}")
 
         if not email:
-            email = f"google_{token[:10]}@example.com"
+            email = f"google_{token[:10]}@example.com" if token else "google_user@example.com"
 
         user, created = User.objects.get_or_create(
             email=email,
@@ -175,6 +195,7 @@ class GoogleLoginView(APIView):
 
 
 class AppleLoginView(APIView):
+    authentication_classes = ()
     permission_classes = (AllowAny,)
 
     def post(self, request):
@@ -208,3 +229,4 @@ class AppleLoginView(APIView):
             },
             "message": "Logged in with Apple successfully."
         })
+

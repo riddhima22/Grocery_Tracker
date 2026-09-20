@@ -175,8 +175,18 @@ CELERY_TIMEZONE = TIME_ZONE
 
 # Gemini configuration
 GEMINI_API_KEY = env('GEMINI_API_KEY', default='')
-GEMINI_MODEL_NAME = env('GEMINI_MODEL_NAME', default='gemini-3.5-flash')
-GEMINI_RECIPE_MODEL_NAME = env('GEMINI_RECIPE_MODEL_NAME', default='gemini-3.5-flash')
+# Check https://ai.google.dev/gemini-api/docs/models for latest stable GA Flash releases
+GEMINI_MODEL_NAME = env('GEMINI_MODEL_NAME', default='gemini-3.6-flash')
+# Check https://ai.google.dev/gemini-api/docs/models for latest stable GA Flash releases
+GEMINI_RECIPE_MODEL_NAME = env('GEMINI_RECIPE_MODEL_NAME', default='gemini-3.6-flash')
+
+# OpenAI configuration
+OPENAI_API_KEY = env('OPENAI_API_KEY', default='')
+OPENAI_MODEL_NAME = env('OPENAI_MODEL_NAME', default='gpt-4o-mini')
+
+# AI Provider Fallback Order
+AI_PROVIDER_ORDER = env.list('AI_PROVIDER_ORDER', default=['gemini', 'openai'])
+
 
 # OCR configurations
 OCR_ENABLED = env.bool('OCR_ENABLED', default=True)
@@ -185,6 +195,11 @@ OCR_PROVIDER = env('OCR_PROVIDER', default='TEXT_DETECTION')
 # Scanning validation limits
 AI_MAX_IMAGE_SIZE_BYTES = env.int('AI_MAX_IMAGE_SIZE_BYTES', default=5 * 1024 * 1024)
 AI_MAX_IMAGES_PER_SCAN = env.int('AI_MAX_IMAGES_PER_SCAN', default=10)
+AI_BLUR_VARIANCE_THRESHOLD = env.float('AI_BLUR_VARIANCE_THRESHOLD', default=100.0)
+
+# Open Food Facts configuration
+OPEN_FOOD_FACTS_BASE_URL = env('OPEN_FOOD_FACTS_BASE_URL', default='https://world.openfoodfacts.org')
+
 
 # Import security checks so they register on startup
 import config.checks  # noqa: F401

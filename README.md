@@ -59,7 +59,7 @@ grocery_track/
 │   │   ├── notifications/        # FCM token registration & Celery beat expiry alerts
 │   │   └── scans/                # Multimodal receipt/produce scan sessions
 │   ├── integrations/
-│   │   ├── ai/                   # Gemini Client & structured JSON schemas
+│   │   ├── ai/                   # AIService facade, Gemini & OpenAI clients, schemas, prompts
 │   │   └── ocr/                  # Vision OCR & date extraction parser
 │   ├── common/                   # Global exception handler & response envelope renderer
 │   └── config/                   # Settings (base, development, production)
@@ -67,6 +67,29 @@ grocery_track/
 ├── docker-compose.yml            # Production docker stack (Django + Postgres + Redis + Celery)
 └── .github/workflows/ci.yml      # CI pipeline for automated testing
 ```
+
+---
+
+## 🤖 AI Provider Fallback Architecture
+
+FreshTrack uses an `AIService` facade with dynamic multi-provider fallback. The system attempts requests using the primary provider (Google Gemini) and automatically falls back to secondary providers (OpenAI GPT-4o-mini) if rate limits, network outages, or API errors occur.
+
+### AI Configuration & Environment Variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `AI_PROVIDER_ORDER` | `gemini,openai` | Ordered list of AI providers to try for inference |
+| `GEMINI_API_KEY` | `""` | Google Gemini API key (`google-genai` SDK) |
+| `GEMINI_MODEL_NAME` | `gemini-2.5-flash` | Multimodal model for scans & meal inference |
+| `GEMINI_RECIPE_MODEL_NAME` | `gemini-2.5-flash` | Model for recipe generation |
+| `OPENAI_API_KEY` | `""` | OpenAI API key for fallback provider |
+| `OPENAI_MODEL_NAME` | `gpt-4o-mini` | OpenAI vision & JSON model for fallback |
+
+### How Provider Fallback Works
+1. When a multimodal vision scan, meal ingredient inference, or recipe generation request arrives, `AIService` inspects `AI_PROVIDER_ORDER`.
+2. It attempts execution with the first enabled provider (e.g. Gemini).
+3. If the primary provider raises an exception (e.g. 429 Rate Limit, 503 Service Unavailable, or invalid API key), `AIService` catches the failure, logs a warning, and seamlessly retries with the next provider (e.g. OpenAI).
+4. If all configured providers fail, an explicit exception is raised so API endpoints return standardized 502/500 error envelopes without corrupting database transactions.
 
 ---
 
@@ -84,12 +107,19 @@ python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements/development.txt
 
+# Copy example environment variables
+cp .env.example .env
+
 # Run migrations
 python manage.py migrate --settings=config.settings.development
 
 # Start development server
 python manage.py runserver --settings=config.settings.development
 ```
+
+#### 🔑 OCR Credential Setup (Google Cloud Vision)
+- **Google Cloud Vision OCR** requires a dedicated service-account key JSON file configured via the `GOOGLE_APPLICATION_CREDENTIALS` environment variable (distinct from `GEMINI_API_KEY`), in a GCP project with the **Cloud Vision API** enabled and billing active.
+- **Graceful Fallback**: If `GOOGLE_APPLICATION_CREDENTIALS` is not set or the GCP Vision client cannot initialize, OCR silently disables itself. Multimodal grocery scanning and date estimation still operate seamlessly using Gemini Vision alone (without supplementary OCR date verification).
 
 ### 3. Flutter App Setup
 ```bash

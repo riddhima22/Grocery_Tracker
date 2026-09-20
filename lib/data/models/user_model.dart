@@ -68,6 +68,24 @@ class UserModel {
     'notify_daily_recipe': notifyDailyRecipe,
   };
 
+  Map<String, dynamic> toFullJson() => {
+    'id': id,
+    'email': email,
+    'display_name': displayName,
+    'avatar_url': avatarUrl,
+    'email_verified': emailVerified,
+    'diet_type': dietType,
+    'cuisine_pref': cuisinePref,
+    'allergies': allergies,
+    'household_size': householdSize,
+    'notify_3_days': notify3Days,
+    'notify_1_day': notify1Day,
+    'notify_daily_recipe': notifyDailyRecipe,
+    'total_tracked': totalTracked,
+    'saved_from_waste': savedFromWaste,
+    'recipes_cooked': recipesCooked,
+  };
+
   UserModel copyWith({
     String? displayName,
     String? avatarUrl,

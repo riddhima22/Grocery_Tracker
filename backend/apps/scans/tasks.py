@@ -1,12 +1,82 @@
 from celery import shared_task
+from celery.exceptions import MaxRetriesExceededError, Retry
 from django.utils import timezone
 from django.db import transaction
 from .models import ScanSession, ScanImage, ScanCandidate
 from integrations.ai.model_router import ModelRouter
+from integrations.ai.gemini_client import AIContentBlockedError
 import logging
 import datetime
 
 logger = logging.getLogger('freshtrack.scans.tasks')
+
+
+def is_transient_error(exc: Exception) -> bool:
+    """
+    Distinguishes transient/retryable errors (rate limits, 429, 5xx, network timeouts,
+    retryable google.api_core exceptions) from permanent errors (bad image, schema violation,
+    safety block).
+    """
+    if isinstance(exc, AIContentBlockedError):
+        return False
+
+    # Check for google-api-core retryable exceptions
+    try:
+        from google.api_core import exceptions as google_exceptions
+        retryable_google = (
+            google_exceptions.ResourceExhausted,      # 429
+            google_exceptions.ServiceUnavailable,     # 503
+            google_exceptions.DeadlineExceeded,       # 504 / timeout
+            google_exceptions.InternalServerError,    # 500
+            google_exceptions.BadGateway,             # 502
+            google_exceptions.GatewayTimeout,
+        )
+        if isinstance(exc, retryable_google):
+            return True
+        non_retryable_google = (
+            google_exceptions.InvalidArgument,        # 400
+            google_exceptions.PermissionDenied,       # 403
+            google_exceptions.Unauthenticated,        # 401
+            google_exceptions.NotFound,               # 404
+        )
+        if isinstance(exc, non_retryable_google):
+            return False
+    except ImportError:
+        pass
+
+    # Built-in network / timeout exceptions
+    if isinstance(exc, (TimeoutError, ConnectionError)):
+        return True
+
+    status_code = getattr(exc, 'status_code', None) or getattr(exc, 'code', None)
+    if status_code in (429, 500, 502, 503, 504):
+        return True
+    if status_code in (400, 401, 403, 404):
+        return False
+
+    msg = str(exc).lower()
+
+    # Permanent failure indicators (do not retry)
+    permanent_indicators = [
+        'blocked by safety', 'blocked by content', 'content filters',
+        'corrupted', 'unreadable', 'resolution is too low', 'exceeds size limit',
+        'duplicate image', 'no valid images', 'image file does not exist',
+        'invalid argument', 'schema validation', 'jsondecodeerror'
+    ]
+    if any(ind in msg for ind in permanent_indicators):
+        return False
+
+    transient_indicators = [
+        '429', 'rate limit', 'quota', 'resource_exhausted', 'resource exhausted',
+        'timeout', 'timed out', 'deadline exceeded', '503', '502', '500',
+        'service unavailable', 'temporarily unavailable', 'connection error',
+        'connection reset', 'try again', 'server error'
+    ]
+    if any(ind in msg for ind in transient_indicators):
+        return True
+
+    return False
+
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=10)
 def process_scan_session_task(self, session_id):
@@ -126,7 +196,18 @@ def process_scan_session_task(self, session_id):
                 successful_count += 1
 
     except Exception as e:
-        logger.error(f"Error processing images: {str(e)}", exc_info=True)
+        logger.error(f"Error processing images for session {session_id}: {str(e)}", exc_info=True)
+        if is_transient_error(e) and self is not None and getattr(self, 'request', None) is not None:
+            try:
+                countdown = 10 * (self.request.retries + 1)
+                logger.warning(
+                    f"Transient error detected for scan session {session_id} ({e}). "
+                    f"Retrying in {countdown}s (retry {self.request.retries + 1}/{self.max_retries})..."
+                )
+                raise self.retry(exc=e, countdown=countdown)
+            except MaxRetriesExceededError:
+                logger.error(f"Max retries ({self.max_retries}) exceeded for scan session {session_id}.")
+
         for scan_image in images:
             scan_image.status = ScanImage.Statuses.FAILED
             scan_image.error_message = str(e)

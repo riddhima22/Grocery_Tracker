@@ -7,7 +7,8 @@ from .models import Recipe
 from .serializers import RecipeSerializer
 from apps.groceries.models import GroceryItem
 from apps.groceries.services import deduct_pantry_items_bulk
-from integrations.ai.gemini_client import GeminiClient
+from integrations.ai.ai_service import AIService
+from integrations.ai.gemini_client import AIContentBlockedError
 from common.exceptions import ResourceNotFoundException, ForbiddenException
 import logging
 import datetime
@@ -60,11 +61,14 @@ class RecipeViewSet(viewsets.ReadOnlyModelViewSet):
             "meal_type": request.data.get('meal_type', 'any')
         }
 
-        # 3. Call Gemini API securely through AI service wrapper
-        gemini = GeminiClient()
+        # 3. Call AI service securely through multi-provider fallback wrapper
+        ai_service = AIService()
         try:
-            ai_output = gemini.generate_recipes(grocery_data, preferences)
+            ai_output = ai_service.generate_recipes(grocery_data, preferences)
             recipes_data = ai_output.get('recipes', [])
+        except AIContentBlockedError as e:
+            logger.warning(f"Recipe generation content blocked: {e}")
+            return Response({"success": False, "error": "The recipe request couldn't be processed — try adjusting your preferences or ingredients."}, status=400)
         except Exception as e:
             logger.error(f"Recipe generation failed: {str(e)}", exc_info=True)
             return Response({"success": False, "error": "AI recipe generator is temporarily unavailable."}, status=502)

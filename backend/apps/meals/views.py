@@ -7,7 +7,8 @@ from rest_framework.response import Response
 
 from apps.groceries.models import GroceryItem
 from apps.groceries.services import deduct_pantry_items_bulk
-from integrations.ai.gemini_client import GeminiClient
+from integrations.ai.ai_service import AIService
+from integrations.ai.gemini_client import AIContentBlockedError
 
 from .models import MealLog, MealIngredientCandidate
 from .serializers import MealLogSerializer
@@ -29,7 +30,7 @@ class MealLogViewSet(viewsets.ModelViewSet):
         if not image_file and not text_description:
             return Response({'error': 'Please provide an image or a description of the meal.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Temp save image for Gemini inference (if we have an image)
+        # Temp save image for AI inference (if we have an image)
         meal_log = MealLog(
             user=user,
             description=text_description,
@@ -53,11 +54,18 @@ class MealLogViewSet(viewsets.ModelViewSet):
                 "status": g.status
             })
 
-        gemini = GeminiClient()
+        ai_service = AIService()
         image_path = meal_log.image.path if meal_log.image else None
         
         try:
-            ai_output = gemini.infer_meal_ingredients(image_path, text_description, grocery_data)
+            ai_output = ai_service.infer_meal_ingredients(image_path, text_description, grocery_data)
+        except AIContentBlockedError as e:
+            logger.warning(f"Meal inference content blocked: {e}")
+            meal_log.delete()
+            return Response({
+                'success': False,
+                'error': "The image couldn't be analyzed — try a clearer photo or a different angle."
+            }, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             meal_log.delete()
             return Response({'error': 'Meal inference failed.', 'details': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

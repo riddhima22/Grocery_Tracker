@@ -254,6 +254,58 @@ class GroceryItemViewSet(viewsets.ModelViewSet):
             "data": prediction
         })
 
+    @action(detail=False, methods=['get'], url_path='barcode-lookup')
+    def barcode_lookup(self, request):
+        barcode = request.query_params.get('barcode', '').strip()
+        if not barcode:
+            return Response(
+                {"success": False, "error": "Barcode parameter is required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 1. Check user's pantry history
+        pantry_item = GroceryItem.objects.filter(
+            user=request.user,
+            barcode=barcode
+        ).order_by('-created_at').first()
+
+        if pantry_item:
+            return Response({
+                "success": True,
+                "data": {
+                    "barcode": barcode,
+                    "name": pantry_item.name,
+                    "brand": pantry_item.brand,
+                    "category": pantry_item.category,
+                    "unit": pantry_item.unit,
+                    "calories_per_100g": pantry_item.calories_per_100g,
+                    "allergens": pantry_item.allergens if isinstance(pantry_item.allergens, list) else [],
+                    "storage_zone": pantry_item.storage_zone,
+                    "source": "pantry_history",
+                    "found": True,
+                }
+            })
+
+        # 2. Query Open Food Facts
+        from .barcode_lookup import lookup_open_food_facts
+        off_product = lookup_open_food_facts(barcode)
+        if off_product:
+            return Response({
+                "success": True,
+                "data": off_product
+            })
+
+        # 3. Not found fallback
+        return Response({
+            "success": True,
+            "data": {
+                "barcode": barcode,
+                "found": False,
+            },
+            "message": "No product found for this barcode. Please enter details manually."
+        }, status=status.HTTP_200_OK)
+
+
     @action(detail=False, methods=['get'], url_path='ai-insights')
     def ai_insights(self, request):
         from django.db.models import Avg

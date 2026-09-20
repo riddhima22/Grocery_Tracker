@@ -68,7 +68,7 @@ class _SplashViewState extends State<SplashView> with SingleTickerProviderStateM
     await Future.wait([
       auth.checkAuthStatus(),
       onboarding.checkOnboardingStatus(),
-      Future.delayed(const Duration(milliseconds: 2800)),
+      Future.delayed(const Duration(milliseconds: 200)),
     ]);
 
     if (!mounted) return;
@@ -89,7 +89,7 @@ class _SplashViewState extends State<SplashView> with SingleTickerProviderStateM
       targetRoute = AppRoutes.login;
     }
 
-    // Use a fade transition for smooth navigation
+    // Use a fast, smooth fade transition for instant navigation
     Navigator.pushReplacement(
       context,
       PageRouteBuilder(
@@ -98,7 +98,7 @@ class _SplashViewState extends State<SplashView> with SingleTickerProviderStateM
           final builder = _getRouteBuilder(targetRoute);
           return builder(context);
         },
-        transitionDuration: const Duration(milliseconds: 500),
+        transitionDuration: const Duration(milliseconds: 200),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return FadeTransition(opacity: animation, child: child);
         },

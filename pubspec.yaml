@@ -6,7 +6,8 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.10.4
+  sdk: '>=3.11.0 <4.0.0'
+  flutter: '>=3.38.4'
 
 dependencies:
   flutter:
@@ -101,12 +102,6 @@ flutter:
   
   
   uses-material-design: true
-
-  assets:
-     - assets/images/
-     - assets/icons/
-     - assets/animations/
-     - .env
 
   
   

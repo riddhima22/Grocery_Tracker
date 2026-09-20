@@ -68,18 +68,31 @@ class ScanSessionViewSet(viewsets.ReadOnlyModelViewSet):
                 )
 
         # Spawn background task.
-        # If running in eager mode (development), use a daemon thread to prevent blocking the HTTP response.
+        # Uses Celery if available, and gracefully falls back to a daemon thread
         import threading
+        import logging
         from django.conf import settings
         
+        task_logger = logging.getLogger('freshtrack.scans.views')
+
         if getattr(settings, 'CELERY_TASK_ALWAYS_EAGER', False):
             threading.Thread(
                 target=process_scan_session_task,
-                args=(None, str(session.id)),
+                args=(str(session.id),),
                 daemon=True
             ).start()
         else:
-            process_scan_session_task.delay(str(session.id))
+            try:
+                process_scan_session_task.delay(str(session.id))
+            except Exception as celery_err:
+                task_logger.warning(
+                    f"Celery queue unavailable ({celery_err}). Falling back to daemon thread for scan session {session.id}."
+                )
+                threading.Thread(
+                    target=process_scan_session_task,
+                    args=(str(session.id),),
+                    daemon=True
+                ).start()
 
         return Response({
             "success": True,

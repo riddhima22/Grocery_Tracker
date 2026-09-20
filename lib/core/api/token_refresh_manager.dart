@@ -13,28 +13,34 @@ class TokenRefreshManager {
   bool _isRefreshing = false;
   Completer<String?>? _refreshCompleter;
 
-  Future<String?> refreshAccessToken(Dio dioClient) async {
-    if (_isRefreshing) {
+  Future<String?> refreshAccessToken([Dio? dioClient]) async {
+    if (_isRefreshing && _refreshCompleter != null) {
       AppLogger.info('Token refresh is already in progress, awaiting result...');
-      return _refreshCompleter?.future;
+      return _refreshCompleter!.future;
     }
 
     _isRefreshing = true;
-    _refreshCompleter = Completer<String?>();
+    final completer = Completer<String?>();
+    _refreshCompleter = completer;
 
     try {
       AppLogger.info('Starting token refresh request...');
       final refreshToken = await _secureStorage.getRefreshToken();
       if (refreshToken == null) {
         AppLogger.warning('No refresh token found in storage.');
-        _refreshCompleter?.complete(null);
+        if (!completer.isCompleted) completer.complete(null);
         return null;
       }
 
       // Perform request using a clean Dio instance to avoid interceptor recursion
       final freshDio = Dio(BaseOptions(
         baseUrl: ApiEndpoints.baseUrl,
-        connectTimeout: const Duration(seconds: 10),
+        connectTimeout: const Duration(seconds: 30),
+        receiveTimeout: const Duration(seconds: 30),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
       ));
 
       final response = await freshDio.post(
@@ -65,19 +71,21 @@ class TokenRefreshManager {
         }
         
         AppLogger.info('Token refresh completed successfully.');
-        _refreshCompleter?.complete(newAccess);
+        if (!completer.isCompleted) completer.complete(newAccess);
+        return newAccess;
       } else {
         AppLogger.warning('Token refresh returned invalid status: ${response.statusCode}');
-        _refreshCompleter?.complete(null);
+        if (!completer.isCompleted) completer.complete(null);
+        return null;
       }
     } catch (e, stack) {
       AppLogger.error('Token refresh failed', e, stack);
-      _refreshCompleter?.complete(null);
+      if (!completer.isCompleted) completer.complete(null);
+      return null;
     } finally {
       _isRefreshing = false;
       _refreshCompleter = null;
     }
-
-    return _refreshCompleter?.future;
   }
 }
+

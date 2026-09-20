@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
+import 'package:google_sign_in/google_sign_in.dart';
 import '../providers/auth_provider.dart';
 import '../../onboarding/providers/onboarding_provider.dart';
 import '../../../config/app_colors.dart';
@@ -15,7 +17,6 @@ import '../../../core/widgets/app_text_field.dart';
 import '../../../core/widgets/app_error_banner.dart';
 import '../../../core/utils/validators.dart';
 import '../../../core/extensions/responsive_context_extension.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 
 class LoginView extends StatefulWidget {
   const LoginView({super.key});
@@ -71,6 +72,18 @@ class _LoginViewState extends State<LoginView> {
             authDetails.accessToken ??
             'mock_google_token';
 
+        // Synchronize with Firebase Auth
+        try {
+          final fb_auth.OAuthCredential credential =
+              fb_auth.GoogleAuthProvider.credential(
+            accessToken: authDetails.accessToken,
+            idToken: authDetails.idToken,
+          );
+          await fb_auth.FirebaseAuth.instance.signInWithCredential(credential);
+        } catch (fbError) {
+          debugPrint('Firebase sign in sync note: $fbError');
+        }
+
         final authProvider = context.read<AuthProvider>();
         final success = await authProvider.loginWithGoogle(
           token: token,
@@ -88,9 +101,11 @@ class _LoginViewState extends State<LoginView> {
         }
       }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Google Sign-In failed: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Google Sign-In failed: $e')));
+      }
     }
   }
 

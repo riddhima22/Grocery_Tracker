@@ -99,7 +99,7 @@ class ScanProvider extends ChangeNotifier {
         final session = await _scanRepository.getScanSession(_currentSession!.id);
         _currentSession = session;
         
-        if (session.status == 'completed' || session.status == 'partial_success') {
+        if (session.status == 'completed' || session.status == 'partial_success' || session.status == 'partial') {
           timer.cancel();
           // Load candidates
           _candidates = await _scanRepository.getCandidates(session.id);
@@ -113,7 +113,11 @@ class ScanProvider extends ChangeNotifier {
           notifyListeners();
         } else if (session.status == 'failed') {
           timer.cancel();
-          _errorMessage = "Image analysis failed. Please try a clearer picture.";
+          final firstError = session.images.firstWhere(
+            (img) => img.errorMessage.isNotEmpty,
+            orElse: () => const ScanImageModel(id: '', status: '', errorMessage: ''),
+          ).errorMessage;
+          _errorMessage = firstError.isNotEmpty ? firstError : "Image analysis failed. Please try a clearer picture.";
           _uiState = ScanUIState.error;
           notifyListeners();
         }

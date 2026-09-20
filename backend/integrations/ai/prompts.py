@@ -21,30 +21,42 @@ OCR TEXT BLOCKS:
 
 Reference Date (Today): {current_date}
 
-Detect:
-1. One item or multiple items in the image(s).
-2. For each item, extract:
-   - "name": normalized generic name of the item (e.g. "Full Cream Milk", "Tomato", "Wheat Flour").
+Detect and extract details for EVERY grocery item in the image(s):
+1. Item Identity & Category:
+   - "name": specific normalized name of the item (e.g. "Fresh Red Apple", "Organic Whole Milk", "Yellow Onion", "Wheat Bread").
    - "brand": brand name if visible, otherwise empty string.
    - "description": a short user-friendly description of the item (max 200 chars). No emojis.
    - "category": choose from ['Vegetables', 'Fruits', 'Dairy', 'Bakery', 'Meat', 'Grains', 'Snacks', 'Beverages', 'Spices', 'Other'].
    - "icon_key": choose matching lowercase key from: ['vegetables', 'fruits', 'dairy', 'grains', 'beverage', 'spices', 'grocery'].
    - "quantity": numeric quantity (finite float/int > 0).
    - "unit": unit of measurement. MUST choose one from ['kg', 'g', 'L', 'ml', 'pcs', 'pack', 'bottle', 'box', 'dozen', 'bunch', 'packet'].
-   - "expiry_date": the final calculated or extracted expiration date in "YYYY-MM-DD" format.
+
+2. Optimal Storage Zone & Reason (Smart Placement):
+   - "storage_zone": MUST choose the most suitable storage zone from:
+     * 'fridge': for perishables like apples, carrots, leafy greens, berries, milk, cheese, yogurt, fresh meat, opened condiments.
+     * 'counter': for bananas, whole tomatoes, citrus fruits, uncut avocados, fresh whole melons.
+     * 'pantry': for dry grains, pasta, lentils, flour, canned goods, honey, oils, unopened shelf-stable items.
+     * 'basket': for potatoes, onions, garlic, ginger, root vegetables.
+     * 'freezer': for frozen meats, ice cream, frozen vegetables/meals.
+     * 'cabinet': for snacks, cookies, tea, coffee.
+     * 'spice': for whole and ground spices, seasonings, salt.
+   - "storage_reason": concise explanation why this storage zone is recommended for this item (e.g. "Chilling in the refrigerator crisper slows respiration and preserves crispness.").
+   - "shelf_life_guidance": actionable storage tips to maximize shelf life (e.g. "Store in refrigerator crisper drawer away from ethylene-sensitive vegetables. Keeps fresh for 3-4 weeks.").
+
+3. Shelf Life & Expiration Date (Mandatory Date Calculation):
+   - "expiry_date": ALWAYS provide a valid "YYYY-MM-DD" date!
+     * If printed on the package (EXP / Best Before / Use By), use that extracted date.
+     * If NO printed packaging date is visible (e.g., fresh apples, bananas, loose vegetables, fresh bread, unlabelled items), calculate a realistic expiration date from Reference Date ({current_date}) based on standard shelf life when kept in the recommended storage_zone (e.g. fresh apples in fridge ~28 days, bananas on counter ~6 days, tomatoes ~7 days, onions in pantry ~30 days, bread ~6 days, milk ~7 days).
    - "manufacturing_date": the printed manufacturing date in "YYYY-MM-DD" format if visible, otherwise null.
    - "packed_date": the printed packed date in "YYYY-MM-DD" format if visible, otherwise null.
    - "best_before_date": the printed best before date in "YYYY-MM-DD" format if visible, otherwise null.
-   - "date_type": choose from ['expiry', 'best_before', 'use_by', 'manufacturing', 'packed', 'unknown'].
-   - "date_source": choose from ['ocr_verified', 'vision_detected', 'calculated_from_packaging', 'user_entered', 'unknown'].
-   - "raw_date_text": the exact raw text snippet of the date label from the packaging (e.g., "EXP 18/07/2026").
-   - "storage_zone": default storage location. MUST choose one from ['fridge', 'freezer', 'pantry', 'counter', 'cabinet', 'basket', 'spice'].
-   - "storage_reason": one short reason explain why this storage zone is selected (follow package instruction first if visible, do not claim that storage extends manufacturer printed expiry date).
-   - "shelf_life_guidance": practical storage tips to help maintain freshness and reduce premature spoilage, including opening-state guidance or items to avoid storing nearby when relevant. No emojis.
-   - "confidence": confidence in detection. MUST choose one from ['High', 'Medium', 'Low'].
-   - "date_confidence": confidence in date extraction. MUST choose one from ['High', 'Medium', 'Low'].
-   - "source_image_index": integer index (0-based) of the image this item was detected in, based on the order images were provided.
-   - "warnings": array of strings listing quality warnings (e.g., "Image too blurry", "Lighting too dark", "Product label partially hidden", "Expiry text not readable").
+   - "date_type": choose from ['expiry', 'best_before', 'use_by', 'manufacturing', 'packed', 'estimated'].
+   - "date_source": choose from ['ocr_verified', 'vision_detected', 'calculated_from_packaging', 'calculated_shelf_life', 'user_entered', 'unknown'].
+   - "raw_date_text": the exact raw text snippet of the date label if visible on pack (e.g., "EXP 18/07/2026"), or "Estimated based on item shelf life".
+   - "confidence": confidence in detection: ['High', 'Medium', 'Low'].
+   - "date_confidence": confidence in date extraction: ['High', 'Medium', 'Low'].
+   - "source_image_index": integer index (0-based) of the image this item was detected in.
+   - "warnings": array of strings listing quality warnings if any.
 
 Return a valid JSON object matching the requested schema.
 """
