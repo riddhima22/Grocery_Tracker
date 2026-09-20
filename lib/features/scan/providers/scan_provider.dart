@@ -12,7 +12,7 @@ enum ScanUIState { idle, selecting, uploading, analyzing, review, success, error
 class ScanProvider extends ChangeNotifier {
   final ScanRepository _scanRepository = ScanRepository();
 
-  List<XFile> _selectedImages = [];
+  final List<XFile> _selectedImages = [];
   ScanUIState _uiState = ScanUIState.idle;
   String? _errorMessage;
   

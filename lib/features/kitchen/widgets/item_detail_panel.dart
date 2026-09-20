@@ -128,9 +128,7 @@ class _ItemDetailPanelState extends State<ItemDetailPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final int? daysLeft = widget.item.expiryDate != null 
-        ? widget.item.expiryDate!.difference(DateTime.now()).inDays 
-        : null;
+    final int? daysLeft = widget.item.expiryDate?.difference(DateTime.now()).inDays;
 
     return Center(
       child: Container(
@@ -203,7 +201,7 @@ class _ItemDetailPanelState extends State<ItemDetailPanel> {
                                 vertical: context.scaleHeight(4.0),
                               ),
                               decoration: BoxDecoration(
-                                color: AppColors.primary.withOpacity(0.12),
+                                color: AppColors.primary.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(AppRadius.chip(context) * 0.75),
                               ),
                               child: Text(
@@ -265,9 +263,9 @@ class _ItemDetailPanelState extends State<ItemDetailPanel> {
               Container(
                 padding: EdgeInsets.all(AppSpacing.sm(context)),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.08),
+                  color: AppColors.primary.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(AppRadius.card(context) * 0.75),
-                  border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,

@@ -141,7 +141,7 @@ class _MealLogViewState extends State<MealLogView> {
                     ? Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.add_a_photo, size: 48, color: AppColors.primary.withOpacity(0.5)),
+                          Icon(Icons.add_a_photo, size: 48, color: AppColors.primary.withValues(alpha: 0.5)),
                           const SizedBox(height: 8),
                           Text('Tap to add photo', style: AppTextStyles.labelMedium(context)),
                         ],
@@ -174,11 +174,11 @@ class _MealLogViewState extends State<MealLogView> {
                 fillColor: AppColors.card,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(AppRadius.card(context)),
-                  borderSide: BorderSide(color: AppColors.cardBorder),
+                  borderSide: const BorderSide(color: AppColors.cardBorder),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(AppRadius.card(context)),
-                  borderSide: BorderSide(color: AppColors.cardBorder),
+                  borderSide: const BorderSide(color: AppColors.cardBorder),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(AppRadius.card(context)),

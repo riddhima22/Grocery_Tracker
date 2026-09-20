@@ -3,8 +3,6 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../../../config/app_colors.dart';
 import '../../../config/app_spacing.dart';
-import '../../../config/app_radius.dart';
-import '../../../config/app_icon_sizes.dart';
 import '../../../config/app_constraints.dart';
 import '../../../config/app_text_styles.dart';
 import '../../../config/app_routes.dart';
@@ -13,7 +11,6 @@ import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_text_field.dart';
 import '../../../core/widgets/app_error_banner.dart';
 import '../../../core/utils/validators.dart';
-import '../../../core/extensions/responsive_context_extension.dart';
 
 class SignupView extends StatefulWidget {
   const SignupView({super.key});

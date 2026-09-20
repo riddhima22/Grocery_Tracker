@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../config/app_colors.dart';
 import '../../config/app_text_styles.dart';
-import '../../config/app_spacing.dart';
 import '../../config/app_radius.dart';
 import '../../core/extensions/responsive_context_extension.dart';
 
@@ -19,7 +18,7 @@ class ExpiryBadge extends StatelessWidget {
       return Container(
         padding: EdgeInsets.symmetric(horizontal: paddingH, vertical: paddingV),
         decoration: BoxDecoration(
-          color: AppColors.info.withOpacity(0.15),
+          color: AppColors.info.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(AppRadius.chip(context)),
         ),
         child: Text(
@@ -47,9 +46,9 @@ class ExpiryBadge extends StatelessWidget {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: paddingH, vertical: paddingV),
       decoration: BoxDecoration(
-        color: badgeColor.withOpacity(0.15),
+        color: badgeColor.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(AppRadius.chip(context)),
-        border: Border.all(color: badgeColor.withOpacity(0.3), width: 1.0),
+        border: Border.all(color: badgeColor.withValues(alpha: 0.3), width: 1.0),
       ),
       child: Text(
         label,

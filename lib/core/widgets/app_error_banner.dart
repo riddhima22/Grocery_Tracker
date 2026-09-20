@@ -4,7 +4,6 @@ import '../../config/app_text_styles.dart';
 import '../../config/app_spacing.dart';
 import '../../config/app_radius.dart';
 import '../../config/app_icon_sizes.dart';
-import '../../core/extensions/responsive_context_extension.dart';
 
 class AppErrorBanner extends StatelessWidget {
   final String? errorMessage;
@@ -27,9 +26,9 @@ class AppErrorBanner extends StatelessWidget {
         vertical: AppSpacing.sm(context),
       ),
       decoration: BoxDecoration(
-        color: AppColors.danger.withOpacity(0.15),
+        color: AppColors.danger.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(AppRadius.card(context) * 0.75),
-        border: Border.all(color: AppColors.danger.withOpacity(0.3)),
+        border: Border.all(color: AppColors.danger.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [

@@ -13,7 +13,7 @@ class GroceryRepository {
 
   Future<Map<String, dynamic>> lookupBarcode(String barcode) async {
     final response = await _apiClient.get(
-      ApiEndpoints.groceries + 'barcode-lookup/',
+      '${ApiEndpoints.groceries}barcode-lookup/',
       queryParameters: {'barcode': barcode},
     );
     return response.data['data'] as Map<String, dynamic>;

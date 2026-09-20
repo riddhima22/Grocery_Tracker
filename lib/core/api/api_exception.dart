@@ -9,11 +9,11 @@ class ApiException implements Exception {
 }
 
 class NetworkException extends ApiException {
-  NetworkException(String message) : super(message);
+  NetworkException(super.message);
 }
 
 class TimeoutException extends ApiException {
-  TimeoutException(String message) : super(message);
+  TimeoutException(super.message);
 }
 
 class ValidationException extends ApiException {
@@ -50,5 +50,5 @@ class ServerException extends ApiException {
 }
 
 class UnknownApiException extends ApiException {
-  UnknownApiException(String message) : super(message);
+  UnknownApiException(super.message);
 }

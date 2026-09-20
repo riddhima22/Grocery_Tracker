@@ -135,9 +135,9 @@ class _ForgotPasswordViewState extends State<ForgotPasswordView> {
           width: iconBoxSize,
           height: iconBoxSize,
           decoration: BoxDecoration(
-            color: AppColors.success.withOpacity(0.12),
+            color: AppColors.success.withValues(alpha: 0.12),
             shape: BoxShape.circle,
-            border: Border.all(color: AppColors.success.withOpacity(0.3), width: 1.5),
+            border: Border.all(color: AppColors.success.withValues(alpha: 0.3), width: 1.5),
           ),
           child: Center(
             child: Icon(

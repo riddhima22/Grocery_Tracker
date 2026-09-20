@@ -160,9 +160,9 @@ class _RecipeDetailViewState extends State<RecipeDetailView> {
     return Container(
       padding: EdgeInsets.all(AppSpacing.sm(context)),
       decoration: BoxDecoration(
-        color: AppColors.danger.withOpacity(0.12),
+        color: AppColors.danger.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(AppRadius.card(context) * 0.75),
-        border: Border.all(color: AppColors.danger.withOpacity(0.25)),
+        border: Border.all(color: AppColors.danger.withValues(alpha: 0.25)),
       ),
       child: Row(
         children: [
@@ -190,9 +190,9 @@ class _RecipeDetailViewState extends State<RecipeDetailView> {
             vertical: context.scaleHeight(6.0),
           ),
           decoration: BoxDecoration(
-            color: AppColors.primary.withOpacity(0.12),
+            color: AppColors.primary.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(AppRadius.chip(context)),
-            border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+            border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
           ),
           child: Text(
             '✓ $i',
@@ -234,16 +234,16 @@ class _RecipeDetailViewState extends State<RecipeDetailView> {
         final isChecked = _checkedSteps.contains(index);
         
         return Card(
-          color: isChecked ? AppColors.card.withOpacity(0.4) : AppColors.card,
+          color: isChecked ? AppColors.card.withValues(alpha: 0.4) : AppColors.card,
           margin: EdgeInsets.symmetric(vertical: AppSpacing.xxs(context)),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.card(context) * 0.75),
-            side: BorderSide(color: isChecked ? AppColors.cardBorder.withOpacity(0.5) : AppColors.cardBorder),
+            side: BorderSide(color: isChecked ? AppColors.cardBorder.withValues(alpha: 0.5) : AppColors.cardBorder),
           ),
           child: ListTile(
             leading: CircleAvatar(
               radius: 12.0,
-              backgroundColor: isChecked ? AppColors.primary.withOpacity(0.2) : AppColors.surface,
+              backgroundColor: isChecked ? AppColors.primary.withValues(alpha: 0.2) : AppColors.surface,
               child: Text(
                 '${index + 1}',
                 style: TextStyle(

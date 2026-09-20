@@ -1,6 +1,5 @@
 import 'package:dio/dio.dart';
 import 'package:image_picker/image_picker.dart';
-import 'dart:io';
 import '../../core/api/api_client.dart';
 import '../../core/api/api_endpoints.dart';
 import '../models/scan_session_model.dart';
@@ -48,14 +47,14 @@ class ScanRepository {
 
   Future<ScanCandidateModel> updateCandidate(String candidateId, Map<String, dynamic> data) async {
     final response = await _apiClient.patch(
-      ApiEndpoints.scans + 'candidates/$candidateId/',
+      '${ApiEndpoints.scans}candidates/$candidateId/',
       data: data,
     );
     return ScanCandidateModel.fromJson(response.data['data']);
   }
 
   Future<void> deleteCandidate(String candidateId) async {
-    await _apiClient.delete(ApiEndpoints.scans + 'candidates/$candidateId/');
+    await _apiClient.delete('${ApiEndpoints.scans}candidates/$candidateId/');
   }
 
   Future<List<GroceryModel>> confirmScan(String sessionId, List<String> candidateIds, String idempotencyKey) async {

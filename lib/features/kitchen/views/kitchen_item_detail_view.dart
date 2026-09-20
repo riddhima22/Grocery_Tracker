@@ -87,6 +87,7 @@ class _KitchenItemDetailViewState extends State<KitchenItemDetailView> with Sing
       'purchase_date': _currentItem.purchaseDate.toIso8601String().substring(0, 10),
     });
 
+    if (!mounted) return;
     // 2. Save updates to database
     final kitchenProvider = context.read<KitchenProvider>();
     final success = await kitchenProvider.updateItem(
@@ -107,6 +108,7 @@ class _KitchenItemDetailViewState extends State<KitchenItemDetailView> with Sing
       },
     );
 
+    if (!mounted) return;
     if (success) {
       // Find the updated item in list
       final updatedItem = kitchenProvider.items.firstWhere((i) => i.id == _currentItem.id);
@@ -161,7 +163,6 @@ class _KitchenItemDetailViewState extends State<KitchenItemDetailView> with Sing
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final double cardPadding = AppSpacing.md(context);
     final freshnessColor = _getFreshnessColor(_currentItem.freshnessScore);
     
@@ -279,7 +280,7 @@ class _KitchenItemDetailViewState extends State<KitchenItemDetailView> with Sing
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.12),
+                        color: AppColors.primary.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -291,7 +292,7 @@ class _KitchenItemDetailViewState extends State<KitchenItemDetailView> with Sing
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
                       decoration: BoxDecoration(
-                        color: freshnessColor.withOpacity(0.12),
+                        color: freshnessColor.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -421,7 +422,7 @@ class _KitchenItemDetailViewState extends State<KitchenItemDetailView> with Sing
               ),
               Switch(
                 value: _currentItem.isOpened,
-                activeColor: AppColors.primary,
+                activeThumbColor: AppColors.primary,
                 onChanged: (val) {
                   _updateItemParameters(isOpened: val);
                 },
@@ -482,9 +483,9 @@ class _KitchenItemDetailViewState extends State<KitchenItemDetailView> with Sing
     return Container(
       padding: EdgeInsets.all(AppSpacing.md(context)),
       decoration: BoxDecoration(
-        color: AppColors.primary.withOpacity(0.06),
+        color: AppColors.primary.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(AppRadius.card(context)),
-        border: Border.all(color: AppColors.primary.withOpacity(0.20)),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.20)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -617,7 +618,7 @@ class _KitchenItemDetailViewState extends State<KitchenItemDetailView> with Sing
                     return Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: AppColors.danger.withOpacity(0.12),
+                        color: AppColors.danger.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(

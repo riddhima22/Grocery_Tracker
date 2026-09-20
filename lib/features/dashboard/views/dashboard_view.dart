@@ -6,7 +6,6 @@ import '../../auth/providers/auth_provider.dart';
 import '../../../config/app_colors.dart';
 import '../../../config/app_spacing.dart';
 import '../../../config/app_radius.dart';
-import '../../../config/app_icon_sizes.dart';
 import '../../../config/app_text_styles.dart';
 import '../../../core/widgets/app_scaffold.dart';
 import '../../../core/widgets/app_section_header.dart';
@@ -17,7 +16,6 @@ import '../../../core/services/ai_service.dart';
 import '../../../core/services/ai_search_service.dart';
 import '../../kitchen/views/kitchen_item_detail_view.dart';
 import '../../meals/views/meal_log_view.dart';
-import '../../../data/models/grocery_model.dart';
 
 class DashboardView extends StatefulWidget {
   const DashboardView({super.key});
@@ -605,7 +603,7 @@ class _StorageHealthPainter extends CustomPainter {
     final double center = size.width / 2;
     final double radius = (size.width - 12) / 2;
     final Rect rect = Rect.fromCircle(center: Offset(center, center), radius: radius);
-    final double strokeWidth = 8.0;
+    const double strokeWidth = 8.0;
 
     final Paint bgPaint = Paint()
       ..color = AppColors.cardBorder

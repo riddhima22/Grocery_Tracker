@@ -8,7 +8,6 @@ import '../../../config/app_spacing.dart';
 import '../../../config/app_radius.dart';
 import '../../../config/app_icon_sizes.dart';
 import '../../../config/app_constraints.dart';
-import '../../../config/app_routes.dart';
 import '../../../config/app_text_styles.dart';
 import '../../../config/kitchen_scene_layout.dart';
 import '../../../config/storage_zone_icon_mapper.dart';

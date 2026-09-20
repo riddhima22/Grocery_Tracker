@@ -71,7 +71,7 @@ class MealConfirmView extends StatelessWidget {
                   color: AppColors.card,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(AppRadius.card(context)),
-                    side: BorderSide(color: AppColors.cardBorder),
+                    side: const BorderSide(color: AppColors.cardBorder),
                   ),
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),

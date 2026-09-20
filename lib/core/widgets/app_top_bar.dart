@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../../config/app_colors.dart';
 import '../../config/app_text_styles.dart';
 import '../../config/app_icon_sizes.dart';
-import '../../core/extensions/responsive_context_extension.dart';
 
 class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
@@ -39,7 +38,7 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(1.0),
         child: Container(
-          color: AppColors.cardBorder.withOpacity(0.5),
+          color: AppColors.cardBorder.withValues(alpha: 0.5),
           height: 1.0,
         ),
       ),

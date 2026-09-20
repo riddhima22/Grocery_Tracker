@@ -84,6 +84,7 @@ class _LoginViewState extends State<LoginView> {
           debugPrint('Firebase sign in sync note: $fbError');
         }
 
+        if (!mounted) return;
         final authProvider = context.read<AuthProvider>();
         final success = await authProvider.loginWithGoogle(
           token: token,

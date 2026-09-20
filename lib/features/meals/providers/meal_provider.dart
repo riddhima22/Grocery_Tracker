@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../data/models/meal_log_model.dart';
-import '../../../data/models/meal_ingredient_candidate_model.dart';
 import '../../../data/repositories/meal_repository.dart';
 import '../../../core/utils/app_logger.dart';
 

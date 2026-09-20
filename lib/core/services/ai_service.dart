@@ -102,6 +102,11 @@ class AIServiceImpl implements IAIService {
       estDays *= 0.8;
     }
 
+    // Humidity penalty
+    if (zone == 'pantry' && humidity > 70.0) {
+      estDays *= 0.9;
+    }
+
     // Opened penalty
     if (opened) {
       estDays *= 0.4;

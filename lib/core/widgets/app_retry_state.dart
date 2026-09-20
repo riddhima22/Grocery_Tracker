@@ -3,7 +3,6 @@ import 'app_button.dart';
 import '../../config/app_text_styles.dart';
 import '../../config/app_spacing.dart';
 import '../../config/app_icon_sizes.dart';
-import '../../core/extensions/responsive_context_extension.dart';
 
 class AppRetryState extends StatelessWidget {
   final String errorMessage;

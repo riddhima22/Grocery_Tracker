@@ -157,7 +157,7 @@ class _OnboardingViewState extends State<OnboardingView> {
                             border: Border.all(color: AppColors.cardBorder),
                             boxShadow: [
                               BoxShadow(
-                                color: AppColors.primary.withOpacity(0.08),
+                                color: AppColors.primary.withValues(alpha: 0.08),
                                 blurRadius: 24,
                                 spreadRadius: 8,
                               )
@@ -198,7 +198,7 @@ class _OnboardingViewState extends State<OnboardingView> {
                   SmoothPageIndicator(
                     controller: _pageController,
                     count: _pages.length,
-                    effect: ExpandingDotsEffect(
+                    effect: const ExpandingDotsEffect(
                       activeDotColor: AppColors.primary,
                       dotColor: AppColors.cardBorder,
                       dotHeight: 8.0,

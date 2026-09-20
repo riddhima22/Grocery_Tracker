@@ -5,7 +5,6 @@ import '../../config/app_spacing.dart';
 import '../../config/app_radius.dart';
 import '../../config/app_icon_sizes.dart';
 import '../../config/category_icon_mapper.dart';
-import '../../core/extensions/responsive_context_extension.dart';
 import '../../data/models/scan_candidate_model.dart';
 import 'ai_confidence_badge.dart';
 import 'quantity_stepper.dart';

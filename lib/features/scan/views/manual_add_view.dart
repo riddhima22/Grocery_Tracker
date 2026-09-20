@@ -33,7 +33,7 @@ class _ManualAddViewState extends State<ManualAddView> {
   String _unit = 'pcs';
   String _storageZone = 'pantry';
   DateTime? _expiryDate;
-  DateTime _purchaseDate = DateTime.now();
+  final DateTime _purchaseDate = DateTime.now();
 
   final List<String> _categories = [
     'Vegetables', 'Fruits', 'Dairy', 'Bakery', 'Meat', 'Grains', 'Snacks', 'Beverages', 'Spices', 'Other'
@@ -198,7 +198,7 @@ class _ManualAddViewState extends State<ManualAddView> {
                   Text('Category', style: AppTextStyles.labelMedium(context)),
                   const SizedBox(height: 6),
                   DropdownButtonFormField<String>(
-                    value: _category,
+                    initialValue: _category,
                     decoration: const InputDecoration(
                       contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     ),
@@ -231,7 +231,7 @@ class _ManualAddViewState extends State<ManualAddView> {
                             Text('Unit', style: AppTextStyles.labelMedium(context)),
                             const SizedBox(height: 6),
                             DropdownButtonFormField<String>(
-                              value: _unit,
+                              initialValue: _unit,
                               decoration: const InputDecoration(
                                 contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                               ),
@@ -254,7 +254,7 @@ class _ManualAddViewState extends State<ManualAddView> {
                   Text('Storage Zone', style: AppTextStyles.labelMedium(context)),
                   const SizedBox(height: 6),
                   DropdownButtonFormField<String>(
-                    value: _storageZone,
+                    initialValue: _storageZone,
                     decoration: const InputDecoration(
                       contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     ),

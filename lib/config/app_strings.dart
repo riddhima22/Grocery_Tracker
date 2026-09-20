@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 
 class AppStrings {
   static String activeLanguage = 'en'; // default language, can be switched to 'hi'

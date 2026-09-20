@@ -42,6 +42,7 @@ class _GroceryListViewState extends State<GroceryListView> {
 
     final provider = context.read<GroceryListProvider>();
     final success = await provider.addItem(name, 1.0, 'pcs');
+    if (!mounted) return;
     if (success) {
       _addItemController.clear();
       FocusScope.of(context).unfocus();

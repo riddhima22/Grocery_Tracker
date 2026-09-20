@@ -244,7 +244,7 @@ class _ProfileViewState extends State<ProfileView> {
                   Text('Dietary Type', style: AppTextStyles.labelMedium(context)),
                   const SizedBox(height: 6),
                   DropdownButtonFormField<String>(
-                    value: _dietType,
+                    initialValue: _dietType,
                     decoration: const InputDecoration(
                       contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     ),
@@ -439,7 +439,7 @@ class _ProfileViewState extends State<ProfileView> {
       subtitle: Text(desc, style: AppTextStyles.caption(context)),
       value: value,
       onChanged: onChanged,
-      activeColor: AppColors.primary,
+      activeThumbColor: AppColors.primary,
       contentPadding: EdgeInsets.zero,
     );
   }

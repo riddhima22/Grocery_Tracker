@@ -87,7 +87,6 @@ class AppButton extends StatelessWidget {
           ),
         );
       case AppButtonStyle.primary:
-      default:
         return Container(
           width: double.infinity,
           height: buttonH,

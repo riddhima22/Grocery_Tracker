@@ -42,7 +42,7 @@ class AIConfidenceBadge extends StatelessWidget {
           Icon(Icons.auto_awesome, size: AppIconSizes.sm(context) * 0.6, color: color),
           const SizedBox(width: 4), // small relative spacing
           Text(
-            '$confidence',
+            confidence,
             style: AppTextStyles.caption(context).copyWith(
               color: color,
               fontWeight: FontWeight.bold,

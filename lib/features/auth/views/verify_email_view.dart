@@ -96,9 +96,9 @@ class _VerifyEmailViewState extends State<VerifyEmailView> {
                 width: iconBoxSize,
                 height: iconBoxSize,
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.12),
+                  color: AppColors.primary.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.primary.withOpacity(0.3), width: 1.5),
+                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.3), width: 1.5),
                 ),
                 child: Center(
                   child: Icon(
