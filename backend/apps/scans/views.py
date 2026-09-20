@@ -123,47 +123,118 @@ class ScanSessionViewSet(viewsets.ReadOnlyModelViewSet):
             except ValueError:
                 return Response({"success": False, "error": "Invalid idempotency key format."}, status=400)
 
-        # Get candidates to add
+        # Get candidates to add (fallback to all candidates if selected_ids is empty)
         selected_ids = request.data.get('candidate_ids', [])
-        if not selected_ids:
-            return Response({"success": False, "error": "No candidates selected for saving."}, status=400)
+        if selected_ids:
+            candidates = session.candidates.filter(id__in=selected_ids)
+        else:
+            candidates = session.candidates.all()
 
-        candidates = session.candidates.filter(id__in=selected_ids)
         if not candidates.exists():
             return Response({"success": False, "error": "Selected candidates not found or already processed."}, status=400)
 
         created_groceries = []
 
+        def sanitize_unit(u):
+            if not u: return 'pcs'
+            u_str = str(u).lower().strip()
+            if u_str in ['kg', 'g', 'l', 'ml', 'pcs', 'pack', 'bottle', 'box', 'dozen']:
+                return 'L' if u_str == 'l' else u_str
+            if u_str in ['packet', 'packets', 'pkt']: return 'pack'
+            if u_str in ['piece', 'pieces', 'pc']: return 'pcs'
+            if u_str in ['bunch', 'bunches']: return 'pcs'
+            if u_str in ['liter', 'liters', 'litre', 'litres']: return 'L'
+            if u_str in ['gram', 'grams', 'gm']: return 'g'
+            return 'pcs'
+
+        def sanitize_zone(z):
+            if not z: return 'pantry'
+            z_str = str(z).lower().strip()
+            if z_str in ['fridge', 'freezer', 'pantry', 'counter', 'cabinet', 'basket', 'spice']:
+                return z_str
+            if 'fridge' in z_str or 'refrigerator' in z_str or 'chiller' in z_str: return 'fridge'
+            if 'freezer' in z_str: return 'freezer'
+            if 'basket' in z_str: return 'basket'
+            if 'spice' in z_str: return 'spice'
+            if 'counter' in z_str: return 'counter'
+            return 'pantry'
+
+        def sanitize_confidence(c):
+            if not c: return 'Low'
+            c_str = str(c).strip().capitalize()
+            if c_str in ['High', 'Medium', 'Low']: return c_str
+            return 'Low'
+
+        from apps.groceries.prediction_engine import calculate_item_shelf_life
+        import datetime
+
+        def to_calendar_date(val):
+            if val is None:
+                return None
+            if isinstance(val, datetime.datetime):
+                return val.date()
+            if isinstance(val, datetime.date):
+                return val
+            if isinstance(val, str):
+                val = val.strip()
+                if not val:
+                    return None
+                try:
+                    return datetime.date.fromisoformat(val[:10])
+                except Exception:
+                    pass
+                try:
+                    from dateutil import parser
+                    return parser.parse(val).date()
+                except Exception:
+                    return None
+            return None
+
         with transaction.atomic():
-            # Update user stats
             user = request.user
-            
+
             for candidate in candidates:
+                exp_date = to_calendar_date(candidate.expiry_date)
+                if not exp_date:
+                    days = calculate_item_shelf_life(candidate.name, candidate.category, candidate.storage_zone)
+                    exp_date = timezone.localdate() + datetime.timedelta(days=days)
+
+                unit_val = sanitize_unit(candidate.unit)
+                zone_val = sanitize_zone(candidate.storage_zone)
+                conf_val = sanitize_confidence(candidate.confidence)
+                date_conf_val = sanitize_confidence(candidate.date_confidence)
+
+                mfg_date = to_calendar_date(candidate.manufacturing_date)
+                pck_date = to_calendar_date(candidate.packed_date)
+                bb_date = to_calendar_date(candidate.best_before_date)
+                purch_date = timezone.localdate()
+
                 # Add item to user kitchen/grocery list
                 item = GroceryItem.objects.create(
                     user=request.user,
                     name=candidate.name,
                     brand=candidate.brand,
-                    description=candidate.description,
+                    description=candidate.description or f"Fresh {candidate.name} stored in {zone_val.capitalize()}.",
                     icon_key=candidate.icon_key,
                     category=candidate.category,
                     quantity=candidate.quantity,
-                    unit=candidate.unit,
-                    storage_zone=candidate.storage_zone,
-                    expiry_date=candidate.expiry_date,
-                    manufacturing_date=candidate.manufacturing_date,
-                    packed_date=candidate.packed_date,
-                    best_before_date=candidate.best_before_date,
-                    date_type=candidate.date_type,
-                    date_source=candidate.date_source,
-                    date_confidence=candidate.date_confidence,
+                    unit=unit_val,
+                    storage_zone=zone_val,
+                    expiry_date=exp_date,
+                    manufacturing_date=mfg_date,
+                    packed_date=pck_date,
+                    best_before_date=bb_date,
+                    purchase_date=purch_date,
+                    date_type=candidate.date_type or 'estimated',
+                    date_source=candidate.date_source or 'calculated_shelf_life',
+                    date_confidence=date_conf_val,
                     raw_date_text=candidate.raw_date_text,
                     storage_reason=candidate.storage_reason,
                     shelf_life_guidance=candidate.shelf_life_guidance,
                     ai_detected=True,
-                    ai_confidence=candidate.confidence
+                    ai_confidence=conf_val
                 )
-                
+
                 # Record Activity
                 GroceryActivity.objects.create(
                     user=request.user,
@@ -172,7 +243,7 @@ class ScanSessionViewSet(viewsets.ReadOnlyModelViewSet):
                     new_quantity=item.quantity,
                     unit=item.unit
                 )
-                
+
                 user.total_tracked += 1
                 created_groceries.append(item)
 
@@ -180,7 +251,10 @@ class ScanSessionViewSet(viewsets.ReadOnlyModelViewSet):
 
             # Set session completed & save key
             if idempotency_key:
-                session.idempotency_key = uuid.UUID(str(idempotency_key))
+                try:
+                    session.idempotency_key = uuid.UUID(str(idempotency_key))
+                except Exception:
+                    pass
             session.status = ScanSession.Statuses.COMPLETED
             session.save()
 
@@ -189,11 +263,11 @@ class ScanSessionViewSet(viewsets.ReadOnlyModelViewSet):
 
         # Safely clean up local temporary images
         for scan_image in session.images.all():
-            if scan_image.image and os.path.exists(scan_image.image.path):
-                try:
+            try:
+                if scan_image.image and hasattr(scan_image.image, 'path') and os.path.exists(scan_image.image.path):
                     os.remove(scan_image.image.path)
-                except Exception:
-                    pass
+            except Exception:
+                pass
 
         return Response({
             "success": True,

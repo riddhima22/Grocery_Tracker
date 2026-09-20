@@ -60,7 +60,7 @@ class GroceryItem(models.Model):
     raw_date_text = models.TextField(blank=True)
     storage_reason = models.TextField(blank=True)
     shelf_life_guidance = models.TextField(blank=True)
-    purchase_date = models.DateField(default=timezone.now)
+    purchase_date = models.DateField(default=timezone.localdate)
     
     # Server-side auto calculated fields
     status = models.CharField(max_length=20, default='fresh')

@@ -72,3 +72,93 @@ class ScanTaskRetryTests(TestCase):
         self.assertFalse(is_transient_error(Exception("Image resolution is too low")))
         self.assertFalse(is_transient_error(Exception("Invalid argument: JSONDecodeError")))
 
+
+from rest_framework.test import APITestCase
+from django.contrib.auth import get_user_model
+from apps.scans.models import ScanSession, ScanCandidate
+from apps.groceries.models import GroceryItem
+from apps.groceries.serializers import GroceryItemSerializer
+
+User = get_user_model()
+
+class ScanConfirmationDateRegressionTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="scanner_test@example.com",
+            password="StrongPassword123!",
+            display_name="Scan Tester"
+        )
+        self.client.force_authenticate(user=self.user)
+        self.session = ScanSession.objects.create(
+            user=self.user,
+            status=ScanSession.Statuses.COMPLETED
+        )
+
+    def test_confirm_scan_with_explicit_dates(self):
+        candidate = ScanCandidate.objects.create(
+            scan_session=self.session,
+            name="Organic Milk",
+            category="Dairy",
+            storage_zone="fridge",
+            quantity=2.0,
+            unit="pack",
+            expiry_date=datetime.date(2026, 10, 15),
+            best_before_date=datetime.date(2026, 10, 15),
+            manufacturing_date=datetime.date(2026, 9, 1),
+            packed_date=datetime.date(2026, 9, 2),
+            date_type="best_before",
+            date_source="ocr_verified",
+            date_confidence="High",
+            confidence="High"
+        )
+
+        url = f"/api/v1/scans/sessions/{self.session.id}/confirm/"
+        response = self.client.post(url, {"candidate_ids": [str(candidate.id)]}, format='json')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["success"])
+        items = response.data["data"]
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["name"], "Organic Milk")
+        self.assertEqual(items[0]["expiry_date"], "2026-10-15")
+        self.assertEqual(items[0]["best_before_date"], "2026-10-15")
+        self.assertEqual(items[0]["manufacturing_date"], "2026-09-01")
+        self.assertEqual(items[0]["packed_date"], "2026-09-02")
+        self.assertIsInstance(items[0]["purchase_date"], str)
+
+    def test_confirm_scan_with_datetime_object_coercion(self):
+        candidate = ScanCandidate.objects.create(
+            scan_session=self.session,
+            name="Fresh Apples",
+            category="Fruits",
+            storage_zone="counter",
+            quantity=1.0,
+            unit="kg",
+            expiry_date=datetime.date(2026, 11, 1),
+        )
+        candidate.expiry_date = datetime.datetime(2026, 11, 1, 12, 0, 0, tzinfo=datetime.timezone.utc)
+        candidate.save()
+
+        url = f"/api/v1/scans/sessions/{self.session.id}/confirm/"
+        response = self.client.post(url, {}, format='json')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["success"])
+        items = response.data["data"]
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["name"], "Fresh Apples")
+        self.assertEqual(items[0]["expiry_date"], "2026-11-01")
+
+    def test_grocery_item_default_purchase_date_is_pure_date(self):
+        item = GroceryItem.objects.create(
+            user=self.user,
+            name="Greek Yogurt",
+            category="Dairy",
+            storage_zone="fridge",
+            expiry_date=datetime.date(2026, 10, 5)
+        )
+        self.assertIs(type(item.purchase_date), datetime.date)
+        serializer = GroceryItemSerializer(item)
+        self.assertEqual(serializer.data["purchase_date"], timezone.localdate().isoformat())
+
+
