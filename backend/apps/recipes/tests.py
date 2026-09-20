@@ -165,3 +165,77 @@ class RecipeAPITests(APITestCase):
         # Mark cooked should fail
         response = self.client.post(f'/api/v1/recipes/{recipe.id}/mark-cooked/', {})
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    @patch('apps.recipes.views.AIService')
+    def test_generate_zero_waste_expiring_only_and_fitness_goal(self, MockAIService):
+        mock_service = MockAIService.return_value
+        mock_service.generate_recipes.return_value = {
+            "recipes": [
+                {
+                    "name": "High Protein Zero Waste Scramble",
+                    "icon_key": "restaurant",
+                    "cuisine": "Continental",
+                    "diet_type": "veg",
+                    "prep_time_mins": 15,
+                    "servings": 2,
+                    "calories_per_serving": 250,
+                    "ingredients_used": [
+                        {"pantry_item_id": str(self.pantry_tomato.id), "name": "Tomato", "quantity": 1.0, "unit": "kg"}
+                    ],
+                    "other_ingredients": ["water", "salt", "black pepper"],
+                    "allergens": [],
+                    "steps": ["Slice tomatoes", "Cook with salt and black pepper"],
+                    "nutrition": {"protein_g": 22, "carbs_g": 10, "fat_g": 8, "fiber_g": 5},
+                    "tip": "High protein meal utilizing expiring tomatoes without any extra shopping."
+                }
+            ]
+        }
+
+        payload = {
+            "expiring_only": True,
+            "strict_pantry_only": True,
+            "fitness_goal": "High Protein",
+            "allergies": []
+        }
+        response = self.client.post(self.generate_url, payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['success'])
+        self.assertEqual(len(response.data['data']), 1)
+        recipe_data = response.data['data'][0]
+        self.assertEqual(recipe_data['name'], "High Protein Zero Waste Scramble")
+        # Verify strict pantry: other_ingredients only has staples
+        self.assertIn("salt", recipe_data['other_ingredients'])
+
+        # Verify MockAIService received the preferences including fitness_goal
+        call_args = mock_service.generate_recipes.call_args[0]
+        prefs = call_args[1]
+        self.assertEqual(prefs['fitness_goal'], "High Protein")
+        self.assertTrue(prefs['strict_pantry_only'])
+        self.assertTrue(prefs['expiring_only'])
+
+    @patch('apps.recipes.views.AIService')
+    def test_proactive_allergy_exclusion(self, MockAIService):
+        # Create a peanut item in user's pantry
+        peanut_item = GroceryItem.objects.create(
+            user=self.user1,
+            name='Peanut Butter',
+            quantity=Decimal('1.0'),
+            unit='box',
+            storage_zone='pantry',
+            expiry_date=timezone.now().date() + datetime.timedelta(days=10)
+        )
+
+        mock_service = MockAIService.return_value
+        mock_service.generate_recipes.return_value = {"recipes": []}
+
+        payload = {
+            "allergies": ["peanut"]
+        }
+        response = self.client.post(self.generate_url, payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Check the groceries sent to AIService - peanut_item must be excluded
+        sent_groceries = mock_service.generate_recipes.call_args[0][0]
+        sent_names = [item['name'].lower() for item in sent_groceries]
+        self.assertNotIn("peanut butter", sent_names)
+

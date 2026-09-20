@@ -7,6 +7,7 @@ import '../../../config/app_spacing.dart';
 import '../../../config/app_radius.dart';
 import '../../../config/app_icon_sizes.dart';
 import '../../../config/app_text_styles.dart';
+import '../../../config/app_routes.dart';
 import '../../../core/widgets/app_scaffold.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_retry_state.dart';
@@ -61,6 +62,20 @@ class _GroceryListViewState extends State<GroceryListView> {
           style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold, fontSize: context.scaleFont(20.0)),
         ),
         backgroundColor: Colors.transparent,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.restaurant_menu_rounded),
+            tooltip: 'Expiring Soon Recipes',
+            color: AppColors.primary,
+            onPressed: () {
+              Navigator.pushNamed(
+                context,
+                AppRoutes.recipes,
+                arguments: {'expiring_only': true},
+              );
+            },
+          ),
+        ],
       ),
       body: listProvider.errorMessage != null
           ? AppRetryState(
@@ -72,6 +87,9 @@ class _GroceryListViewState extends State<GroceryListView> {
                 constraints: const BoxConstraints(maxWidth: 600),
                 child: Column(
                   children: [
+                    // Zero-Waste Recipe Banner (cook from expiring food)
+                    _buildZeroWasteBanner(),
+
                     // Quick Manual Add Bar
                     _buildQuickAddBar(),
                     const Divider(),
@@ -96,6 +114,135 @@ class _GroceryListViewState extends State<GroceryListView> {
                 ),
               ),
             ),
+    );
+  }
+
+  Widget _buildZeroWasteBanner() {
+    return Container(
+      margin: EdgeInsets.symmetric(
+        horizontal: AppSpacing.md(context),
+        vertical: AppSpacing.xs(context),
+      ),
+      padding: EdgeInsets.all(AppSpacing.md(context)),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppColors.primary.withValues(alpha: 0.12),
+            AppColors.primaryDeep.withValues(alpha: 0.08),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(AppRadius.card(context)),
+        border: Border.all(
+          color: AppColors.primary.withValues(alpha: 0.25),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppColors.primary,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primary.withValues(alpha: 0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.restaurant_menu_rounded,
+              color: Colors.white,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        'Zero-Waste Recipes',
+                        style: AppTextStyles.labelLarge(context).copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.success.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        'EXPIRING SOON',
+                        style: TextStyle(
+                          fontFamily: 'Outfit',
+                          fontSize: context.scaleFont(8.0),
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.success,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Cook with kitchen items near expiry. No extra shopping!',
+                  style: AppTextStyles.caption(context).copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          FilledButton.tonal(
+            onPressed: () {
+              Navigator.pushNamed(
+                context,
+                AppRoutes.recipes,
+                arguments: {'expiring_only': true},
+              );
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              visualDensity: VisualDensity.compact,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Cook',
+                  style: TextStyle(
+                    fontFamily: 'Outfit',
+                    fontSize: context.scaleFont(11.0),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(width: 2),
+                const Icon(Icons.arrow_forward_rounded, size: 12),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 

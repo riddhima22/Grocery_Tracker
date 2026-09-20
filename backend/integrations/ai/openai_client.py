@@ -103,6 +103,7 @@ class OpenAIClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
                 diet_type=preferences.get('diet_type', 'any'),
                 cuisine_pref=preferences.get('cuisine_pref', 'Indian'),
                 allergens=json.dumps(preferences.get('allergies', [])),
+                fitness_goal=preferences.get('fitness_goal', 'Balanced'),
                 household_size=preferences.get('household_size', 1),
                 max_prep_time_mins=preferences.get('max_prep_time_mins', 60),
                 meal_type=preferences.get('meal_type', 'any')

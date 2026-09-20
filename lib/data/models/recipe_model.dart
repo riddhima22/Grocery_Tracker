@@ -46,11 +46,29 @@ class RecipeModel {
       prepTimeMins: int.tryParse(json['prep_time_mins']?.toString() ?? '30') ?? 30,
       caloriesPerServing: int.tryParse(json['calories_per_serving']?.toString() ?? '200') ?? 200,
       servings: int.tryParse(json['servings']?.toString() ?? '2') ?? 2,
-      ingredientsUsed: List<String>.from(json['ingredients_used'] ?? []),
-      otherIngredients: List<String>.from(json['other_ingredients'] ?? []),
-      allergens: List<String>.from(json['allergens'] ?? []),
-      steps: List<String>.from(json['steps'] ?? []),
-      nutrition: Map<String, String>.from(json['nutrition'] ?? {}),
+      ingredientsUsed: (json['ingredients_used'] as List?)?.map((item) {
+        if (item is Map) {
+          final qty = item['quantity'] ?? '';
+          final unit = item['unit'] ?? '';
+          final name = item['name'] ?? '';
+          final parts = [
+            if (qty.toString().isNotEmpty) qty,
+            if (unit.toString().isNotEmpty) unit,
+            name.toString(),
+          ];
+          return parts.join(' ').trim();
+        }
+        return item.toString();
+      }).toList() ?? const [],
+      otherIngredients: (json['other_ingredients'] as List?)?.map((item) {
+        if (item is Map) {
+          return (item['name'] ?? item.toString()).toString();
+        }
+        return item.toString();
+      }).toList() ?? const [],
+      allergens: (json['allergens'] as List?)?.map((item) => item.toString()).toList() ?? const [],
+      steps: (json['steps'] as List?)?.map((item) => item.toString()).toList() ?? const [],
+      nutrition: (json['nutrition'] as Map?)?.map((k, v) => MapEntry(k.toString(), v.toString())) ?? const {},
       tip: json['tip'] ?? '',
       allergenWarning: json['allergen_warning'] ?? '',
     );

@@ -37,21 +37,24 @@ class RecipeProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> generateNewRecipes() async {
+  Future<bool> generateNewRecipes({Map<String, dynamic>? preferences}) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      final newRecipes = await _recipeRepository.generateRecipes();
+      final newRecipes = await _recipeRepository.generateRecipes(preferences: preferences);
       _recipes.insertAll(0, newRecipes);
       _isLoading = false;
+      notifyListeners();
+      return true;
     } catch (e) {
       _errorMessage = e.toString();
       _isLoading = false;
       AppLogger.error('Failed to generate recipes', e);
+      notifyListeners();
+      return false;
     }
-    notifyListeners();
   }
 
   Future<bool> markAsCooked(String id) async {

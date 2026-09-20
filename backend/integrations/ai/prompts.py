@@ -62,23 +62,41 @@ Return a valid JSON object matching the requested schema.
 """
 
 RECIPE_GENERATION_PROMPT = """
-You are a creative chef. Generate exactly 4 recipes that can be made using the following available items.
-Prioritize items close to expiry. DO NOT use emojis anywhere in the response.
+You are an expert chef specializing in zero-waste cooking, kitchen pantry optimization, and personalized nutrition.
+Generate exactly 4 delicious, practical recipes that can be made using the available groceries listed below.
+Prioritize items that are closest to expiration to eliminate food waste. DO NOT use emojis anywhere in the response.
 
-Available Groceries:
+Available Groceries in Kitchen:
 {available_items}
 
-User Preferences:
+User Profile & Preferences:
 - Diet: {diet_type}
 - Cuisine Preference: {cuisine_pref}
 - Allergies: {allergens}
+- Fitness Goal: {fitness_goal}
 - Household Size: {household_size}
 - Max Prep Time: {max_prep_time_mins} minutes
 - Meal Type: {meal_type}
 
+STRICT ZERO-WASTE & PANTRY-ONLY RULES:
+1. Every recipe MUST be created ONLY from the items listed in "Available Groceries in Kitchen".
+2. DO NOT require the user to buy or use any extra materials, meats, dairy, vegetables, or groceries they do not have.
+3. You may ONLY assume standard household basics if needed: water, salt, black pepper, and basic cooking oil.
+4. "other_ingredients" MUST be empty [] or ONLY contain standard kitchen staples ("water", "salt", "black pepper", "cooking oil"). Under NO circumstances should "other_ingredients" contain groceries that the user does not have.
+5. Prioritize groceries with the fewest days remaining before expiry.
+
+FITNESS GOAL OPTIMIZATION:
+- Align ingredients, cooking methods, and macronutrient profile with the user's fitness goal: "{fitness_goal}".
+- For "High Protein" / "Muscle Gain": maximize protein content using available protein sources (eggs, paneer, lentils, chicken, dairy, etc.).
+- For "Low Calorie" / "Weight Loss": optimize for volume, fiber, and light, nutrient-dense cooking.
+- For "Keto" / "Low Carb": avoid sugar and high-starch ingredients.
+- In the "tip" field, highlight how the recipe satisfies their fitness goal and rescues near-expiry food.
+
 ALLERGY PROTECTION REQUIREMENT:
-Verify recipe ingredients against the user's recorded allergies ({allergens}).
-List any matching allergens in the "allergens" list for the recipe.
+- The user is strictly allergic to: {allergens}.
+- NEVER use, suggest, or include any ingredient containing, derived from, or contaminated by {allergens}.
+- If any item in "Available Groceries in Kitchen" matches an allergen, DO NOT USE IT.
+- List any matching allergens or allergen considerations in the "allergens" list for the recipe.
 
 Return JSON matching the following schema only:
 {{

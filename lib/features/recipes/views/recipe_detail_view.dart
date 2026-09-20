@@ -93,6 +93,70 @@ class _RecipeDetailViewState extends State<RecipeDetailView> {
                   AppGap.xs(context),
                   _buildOtherIngredientsList(),
                   AppGap.md(context),
+                ] else ...[
+                  Container(
+                    padding: EdgeInsets.all(AppSpacing.sm(context)),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(AppRadius.card(context) * 0.75),
+                      border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.check_circle_outline_rounded, color: AppColors.primary, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '100% Zero-Waste: All ingredients are available in your kitchen! No extra shopping needed.',
+                            style: AppTextStyles.caption(context).copyWith(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  AppGap.md(context),
+                ],
+
+                // Chef Tip & Fitness Highlight
+                if (widget.recipe.tip.isNotEmpty) ...[
+                  Container(
+                    padding: EdgeInsets.all(AppSpacing.sm(context)),
+                    decoration: BoxDecoration(
+                      color: AppColors.card,
+                      borderRadius: BorderRadius.circular(AppRadius.card(context) * 0.75),
+                      border: Border.all(color: AppColors.cardBorder),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.tips_and_updates_outlined, color: AppColors.warning, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Chef & Fitness Tip',
+                                style: AppTextStyles.labelMedium(context).copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.warning,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                widget.recipe.tip,
+                                style: AppTextStyles.bodyMedium(context),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  AppGap.md(context),
                 ],
 
                 // Steps

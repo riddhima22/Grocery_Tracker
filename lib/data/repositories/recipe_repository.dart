@@ -11,8 +11,11 @@ class RecipeRepository {
     return list?.map((r) => RecipeModel.fromJson(r)).toList() ?? const [];
   }
 
-  Future<List<RecipeModel>> generateRecipes() async {
-    final response = await _apiClient.post(ApiEndpoints.generateRecipes);
+  Future<List<RecipeModel>> generateRecipes({Map<String, dynamic>? preferences}) async {
+    final response = await _apiClient.post(
+      ApiEndpoints.generateRecipes,
+      data: preferences ?? {},
+    );
     final list = response.data['data'] as List?;
     return list?.map((r) => RecipeModel.fromJson(r)).toList() ?? const [];
   }
