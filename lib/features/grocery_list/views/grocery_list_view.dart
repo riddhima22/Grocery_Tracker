@@ -64,6 +64,22 @@ class _GroceryListViewState extends State<GroceryListView> {
         backgroundColor: Colors.transparent,
         actions: [
           IconButton(
+            icon: const Icon(Icons.auto_awesome),
+            tooltip: 'Smart Restock Finished Items',
+            color: AppColors.primary,
+            onPressed: () async {
+              await listProvider.generateSuggestions();
+              if (context.mounted && listProvider.errorMessage == null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Smart grocery list updated with restock items!'),
+                    backgroundColor: AppColors.primary,
+                  ),
+                );
+              }
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.restaurant_menu_rounded),
             tooltip: 'Expiring Soon Recipes',
             color: AppColors.primary,

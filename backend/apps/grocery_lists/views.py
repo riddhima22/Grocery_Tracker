@@ -39,66 +39,126 @@ class GroceryListViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'])
     def generate(self, request):
         user = request.user
+        from decimal import Decimal
         
-        # 1. Fetch user activities
-        activities = GroceryActivity.objects.filter(user=user)
-        if activities.count() < 3:
-            return Response({
-                "success": False,
-                "error": "Not enough history to generate list. Add more items and log consumption/waste to generate suggestions."
-            }, status=400)
+        # 1. Get or create the active grocery list (Preserve existing active items!)
+        active_list, _ = GroceryList.objects.get_or_create(
+            user=user,
+            status=GroceryList.Statuses.ACTIVE,
+            defaults={'generation_reason': 'Smart replenishment analysis'}
+        )
 
-        # 2. Analyze usage frequency
-        top_items = activities.values('grocery_item__name', 'unit').annotate(
-            count=Count('id')
-        ).order_by('-count')[:5]
+        existing_names = set(
+            GroceryListItem.objects.filter(grocery_list=active_list, purchased=False)
+            .values_list('name', flat=True)
+        )
+        existing_names_lower = {n.lower().strip() for n in existing_names if n}
 
-        # 3. Create grocery list
+        suggestions_added = 0
+
         with transaction.atomic():
-            # Archive old active list
-            GroceryList.objects.filter(user=user, status=GroceryList.Statuses.ACTIVE).update(
-                status=GroceryList.Statuses.ARCHIVED
-            )
-            
-            new_list = GroceryList.objects.create(
-                user=user,
-                status=GroceryList.Statuses.ACTIVE,
-                generation_reason="Replenishment analysis"
-            )
-
-            for item_info in top_items:
-                name = item_info['grocery_item__name']
-                unit = item_info['unit']
-                if not name:
-                    continue
-
-                # Check if item is already present in pantry
-                pantry_qty = GroceryItem.objects.filter(
-                    user=user, name__iexact=name
-                ).exclude(quantity=0).first()
-
-                if not pantry_qty or pantry_qty.quantity < 0.5:
-                    reason = f"You frequently use {name} and your stock is low."
-                    
-                    # Create suggestion item
+            # Source 1: Items in kitchen that are finished (quantity <= 0)
+            finished_items = GroceryItem.objects.filter(user=user, quantity__lte=0).order_by('-updated_at')[:10]
+            for fi in finished_items:
+                clean_name = fi.name.strip()
+                if clean_name.lower() not in existing_names_lower:
                     GroceryListItem.objects.create(
-                        grocery_list=new_list,
-                        name=name,
-                        suggested_quantity=1.0,
-                        quantity=1.0,
-                        unit=unit or 'pcs',
-                        reason=reason,
-                        confidence='High'
+                        grocery_list=active_list,
+                        name=clean_name,
+                        suggested_quantity=Decimal('1.0'),
+                        quantity=Decimal('1.0'),
+                        unit=fi.unit or 'pcs',
+                        reason=f"Finished in kitchen ({clean_name}). Added for replenishment.",
+                        confidence='High',
+                        source_signal='finished_pantry_item',
+                        feedback=GroceryListItem.Feedbacks.PENDING
                     )
+                    existing_names_lower.add(clean_name.lower())
+                    suggestions_added += 1
 
-            # Re-fetch with populated items
-            new_list.refresh_from_db()
+            # Source 2: Items in kitchen running low (0 < quantity <= 1 or status == 'expiring_soon')
+            low_stock_items = GroceryItem.objects.filter(
+                user=user, 
+                quantity__gt=0, 
+                quantity__lte=1
+            ).order_by('expiry_date')[:8]
+            for li in low_stock_items:
+                clean_name = li.name.strip()
+                if clean_name.lower() not in existing_names_lower:
+                    GroceryListItem.objects.create(
+                        grocery_list=active_list,
+                        name=clean_name,
+                        suggested_quantity=Decimal('1.0'),
+                        quantity=Decimal('1.0'),
+                        unit=li.unit or 'pcs',
+                        reason=f"Low stock in kitchen ({li.quantity} {li.unit} remaining).",
+                        confidence='Medium',
+                        source_signal='low_stock_pantry_item',
+                        feedback=GroceryListItem.Feedbacks.PENDING
+                    )
+                    existing_names_lower.add(clean_name.lower())
+                    suggestions_added += 1
 
-        serializer = GroceryListSerializer(new_list)
+            # Source 3: Frequently consumed items from activity history
+            activities = GroceryActivity.objects.filter(user=user)
+            if activities.exists():
+                top_items = activities.values('grocery_item__name', 'unit').annotate(
+                    count=Count('id')
+                ).order_by('-count')[:5]
+
+                for item_info in top_items:
+                    name = (item_info.get('grocery_item__name') or '').strip()
+                    unit = item_info.get('unit') or 'pcs'
+                    if name and name.lower() not in existing_names_lower:
+                        # Only suggest if not already heavily stocked
+                        in_stock = GroceryItem.objects.filter(
+                            user=user, name__iexact=name, quantity__gt=1
+                        ).exists()
+                        if not in_stock:
+                            GroceryListItem.objects.create(
+                                grocery_list=active_list,
+                                name=name,
+                                suggested_quantity=Decimal('1.0'),
+                                quantity=Decimal('1.0'),
+                                unit=unit,
+                                reason=f"You frequently consume {name}.",
+                                confidence='High',
+                                source_signal='frequent_usage',
+                                feedback=GroceryListItem.Feedbacks.PENDING
+                            )
+                            existing_names_lower.add(name.lower())
+                            suggestions_added += 1
+
+            # Source 4: If list is still completely empty, suggest common kitchen essentials
+            if active_list.items.filter(purchased=False).count() == 0:
+                essentials = [
+                    ('Fresh Milk', '1.0', 'L', 'Kitchen staple replenishment'),
+                    ('Eggs', '6.0', 'pcs', 'High-protein breakfast staple'),
+                    ('Bread', '1.0', 'pack', 'Breakfast staple'),
+                    ('Tomatoes', '1.0', 'kg', 'Cooking essential'),
+                    ('Onions', '1.0', 'kg', 'Cooking essential'),
+                ]
+                for name, qty, unit, reason in essentials:
+                    GroceryListItem.objects.create(
+                        grocery_list=active_list,
+                        name=name,
+                        suggested_quantity=Decimal(qty),
+                        quantity=Decimal(qty),
+                        unit=unit,
+                        reason=reason,
+                        confidence='Medium',
+                        source_signal='kitchen_essential',
+                        feedback=GroceryListItem.Feedbacks.PENDING
+                    )
+                    suggestions_added += 1
+
+            active_list.refresh_from_db()
+
+        serializer = GroceryListSerializer(active_list)
         return Response({
             "success": True,
             "data": serializer.data,
-            "message": "Suggested grocery list generated successfully."
+            "message": f"Smart grocery list updated with {suggestions_added} smart suggestions."
         })
 
     @action(detail=True, methods=['post'], url_path='items')

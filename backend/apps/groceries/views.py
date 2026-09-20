@@ -144,6 +144,21 @@ class GroceryItemViewSet(viewsets.ModelViewSet):
                 metadata={'consumed_quantity': float(consume_val)}
             )
 
+            # Auto-add to smart grocery list when item is finished (quantity == 0)
+            if new_qty <= 0:
+                try:
+                    from apps.grocery_lists.services import add_to_active_grocery_list
+                    add_to_active_grocery_list(
+                        user=self.request.user,
+                        name=item.name,
+                        unit=item.unit,
+                        quantity=1.0,
+                        reason=f"Finished in your kitchen ({item.name}). Restock recommended.",
+                        source_signal='item_finished'
+                    )
+                except Exception as e:
+                    logger.warning(f"Could not auto-add finished item to grocery list: {e}")
+
             return Response({
                 "success": True,
                 "data": GroceryItemSerializer(item).data,
@@ -173,6 +188,21 @@ class GroceryItemViewSet(viewsets.ModelViewSet):
             new_qty = old_qty - waste_val
             item.quantity = new_qty
             item.save()
+
+            # Auto-add to smart grocery list when item is depleted/wasted
+            if new_qty <= 0:
+                try:
+                    from apps.grocery_lists.services import add_to_active_grocery_list
+                    add_to_active_grocery_list(
+                        user=self.request.user,
+                        name=item.name,
+                        unit=item.unit,
+                        quantity=1.0,
+                        reason=f"Depleted/wasted in kitchen ({item.name}). Restock recommended.",
+                        source_signal='item_wasted'
+                    )
+                except Exception as e:
+                    logger.warning(f"Could not auto-add wasted item to grocery list: {e}")
 
             # Update stats
             user = self.request.user

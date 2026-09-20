@@ -49,6 +49,18 @@ def deduct_pantry_items_bulk(user, items_to_deduct, activity_source='meal_log'):
             if new_quantity <= 0:
                 grocery_item.quantity = Decimal('0')
                 grocery_item.status = 'expired'
+                try:
+                    from apps.grocery_lists.services import add_to_active_grocery_list
+                    add_to_active_grocery_list(
+                        user=user,
+                        name=grocery_item.name,
+                        unit=grocery_item.unit,
+                        quantity=1.0,
+                        reason=f"Finished during cooking ({grocery_item.name}).",
+                        source_signal='recipe_cooked_finish'
+                    )
+                except Exception as e:
+                    logger.warning(f"Could not auto-add finished item to grocery list: {e}")
             else:
                 grocery_item.quantity = new_quantity
             
