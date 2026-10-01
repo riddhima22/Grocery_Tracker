@@ -314,7 +314,7 @@ class _KitchenViewState extends State<KitchenView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('My Kitchen', style: AppTextStyles.headingLarge(context)),
+                Text('Storage Management', style: AppTextStyles.headingLarge(context)),
                 const SizedBox(height: 2),
                 Text(
                   '${kitchen.totalItems} items total • ${kitchen.expiringCount} expiring soon',

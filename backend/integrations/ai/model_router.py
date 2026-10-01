@@ -184,26 +184,44 @@ class ModelRouter:
                 temp_files_to_cleanup.append(prep_path)
 
         try:
-            # 3. OCR Text Extraction Stage
+            # 3. OCR Text Extraction & Object Detection Stage
             ocr_text = ""
+            ocr_context = ""
             ocr_dates = {}
             ocr_enabled = getattr(settings, 'OCR_ENABLED', True)
             
             if ocr_enabled:
                 ocr_results = []
+                detected_objects = []
                 for path in prepared_paths:
                     res = self.ocr_client.extract_text(path)
                     if res.get("success") and res.get("text"):
                         ocr_results.append(res["text"])
+                    if hasattr(self.ocr_client, 'object_localization'):
+                        objs = self.ocr_client.object_localization(path)
+                        if objs:
+                            for o in objs:
+                                name = o.get("name", "Item")
+                                score = o.get("score", 1.0)
+                                detected_objects.append(f"{name} (confidence: {score:.2f})")
                 
+                context_sections = []
                 if ocr_results:
                     ocr_text = "\n---\n".join(ocr_results)
+                    context_sections.append(f"PACKAGING OCR TEXT BLOCKS:\n{ocr_text}")
                     # Parse expiry dates from OCR text directly
                     ocr_dates = OCRDateParser.extract_dates(ocr_text)
                     logger.info(f"OCR parsed packaging dates: {ocr_dates}")
+                
+                if detected_objects:
+                    obj_hint_text = f"GOOGLE VISION OBJECT-DETECTION HINTS (DETECTED ITEMS COUNT: {len(detected_objects)}):\n" + "\n".join(f"- {d}" for d in detected_objects)
+                    context_sections.append(obj_hint_text)
+                    logger.info(f"Google Vision object localization detected {len(detected_objects)} objects.")
+
+                ocr_context = "\n\n".join(context_sections) if context_sections else ""
 
             # 4. Gemini Multimodal Analysis Stage
-            ai_result = self.ai_client.analyze_grocery_images(prepared_paths, ocr_context=ocr_text)
+            ai_result = self.ai_client.analyze_grocery_images(prepared_paths, ocr_context=ocr_context)
             items = ai_result.get("items", [])
             
             # 5. Accuracy Alignment: Resolve date conflicts & append warnings

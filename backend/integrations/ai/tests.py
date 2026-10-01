@@ -193,8 +193,8 @@ class GeminiHardeningTests(TestCase):
 
     def test_settings_gemini_model_defaults(self):
         from django.conf import settings
-        self.assertEqual(settings.GEMINI_MODEL_NAME, 'gemini-3.6-flash')
-        self.assertEqual(settings.GEMINI_RECIPE_MODEL_NAME, 'gemini-3.6-flash')
+        self.assertEqual(settings.GEMINI_MODEL_NAME, 'gemini-3.5-flash-lite')
+        self.assertEqual(settings.GEMINI_RECIPE_MODEL_NAME, 'gemini-3.5-flash-lite')
 
     def test_translate_gemini_error_auth_error(self):
         from integrations.ai.gemini_client import translate_gemini_error
@@ -283,5 +283,104 @@ class GeminiHardeningTests(TestCase):
         finally:
             if os.path.exists(dark_path):
                 os.remove(dark_path)
+
+
+class GoogleVisionAndPromptTests(TestCase):
+    def test_init_with_credentials_json(self):
+        import json
+        import os
+        from integrations.ocr.google_vision_client import GoogleCloudVisionOCR
+
+        dummy_creds = {
+            "type": "service_account",
+            "project_id": "test-project",
+            "private_key_id": "123",
+            "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC7\n-----END PRIVATE KEY-----\n",
+            "client_email": "test@test-project.iam.gserviceaccount.com",
+            "client_id": "12345",
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+        }
+        creds_json_str = json.dumps(dummy_creds)
+
+        with patch.dict(os.environ, {"GOOGLE_APPLICATION_CREDENTIALS_JSON": creds_json_str}, clear=False):
+            with patch("google.oauth2.service_account.Credentials.from_service_account_info") as mock_from_info:
+                with patch("google.cloud.vision.ImageAnnotatorClient") as mock_client_cls:
+                    mock_from_info.return_value = MagicMock()
+                    mock_client_cls.return_value = MagicMock()
+
+                    ocr = GoogleCloudVisionOCR()
+                    self.assertTrue(ocr.enabled)
+                    mock_from_info.assert_called_once_with(dummy_creds)
+                    mock_client_cls.assert_called_once_with(credentials=mock_from_info.return_value)
+
+    def test_init_fallback_to_file(self):
+        import os
+        from integrations.ocr.google_vision_client import GoogleCloudVisionOCR
+
+        with patch.dict(os.environ, {"GOOGLE_APPLICATION_CREDENTIALS": "/fake/service_account.json"}, clear=False):
+            with patch.dict(os.environ, {"GOOGLE_APPLICATION_CREDENTIALS_JSON": ""}):
+                with patch("os.path.exists", return_value=True):
+                    with patch("google.cloud.vision.ImageAnnotatorClient") as mock_client_cls:
+                        mock_client_cls.return_value = MagicMock()
+                        ocr = GoogleCloudVisionOCR()
+                        self.assertTrue(ocr.enabled)
+                        mock_client_cls.assert_called_once_with()
+
+    def test_init_disabled_when_no_credentials(self):
+        import os
+        from integrations.ocr.google_vision_client import GoogleCloudVisionOCR
+
+        with patch.dict(os.environ, {"GOOGLE_APPLICATION_CREDENTIALS_JSON": "", "GOOGLE_APPLICATION_CREDENTIALS": ""}):
+            ocr = GoogleCloudVisionOCR()
+            self.assertFalse(ocr.enabled)
+            self.assertIsNone(ocr.client)
+
+    def test_object_localization(self):
+        import io
+        from integrations.ocr.google_vision_client import GoogleCloudVisionOCR
+
+        mock_annotator = MagicMock()
+        mock_annotation1 = MagicMock()
+        mock_annotation1.name = "Milk"
+        mock_annotation1.score = 0.95
+        mock_annotation2 = MagicMock()
+        mock_annotation2.name = "Apple"
+        mock_annotation2.score = 0.88
+
+        mock_response = MagicMock()
+        mock_response.error.message = ""
+        mock_response.localized_object_annotations = [mock_annotation1, mock_annotation2]
+        mock_annotator.object_localization.return_value = mock_response
+
+        ocr = GoogleCloudVisionOCR()
+        ocr.enabled = True
+        ocr.client = mock_annotator
+
+        with patch("io.open", return_value=io.BytesIO(b"fake_image_bytes")):
+            results = ocr.object_localization("/fake/image.jpg")
+            self.assertEqual(len(results), 2)
+            self.assertEqual(results[0]["name"], "Milk")
+            self.assertEqual(results[0]["score"], 0.95)
+            self.assertEqual(results[1]["name"], "Apple")
+            self.assertEqual(results[1]["score"], 0.88)
+
+    def test_prompt_detection_and_grouping_instructions(self):
+        from integrations.ai.prompts import SYSTEM_INSTRUCTION, GROCERY_SCAN_PROMPT
+
+        # Detection rule
+        self.assertIn("detect every single distinct grocery item", SYSTEM_INSTRUCTION.lower())
+        self.assertIn("detect every single distinct grocery item", GROCERY_SCAN_PROMPT.lower())
+        
+        # Object detection cross check
+        self.assertIn("object-detection hint", SYSTEM_INSTRUCTION.lower())
+        self.assertIn("object-detection hint", GROCERY_SCAN_PROMPT.lower())
+
+        # Grouping rule
+        self.assertIn("grouping rule", SYSTEM_INSTRUCTION.lower())
+        self.assertIn("grouping rule", GROCERY_SCAN_PROMPT.lower())
+        self.assertIn("combine them into one", SYSTEM_INSTRUCTION.lower())
+        self.assertIn("combine them into one", GROCERY_SCAN_PROMPT.lower())
+
 
 

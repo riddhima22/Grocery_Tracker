@@ -1,7 +1,13 @@
 import uuid
+import os
 from django.db import models
 from django.conf import settings
 from apps.groceries.models import GroceryItem
+
+def get_meal_log_image_path(instance, filename):
+    ext = filename.split('.')[-1]
+    name = f"{uuid.uuid4()}.{ext}"
+    return os.path.join('meal_logs', name)
 
 class MealLog(models.Model):
     class StatusChoices(models.TextChoices):
@@ -11,7 +17,7 @@ class MealLog(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='meal_logs')
-    image = models.ImageField(upload_to='meal_logs/', null=True, blank=True)
+    image = models.ImageField(upload_to=get_meal_log_image_path, null=True, blank=True)
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     status = models.CharField(max_length=50, choices=StatusChoices.choices, default=StatusChoices.PENDING_CONFIRMATION)

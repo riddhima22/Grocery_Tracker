@@ -7,11 +7,9 @@ services:
     environment:
       POSTGRES_DB: freshtrack
       POSTGRES_USER: freshtrack_user
-      POSTGRES_PASSWORD: freshtrack_password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U freshtrack_user -d freshtrack"]
       interval: 5s
@@ -21,8 +19,6 @@ services:
   redis:
     image: redis:7-alpine
     container_name: freshtrack_redis
-    ports:
-      - "6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -41,10 +37,12 @@ services:
       - media_volume:/app/media
     ports:
       - "8000:8000"
+    env_file:
+      - .env
     environment:
       - DEBUG=False
-      - SECRET_KEY=production-secure-freshtrack-secret-key-change-in-prod
-      - DATABASE_URL=postgres://freshtrack_user:freshtrack_password@db:5432/freshtrack
+      - SECRET_KEY=${SECRET_KEY}
+      - DATABASE_URL=${DATABASE_URL}
       - REDIS_URL=redis://redis:6379/0
       - DJANGO_SETTINGS_MODULE=config.settings.production
     depends_on:
@@ -61,10 +59,12 @@ services:
     command: celery -A config worker --loglevel=info
     volumes:
       - ./backend:/app
+    env_file:
+      - .env
     environment:
       - DEBUG=False
-      - SECRET_KEY=production-secure-freshtrack-secret-key-change-in-prod
-      - DATABASE_URL=postgres://freshtrack_user:freshtrack_password@db:5432/freshtrack
+      - SECRET_KEY=${SECRET_KEY}
+      - DATABASE_URL=${DATABASE_URL}
       - REDIS_URL=redis://redis:6379/0
       - DJANGO_SETTINGS_MODULE=config.settings.production
     depends_on:
@@ -81,10 +81,12 @@ services:
     command: celery -A config beat --loglevel=info
     volumes:
       - ./backend:/app
+    env_file:
+      - .env
     environment:
       - DEBUG=False
-      - SECRET_KEY=production-secure-freshtrack-secret-key-change-in-prod
-      - DATABASE_URL=postgres://freshtrack_user:freshtrack_password@db:5432/freshtrack
+      - SECRET_KEY=${SECRET_KEY}
+      - DATABASE_URL=${DATABASE_URL}
       - REDIS_URL=redis://redis:6379/0
       - DJANGO_SETTINGS_MODULE=config.settings.production
     depends_on:

@@ -162,3 +162,35 @@ class ScanConfirmationDateRegressionTests(APITestCase):
         self.assertEqual(serializer.data["purchase_date"], timezone.localdate().isoformat())
 
 
+class ScanUploadValidationTests(TestCase):
+    def test_scan_upload_rejects_corrupted_or_mismatched_image(self):
+        from rest_framework.test import APIClient
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from django.contrib.auth import get_user_model
+        import io
+        from PIL import Image
+
+        user = get_user_model().objects.create_user(
+            email='scan_validator@example.com',
+            password='Password123!',
+            display_name='Scan Validator'
+        )
+        client = APIClient()
+        client.force_authenticate(user=user)
+
+        # Corrupted / fake image
+        bad_file = SimpleUploadedFile("scan.png", b"not-a-real-png-bytes", content_type="image/png")
+        res = client.post('/api/v1/scans/sessions/', {'images': [bad_file]}, format='multipart')
+        self.assertEqual(res.status_code, 400)
+        self.assertFalse(res.data['success'])
+
+        # Format mismatch (JPEG binary pretending to be PNG)
+        buf = io.BytesIO()
+        Image.new('RGB', (10, 10), color='blue').save(buf, format='JPEG')
+        buf.seek(0)
+        mismatch_file = SimpleUploadedFile("scan.png", buf.read(), content_type="image/png")
+        res = client.post('/api/v1/scans/sessions/', {'images': [mismatch_file]}, format='multipart')
+        self.assertEqual(res.status_code, 400)
+        self.assertFalse(res.data['success'])
+
+

@@ -59,10 +59,33 @@ class MeView(APIView):
         if avatar_file:
             # Validate size and extension
             ext = os.path.splitext(avatar_file.name)[1].lower()
-            if ext not in ['.jpg', '.jpeg', '.png', '.webp']:
+            allowed_formats = {
+                '.jpg': 'JPEG',
+                '.jpeg': 'JPEG',
+                '.png': 'PNG',
+                '.webp': 'WEBP',
+            }
+            if ext not in allowed_formats:
                 return Response({"success": False, "error": "Unsupported image format. Allowed: JPG, JPEG, PNG, WEBP"}, status=400)
             if avatar_file.size > 2 * 1024 * 1024:
                 return Response({"success": False, "error": "Image size exceeds 2MB limit."}, status=400)
+
+            # Validate real image content using Pillow
+            try:
+                avatar_file.seek(0)
+                from PIL import Image
+                with Image.open(avatar_file) as pil_img:
+                    pil_img.verify()
+                    actual_format = pil_img.format
+                if actual_format != allowed_formats[ext]:
+                    return Response({
+                        "success": False,
+                        "error": f"Image format mismatch: file content is {actual_format}, but extension is {ext}."
+                    }, status=400)
+            except Exception:
+                return Response({"success": False, "error": "Uploaded file is not a valid image."}, status=400)
+            finally:
+                avatar_file.seek(0)
                 
             from django.core.files.storage import default_storage
             filename = f"avatars/{user.id}{ext}"

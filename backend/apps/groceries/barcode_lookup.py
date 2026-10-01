@@ -147,8 +147,13 @@ def lookup_open_food_facts(barcode: str):
     Performs HTTP lookup against Open Food Facts API v2.
     Returns normalized product dictionary on success or None if not found/error.
     """
+    sanitized_barcode = re.sub(r'[^\d]', '', str(barcode).strip())[:18]
+    if not re.match(r'^\d{6,18}$', sanitized_barcode):
+        logger.warning("Open Food Facts lookup received invalid barcode: %s", sanitized_barcode)
+        return None
+
     base_url = getattr(settings, 'OPEN_FOOD_FACTS_BASE_URL', 'https://world.openfoodfacts.org').rstrip('/')
-    url = f"{base_url}/api/v2/product/{barcode}.json"
+    url = f"{base_url}/api/v2/product/{sanitized_barcode}.json"
     params = {
         'fields': 'product_name,brands,categories,quantity,image_url,nutriments,allergens_tags'
     }
@@ -159,7 +164,7 @@ def lookup_open_food_facts(barcode: str):
     try:
         response = requests.get(url, params=params, headers=headers, timeout=5)
         if response.status_code != 200:
-            logger.warning(f"Open Food Facts returned status code {response.status_code} for barcode {barcode}")
+            logger.warning("Open Food Facts returned status code %s for barcode %s", response.status_code, sanitized_barcode)
             return None
 
         data = response.json()
@@ -168,7 +173,7 @@ def lookup_open_food_facts(barcode: str):
 
         product = data.get('product', {})
         product_name = (product.get('product_name') or '').strip()
-        name = product_name if product_name else barcode
+        name = product_name if product_name else sanitized_barcode
         brand = (product.get('brands') or '').strip()
         category = map_category_from_text(product.get('categories') or '')
         storage_zone = CATEGORY_STORAGE_ZONE_MAP.get(category, GroceryItem.StorageZones.PANTRY)
@@ -177,7 +182,7 @@ def lookup_open_food_facts(barcode: str):
         allergens = clean_allergens(product.get('allergens_tags') or [])
 
         return {
-            "barcode": barcode,
+            "barcode": sanitized_barcode,
             "name": name,
             "brand": brand,
             "category": category,
@@ -190,5 +195,5 @@ def lookup_open_food_facts(barcode: str):
         }
 
     except Exception as e:
-        logger.warning(f"Open Food Facts lookup failed for barcode {barcode}: {str(e)}")
+        logger.warning("Open Food Facts lookup failed for barcode %s: %s", sanitized_barcode, str(e))
         return None

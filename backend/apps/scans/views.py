@@ -41,18 +41,43 @@ class ScanSessionViewSet(viewsets.ReadOnlyModelViewSet):
         import hashlib
         seen_request_hashes = set()
 
+        from PIL import Image
+        ALLOWED_IMAGE_FORMATS = {
+            '.jpg': 'JPEG',
+            '.jpeg': 'JPEG',
+            '.png': 'PNG',
+            '.webp': 'WEBP',
+        }
+
         for img in images_files:
             if img.size > 5 * 1024 * 1024: # 5MB limit
                 return Response({"success": False, "error": f"Image {img.name} exceeds 5MB size limit."}, status=400)
             
             ext = os.path.splitext(img.name)[1].lower()
-            if ext not in ['.jpg', '.jpeg', '.png', '.webp']:
+            if ext not in ALLOWED_IMAGE_FORMATS:
                 return Response({"success": False, "error": f"Unsupported file type: {ext}."}, status=400)
+
+            # Validate real image content using Pillow
+            try:
+                img.seek(0)
+                with Image.open(img) as pil_img:
+                    pil_img.verify()
+                    actual_format = pil_img.format
+                if actual_format != ALLOWED_IMAGE_FORMATS[ext]:
+                    return Response({
+                        "success": False,
+                        "error": f"Image format mismatch for {img.name}: file is {actual_format}, but extension is {ext}."
+                    }, status=400)
+            except Exception:
+                return Response({"success": False, "error": f"File {img.name} is not a valid image."}, status=400)
+            finally:
+                img.seek(0)
 
             # Check duplicate content hashes
             hasher = hashlib.md5()
             for chunk in img.chunks():
                 hasher.update(chunk)
+            img.seek(0)
             img_hash = hasher.hexdigest()
             if img_hash in seen_request_hashes:
                 return Response({"success": False, "error": f"Duplicate image uploaded: {img.name}."}, status=400)

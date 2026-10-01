@@ -81,6 +81,22 @@ class GroceryAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertFalse(response.data['success'])
 
+    def test_barcode_lookup_invalid_format_returns_400(self):
+        """Barcode lookup with non-numeric or out-of-range length returns 400."""
+        self.client.force_authenticate(user=self.user1)
+        # Non-numeric / path traversal attempt
+        response = self.client.get('/api/v1/groceries/barcode-lookup/?barcode=../../etc/passwd')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(response.data['success'])
+
+        # Too short (< 6 digits)
+        response = self.client.get('/api/v1/groceries/barcode-lookup/?barcode=12345')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        # Too long (> 18 digits)
+        response = self.client.get('/api/v1/groceries/barcode-lookup/?barcode=1234567890123456789')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
     def test_barcode_lookup_pantry_history_hit(self):
         """Barcode lookup should return item details from user's pantry history if available."""
         barcode = '8901030382725'

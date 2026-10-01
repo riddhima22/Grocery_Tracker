@@ -293,6 +293,13 @@ class GroceryItemViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        import re
+        if not re.match(r'^\d{6,18}$', barcode):
+            return Response(
+                {"success": False, "error": "Invalid barcode format. Barcode must be between 6 and 18 digits."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         # 1. Check user's pantry history
         pantry_item = GroceryItem.objects.filter(
             user=request.user,
