@@ -5,19 +5,29 @@ from django.conf.urls.static import static
 from django.http import JsonResponse
 
 def health_check(request):
+    is_healthy = True
     db_status = "connected"
+
     try:
         from django.db import connection
         with connection.cursor() as cursor:
             cursor.execute("SELECT 1;")
     except Exception as e:
+        is_healthy = False
         db_status = f"unreachable: {str(e)}"
+        try:
+            from django.db import connection
+            connection.close()
+        except Exception:
+            pass
 
-    return JsonResponse({
-        "status": "healthy",
+    response_data = {
+        "status": "healthy" if is_healthy else "unhealthy",
         "service": "grocery-tracker-backend",
         "database": db_status,
-    })
+    }
+    status_code = 200 if is_healthy else 503
+    return JsonResponse(response_data, status=status_code)
 
 v1_patterns = [
     path('health/', health_check, name='v1_health_check'),

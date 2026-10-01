@@ -20,3 +20,9 @@ SECURE_HSTS_PRELOAD = True
 # Disable CORS wildcard in production
 CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=[])
+
+# Ensure production PostgreSQL on Render enforces SSL
+if 'postgresql' in DATABASES['default']['ENGINE']:
+    db_options = DATABASES['default'].setdefault('OPTIONS', {})
+    if 'sslmode' not in db_options:
+        db_options['sslmode'] = env.str('DB_SSLMODE', default='require')

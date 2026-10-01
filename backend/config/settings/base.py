@@ -1,7 +1,9 @@
 import os
+import sys
 from pathlib import Path
 from datetime import timedelta
 import environ
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -10,9 +12,21 @@ env = environ.Env()
 # Read environment file
 environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
-SECRET_KEY = env('SECRET_KEY', default='django-insecure-freshtrack-secret')
 DEBUG = env.bool('DEBUG', default=False)
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['*'])
+
+# In production (DEBUG=False), require SECRET_KEY at startup; keep fallback for dev/tests
+is_dev_or_test = DEBUG or ('test' in sys.argv) or ('development' in os.environ.get('DJANGO_SETTINGS_MODULE', ''))
+if not is_dev_or_test:
+    SECRET_KEY = env('SECRET_KEY')
+    if not SECRET_KEY:
+        raise ImproperlyConfigured("SECRET_KEY environment variable is required and cannot be empty when DEBUG=False.")
+else:
+    SECRET_KEY = env('SECRET_KEY', default='django-insecure-freshtrack-secret')
+
+if not is_dev_or_test:
+    ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=[])
+else:
+    ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['*'])
 
 # Custom User Model
 AUTH_USER_MODEL = 'accounts.User'
@@ -82,6 +96,21 @@ DATABASES = {
 }
 # Enable persistent DB connections to reduce latency on remote PostgreSQL (Neon/Render)
 DATABASES['default']['CONN_MAX_AGE'] = env.int('DB_CONN_MAX_AGE', default=600)
+
+# In Django 4.1+, CONN_HEALTH_CHECKS ensures stale/terminated connections are verified and reconnected
+DATABASES['default']['CONN_HEALTH_CHECKS'] = env.bool('DB_CONN_HEALTH_CHECKS', default=True)
+
+# PostgreSQL-specific network stability options (TCP keepalives and connect timeout)
+if 'postgresql' in DATABASES['default']['ENGINE']:
+    db_options = DATABASES['default'].setdefault('OPTIONS', {})
+    # Keepalive options prevent intermediaries/firewalls (Render routers, AWS NAT) from dropping idle connections
+    db_options.setdefault('connect_timeout', env.int('DB_CONNECT_TIMEOUT', default=10))
+    db_options.setdefault('keepalives', 1)
+    db_options.setdefault('keepalives_idle', env.int('DB_KEEPALIVES_IDLE', default=30))
+    db_options.setdefault('keepalives_interval', env.int('DB_KEEPALIVES_INTERVAL', default=10))
+    db_options.setdefault('keepalives_count', env.int('DB_KEEPALIVES_COUNT', default=5))
+    if 'DB_SSLMODE' in env:
+        db_options['sslmode'] = env('DB_SSLMODE')
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -199,6 +228,9 @@ AI_PROVIDER_ORDER = env.list('AI_PROVIDER_ORDER', default=['gemini', 'openai'])
 # OCR configurations
 OCR_ENABLED = env.bool('OCR_ENABLED', default=True)
 OCR_PROVIDER = env('OCR_PROVIDER', default='TEXT_DETECTION')
+GOOGLE_APPLICATION_CREDENTIALS_JSON = env('GOOGLE_APPLICATION_CREDENTIALS_JSON', default='')
+GOOGLE_APPLICATION_CREDENTIALS = env('GOOGLE_APPLICATION_CREDENTIALS', default='')
+
 
 # Scanning validation limits
 AI_MAX_IMAGE_SIZE_BYTES = env.int('AI_MAX_IMAGE_SIZE_BYTES', default=5 * 1024 * 1024)
