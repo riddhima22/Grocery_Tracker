@@ -180,16 +180,32 @@ class KitchenProvider extends ChangeNotifier {
     }
   }
 
+  final Set<String> _deletingItemIds = {};
+  bool isItemDeleting(String id) => _deletingItemIds.contains(id);
+
   Future<bool> deleteItem(String id) async {
+    if (_deletingItemIds.contains(id)) {
+      AppLogger.warning('Delete request already in progress for item: $id');
+      return false;
+    }
+
+    _deletingItemIds.add(id);
+    _errorMessage = null;
+    notifyListeners();
+
     try {
       await _groceryRepository.deleteGrocery(id);
       _items.removeWhere((i) => i.id == id);
       _cacheManager.saveGroceries(_items);
-      notifyListeners();
+      NotificationService().scheduleExpiryAlertsForItems(_items);
       return true;
     } catch (e) {
-      AppLogger.error('Delete failed', e);
+      _errorMessage = e.toString();
+      AppLogger.error('Delete failed for item $id', e);
       return false;
+    } finally {
+      _deletingItemIds.remove(id);
+      notifyListeners();
     }
   }
 

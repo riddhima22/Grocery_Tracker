@@ -129,23 +129,65 @@ class _KitchenItemDetailViewState extends State<KitchenItemDetailView> with Sing
     }
   }
 
-  void _confirmDelete() {
-    showDialog(
+  bool _isDeleting = false;
+
+  Future<void> _handleDelete() async {
+    if (_isDeleting) return;
+
+    // 1. Show confirmation dialog and wait for user's explicit confirmation
+    final confirmed = await ConfirmDialog.show(
       context: context,
-      builder: (ctx) => ConfirmDialog(
-        title: 'Delete Item',
-        content: 'Are you sure you want to delete ${_currentItem.name} from your pantry?',
-        confirmLabel: 'Delete',
-        cancelLabel: 'Cancel',
-        isDestructive: true,
-        onConfirm: () async {
-          final success = await context.read<KitchenProvider>().deleteItem(_currentItem.id);
-          if (success && mounted) {
-            Navigator.pop(context); // Close details page
-          }
-        },
-      ),
+      title: 'Delete Confirmation',
+      content: 'Are you sure you want to delete this item? This action cannot be undone.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      isDestructive: true,
     );
+
+    // If Cancel was selected or dialog was dismissed, abort immediately without any API call
+    if (!mounted || confirmed != true) return;
+
+    // 2. User confirmed: Enter loading state
+    setState(() => _isDeleting = true);
+
+    try {
+      final kitchenProvider = context.read<KitchenProvider>();
+      final success = await kitchenProvider.deleteItem(_currentItem.id);
+
+      if (!mounted) return;
+
+      if (success) {
+        // Show success toast/snack bar
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Item deleted successfully'),
+            backgroundColor: AppColors.success,
+            duration: Duration(seconds: 2),
+          ),
+        );
+        // Pop the detail view immediately
+        Navigator.pop(context);
+      } else {
+        setState(() => _isDeleting = false);
+        final errorMsg = kitchenProvider.errorMessage ?? 'Failed to delete item. Please try again.';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMsg),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isDeleting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to delete item: $e'),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _consumeAll() async {
@@ -174,11 +216,27 @@ class _KitchenItemDetailViewState extends State<KitchenItemDetailView> with Sing
           style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold, fontSize: context.scaleFont(20.0)),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.delete_outline),
-            color: AppColors.danger,
-            onPressed: _confirmDelete,
-          )
+          if (_isDeleting)
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: AppSpacing.sm(context)),
+              child: const Center(
+                child: SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.2,
+                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.danger),
+                  ),
+                ),
+              ),
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.delete_outline),
+              color: AppColors.danger,
+              tooltip: 'Delete Item',
+              onPressed: _isDeleting ? null : _handleDelete,
+            ),
         ],
       ),
       body: Stack(

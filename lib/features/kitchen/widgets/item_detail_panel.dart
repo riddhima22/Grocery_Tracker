@@ -51,23 +51,63 @@ class _ItemDetailPanelState extends State<ItemDetailPanel> {
     }
   }
 
-  void _confirmDelete() {
-    showDialog(
+  bool _isDeleting = false;
+
+  Future<void> _handleDelete() async {
+    if (_isDeleting) return;
+
+    // 1. Show confirmation dialog and wait for user choice
+    final confirmed = await ConfirmDialog.show(
       context: context,
-      builder: (ctx) => ConfirmDialog(
-        title: 'Delete Item',
-        content: 'Are you sure you want to delete ${widget.item.name} from your pantry?',
-        confirmLabel: 'Delete',
-        cancelLabel: 'Cancel',
-        isDestructive: true,
-        onConfirm: () async {
-          final success = await context.read<KitchenProvider>().deleteItem(widget.item.id);
-          if (success && mounted) {
-            Navigator.pop(context); // close bottom sheet
-          }
-        },
-      ),
+      title: 'Delete Confirmation',
+      content: 'Are you sure you want to delete this item? This action cannot be undone.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      isDestructive: true,
     );
+
+    // If Cancel pressed or dialog dismissed, abort without API call
+    if (!mounted || confirmed != true) return;
+
+    // 2. User confirmed: Enter loading state
+    setState(() => _isDeleting = true);
+
+    try {
+      final kitchenProvider = context.read<KitchenProvider>();
+      final success = await kitchenProvider.deleteItem(widget.item.id);
+
+      if (!mounted) return;
+
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Item deleted successfully'),
+            backgroundColor: AppColors.success,
+            duration: Duration(seconds: 2),
+          ),
+        );
+        Navigator.pop(context); // close bottom sheet
+      } else {
+        setState(() => _isDeleting = false);
+        final errorMsg = kitchenProvider.errorMessage ?? 'Failed to delete item. Please try again.';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMsg),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isDeleting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to delete item: $e'),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
+    }
   }
 
   void _showConsumeQtySelector() {
@@ -343,7 +383,8 @@ class _ItemDetailPanelState extends State<ItemDetailPanel> {
                   Expanded(
                     child: AppButton(
                       text: 'Delete Item',
-                      onPressed: _confirmDelete,
+                      onPressed: _isDeleting ? null : _handleDelete,
+                      isLoading: _isDeleting,
                       style: AppButtonStyle.danger,
                     ),
                   ),

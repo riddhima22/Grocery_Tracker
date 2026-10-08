@@ -119,23 +119,22 @@ class _ProfileViewState extends State<ProfileView> {
     );
   }
 
-  void _deleteAccount() {
-    showDialog(
+  Future<void> _deleteAccount() async {
+    final confirmed = await ConfirmDialog.show(
       context: context,
-      builder: (ctx) => ConfirmDialog(
-        title: 'Delete Account',
-        content: 'WARNING: Deleting your account is completely irreversible. All your inventory, stats, and recipes will be deleted forever.',
-        confirmLabel: 'Permanently Delete',
-        cancelLabel: 'Cancel',
-        isDestructive: true,
-        onConfirm: () async {
-          final success = await context.read<AuthProvider>().deleteAccount();
-          if (success && mounted) {
-            Navigator.pushNamedAndRemoveUntil(context, AppRoutes.login, (route) => false);
-          }
-        },
-      ),
+      title: 'Delete Account',
+      content: 'WARNING: Deleting your account is completely irreversible. All your inventory, stats, and recipes will be deleted forever.',
+      confirmLabel: 'Permanently Delete',
+      cancelLabel: 'Cancel',
+      isDestructive: true,
     );
+
+    if (!mounted || confirmed != true) return;
+
+    final success = await context.read<AuthProvider>().deleteAccount();
+    if (success && mounted) {
+      Navigator.pushNamedAndRemoveUntil(context, AppRoutes.login, (route) => false);
+    }
   }
 
   void _addAllergy() {
