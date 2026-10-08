@@ -104,30 +104,45 @@ class MealLogViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='confirm-deduction')
     def confirm_deduction(self, request, pk=None):
-        meal_log = self.get_object()
+        meal_log_obj = self.get_object()
         user = request.user
 
-        if meal_log.status != MealLog.StatusChoices.PENDING_CONFIRMATION:
-            return Response({'error': 'Meal is already confirmed or cancelled.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        candidate_deductions = request.data.get('candidate_deductions', [])
-        
-        items_to_deduct = []
-        
         with transaction.atomic():
+            # Row-level lock on MealLog to prevent concurrent double confirmation
+            meal_log = MealLog.objects.select_for_update().get(pk=meal_log_obj.pk)
+
+            # Idempotent replay if already confirmed
+            if meal_log.status == MealLog.StatusChoices.CONFIRMED:
+                serializer = self.get_serializer(meal_log)
+                cached = meal_log.deduction_result or {}
+                return Response({
+                    "success": True,
+                    "data": serializer.data,
+                    "deduction_summary": cached.get('summary', []),
+                    "deduction_errors": cached.get('errors', []),
+                    "already_confirmed": True,
+                    "message": "Meal was already confirmed (idempotent replay)."
+                })
+
+            if meal_log.status != MealLog.StatusChoices.PENDING_CONFIRMATION:
+                return Response({'error': f'Meal cannot be confirmed because status is {meal_log.status}.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            candidate_deductions = request.data.get('candidate_deductions', [])
+            items_to_deduct = []
+
             for c_data in candidate_deductions:
                 c_id = c_data.get('candidate_id')
                 confirmed = c_data.get('confirmed', False)
                 quantity = c_data.get('quantity', 0)
                 
                 try:
-                    candidate = MealIngredientCandidate.objects.get(id=c_id, meal_log=meal_log)
+                    candidate = MealIngredientCandidate.objects.select_for_update().get(id=c_id, meal_log=meal_log)
                 except MealIngredientCandidate.DoesNotExist:
                     continue
                 
                 candidate.confirmed = confirmed
                 candidate.deduct_quantity = quantity
-                candidate.save()
+                candidate.save(update_fields=['confirmed', 'deduct_quantity'])
                 
                 if confirmed and quantity > 0:
                     items_to_deduct.append({
@@ -140,7 +155,12 @@ class MealLogViewSet(viewsets.ModelViewSet):
             summary, errors = deduct_pantry_items_bulk(user, items_to_deduct, activity_source='meal_log')
             
             meal_log.status = MealLog.StatusChoices.CONFIRMED
-            meal_log.save()
+            meal_log.confirmed_at = timezone.now()
+            meal_log.deduction_result = {
+                'summary': summary,
+                'errors': errors
+            }
+            meal_log.save(update_fields=['status', 'confirmed_at', 'deduction_result', 'updated_at'])
             
             serializer = self.get_serializer(meal_log)
             

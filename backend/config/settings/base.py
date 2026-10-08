@@ -148,8 +148,27 @@ STORAGES = {
     },
 }
 
-MEDIA_URL = 'media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+# Production S3-compatible Object Storage (AWS S3, Cloudflare R2, MinIO, etc.)
+AWS_STORAGE_BUCKET_NAME = env('AWS_STORAGE_BUCKET_NAME', default=None)
+if AWS_STORAGE_BUCKET_NAME:
+    STORAGES["default"] = {
+        "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
+        "OPTIONS": {
+            "bucket_name": AWS_STORAGE_BUCKET_NAME,
+            "region_name": env('AWS_S3_REGION_NAME', default='us-east-1'),
+            "endpoint_url": env('AWS_S3_ENDPOINT_URL', default=None),
+            "access_key": env('AWS_ACCESS_KEY_ID', default=None),
+            "secret_key": env('AWS_SECRET_ACCESS_KEY', default=None),
+            "custom_domain": env('AWS_S3_CUSTOM_DOMAIN', default=None),
+            "file_overwrite": False,
+            "default_acl": None,
+        }
+    }
+    s3_domain = env('AWS_S3_CUSTOM_DOMAIN', default=None) or f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
+    MEDIA_URL = f"https://{s3_domain}/"
+else:
+    MEDIA_URL = 'media/'
+    MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -205,6 +224,16 @@ CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_ALWAYS_EAGER = env.bool('CELERY_TASK_ALWAYS_EAGER', default=True)
 CELERY_TASK_EAGER_PROPAGATES = True
+
+from celery.schedules import crontab
+
+# Celery Beat Periodic Schedules
+CELERY_BEAT_SCHEDULE = {
+    'send-daily-expiry-alerts': {
+        'task': 'apps.notifications.tasks.send_expiry_alerts_task',
+        'schedule': crontab(hour=8, minute=0),  # Daily at 08:00 AM
+    },
+}
 
 # Gemini configuration
 GEMINI_API_KEY = env('GEMINI_API_KEY', default='')

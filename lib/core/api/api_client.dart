@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'api_endpoints.dart';
 import 'api_error_mapper.dart';
 import 'token_refresh_manager.dart';
@@ -128,13 +129,37 @@ class ApiClient {
         },
       );
 
-  Interceptor _logInterceptor() => LogInterceptor(
-        requestHeader: true,
-        requestBody: true,
+  Interceptor _logInterceptor() {
+    if (kReleaseMode) {
+      // In production release mode, disable all payload/header logging
+      return LogInterceptor(
+        request: false,
+        requestHeader: false,
+        requestBody: false,
         responseHeader: false,
-        responseBody: true,
-        logPrint: (obj) => AppLogger.debug(obj.toString()),
+        responseBody: false,
+        error: false,
       );
+    }
+
+    return LogInterceptor(
+      requestHeader: false,
+      requestBody: true,
+      responseHeader: false,
+      responseBody: false,
+      logPrint: (obj) {
+        String msg = obj.toString();
+        // Redact authorization headers
+        msg = msg.replaceAll(RegExp(r'Bearer\s+[a-zA-Z0-9_\-\.]+'), 'Bearer [REDACTED]');
+        // Redact passwords, tokens, and credentials in json payloads
+        msg = msg.replaceAll(
+          RegExp(r'"(password|token|refresh|access|id_token|secret)":\s*"[^"]*"', caseSensitive: false),
+          r'"$1": "[REDACTED]"',
+        );
+        AppLogger.debug(msg);
+      },
+    );
+  }
 
   Future<Response> get(String path, {Map<String, dynamic>? queryParameters, Options? options}) async {
     try {

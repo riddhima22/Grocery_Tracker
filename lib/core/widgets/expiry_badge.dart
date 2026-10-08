@@ -6,15 +6,25 @@ import '../../core/extensions/responsive_context_extension.dart';
 
 class ExpiryBadge extends StatelessWidget {
   final DateTime? expiryDate;
+  final DateTime? estimatedDate;
+  final bool isEstimated;
 
-  const ExpiryBadge({super.key, this.expiryDate});
+  const ExpiryBadge({
+    super.key,
+    this.expiryDate,
+    this.estimatedDate,
+    this.isEstimated = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     final double paddingH = context.scaleWidth(8.0);
     final double paddingV = context.scaleHeight(4.0);
 
-    if (expiryDate == null) {
+    final effectiveDate = expiryDate ?? estimatedDate;
+    final bool estimated = isEstimated || (expiryDate == null && estimatedDate != null);
+
+    if (effectiveDate == null) {
       return Container(
         padding: EdgeInsets.symmetric(horizontal: paddingH, vertical: paddingV),
         decoration: BoxDecoration(
@@ -23,24 +33,27 @@ class ExpiryBadge extends StatelessWidget {
         ),
         child: Text(
           'No Expiry',
-          style: AppTextStyles.caption(context).copyWith(color: AppColors.info, fontWeight: FontWeight.bold),
+          style: AppTextStyles.caption(context).copyWith(
+            color: AppColors.info,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       );
     }
 
-    final difference = expiryDate!.difference(DateTime.now()).inDays;
+    final difference = effectiveDate.difference(DateTime.now()).inDays;
     Color badgeColor;
     String label;
 
     if (difference < 0) {
       badgeColor = AppColors.danger;
-      label = 'Expired';
+      label = estimated ? 'Past Est.' : 'Expired';
     } else if (difference <= 3) {
       badgeColor = AppColors.warning;
-      label = '${difference}d left';
+      label = estimated ? '~${difference}d (Est)' : '${difference}d left';
     } else {
       badgeColor = AppColors.success;
-      label = '${difference}d left';
+      label = estimated ? '~${difference}d (Est)' : '${difference}d left';
     }
 
     return Container(

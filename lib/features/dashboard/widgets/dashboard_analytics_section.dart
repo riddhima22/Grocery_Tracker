@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../config/app_colors.dart';
 import '../../../config/app_spacing.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../../kitchen/providers/kitchen_provider.dart';
 import 'dashboard_analytics_empty_state.dart';
 import 'kitchen_health_hero_card.dart';
@@ -115,13 +117,11 @@ class DashboardAnalyticsSection extends StatelessWidget {
       wasteRiskColor = AppColors.warning;
     }
 
-    final wasteSubtitle = wasteRisk > 0
-        ? '₹${wasteRisk.toInt()} at risk'
-        : expiringCount > 0
-            ? '₹${expiringCount * 65} at risk'
-            : 'Zero immediate risk';
+    final savedItemsCount = context.watch<AuthProvider>().user?.savedFromWaste ?? 0;
+    final wasteSubtitle = expiringCount > 0
+        ? '$expiringCount item${expiringCount > 1 ? 's' : ''} near expiry'
+        : 'Zero items at immediate risk';
 
-    final savedAmount = totalCount * 40;
     final lastScan = _formatLastScanTime();
     final recommendations = _buildRecommendations();
     final animValue = animation?.value ?? 1.0;
@@ -189,16 +189,16 @@ class DashboardAnalyticsSection extends StatelessWidget {
         ),
         AppGap.sm(context),
 
-        // 3. Financial & Waste Risk Row (2 Cards)
+        // 3. Waste Prevention & Risk Row (2 Cards)
         Row(
           children: [
             Expanded(
               child: KpiCard(
-                label: 'Estimated Savings',
-                value: '₹$savedAmount',
+                label: 'Saved From Waste',
+                value: '$savedItemsCount',
                 icon: Icons.savings_outlined,
                 accentColor: AppColors.primary,
-                subtitle: 'From food tracking',
+                subtitle: 'Items consumed in time',
               ),
             ),
             const SizedBox(width: 8),

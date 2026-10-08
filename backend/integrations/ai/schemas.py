@@ -19,6 +19,8 @@ GROCERY_SCAN_SCHEMA = {
                         "enum": ["kg", "g", "l", "L", "ml", "pcs", "pack", "bottle", "box", "dozen", "bunch", "packet"]
                     },
                     "expiry_date": {"type": "STRING", "nullable": True}, # YYYY-MM-DD format
+                    "estimated_consumption_date": {"type": "STRING", "nullable": True}, # YYYY-MM-DD format
+                    "is_expiry_estimated": {"type": "BOOLEAN"},
                     "manufacturing_date": {"type": "STRING", "nullable": True}, # YYYY-MM-DD format
                     "packed_date": {"type": "STRING", "nullable": True}, # YYYY-MM-DD format
                     "best_before_date": {"type": "STRING", "nullable": True}, # YYYY-MM-DD format

@@ -49,8 +49,11 @@ class GroceryItem(models.Model):
     unit = models.CharField(max_length=20, choices=Units.choices, default=Units.PCS)
     storage_zone = models.CharField(max_length=20, choices=StorageZones.choices, default=StorageZones.PANTRY)
     storage_notes = models.TextField(blank=True)
+    scan_session = models.ForeignKey('scans.ScanSession', on_delete=models.SET_NULL, null=True, blank=True, related_name='created_groceries')
     
     expiry_date = models.DateField(null=True, blank=True)
+    estimated_consumption_date = models.DateField(null=True, blank=True)
+    is_expiry_estimated = models.BooleanField(default=False, db_default=False)
     manufacturing_date = models.DateField(null=True, blank=True)
     packed_date = models.DateField(null=True, blank=True)
     best_before_date = models.DateField(null=True, blank=True)
@@ -102,12 +105,34 @@ class GroceryItem(models.Model):
             models.Index(fields=['user', 'storage_zone']),
             models.Index(fields=['user', 'created_at']),
         ]
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(quantity__gte=0),
+                name='grocery_quantity_non_negative'
+            )
+        ]
+
+    def _resolve_is_expiry_estimated(self) -> bool:
+        if self.expiry_date is None and self.estimated_consumption_date is None:
+            return False
+        if self.estimated_consumption_date is not None:
+            return True
+        if self.date_type == 'estimated' or self.date_source == 'calculated_shelf_life':
+            return True
+        return False
+
+    def clean(self):
+        super().clean()
+        if self.is_expiry_estimated is None:
+            self.is_expiry_estimated = self._resolve_is_expiry_estimated()
+        else:
+            self.is_expiry_estimated = bool(self.is_expiry_estimated)
 
     def save(self, *args, **kwargs):
         import datetime
         # Ensure all calendar DateFields are pure datetime.date instances (not datetime.datetime)
         for date_field in (
-            'expiry_date', 'manufacturing_date', 'packed_date',
+            'expiry_date', 'estimated_consumption_date', 'manufacturing_date', 'packed_date',
             'best_before_date', 'purchase_date', 'predicted_expiry',
             'recommended_consumption_date'
         ):
@@ -115,18 +140,27 @@ class GroceryItem(models.Model):
             if isinstance(val, datetime.datetime):
                 setattr(self, date_field, val.date())
 
-        # Calculate status server-side
-        if self.expiry_date is None:
-            self.status = 'fresh'
+        # Ensure is_expiry_estimated is strictly boolean and never NULL
+        if self.is_expiry_estimated is None:
+            self.is_expiry_estimated = self._resolve_is_expiry_estimated()
         else:
-            days_left = (self.expiry_date - timezone.localdate()).days
-            if days_left < 0:
-                self.status = 'expired'
-            elif days_left <= 3:
-                self.status = 'expiring'
-            else:
+            self.is_expiry_estimated = bool(self.is_expiry_estimated)
+
+        # Calculate status server-side based on actual expiry date or estimated consumption date
+        if self.status not in ['consumed', 'wasted']:
+            effective_date = self.expiry_date or self.estimated_consumption_date or self.predicted_expiry
+            if effective_date is None:
                 self.status = 'fresh'
+            else:
+                days_left = (effective_date - timezone.localdate()).days
+                if days_left < 0:
+                    self.status = 'expired'
+                elif days_left <= 3:
+                    self.status = 'expiring'
+                else:
+                    self.status = 'fresh'
         super().save(*args, **kwargs)
+
 
     def __str__(self):
         return f"{self.name} ({self.quantity} {self.unit})"

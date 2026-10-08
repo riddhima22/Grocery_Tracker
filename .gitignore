@@ -38,9 +38,10 @@ migrate_working_dir/
 .env.*
 .venv
 
-# Backend database and media files
+# Backend database, data, and media files
 backend/db.sqlite3
 backend/media/
+backend/data/
 *.sqlite3
 
 # Symbolication related

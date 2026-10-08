@@ -45,3 +45,21 @@ class PasswordResetSerializer(serializers.Serializer):
 
     def validate_email(self, value):
         return value.lower().strip()
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    token = serializers.CharField(required=True)
+    password = serializers.CharField(required=False, min_length=8, write_only=True)
+    new_password = serializers.CharField(required=False, min_length=8, write_only=True)
+
+    def validate(self, attrs):
+        pw = attrs.get('password') or attrs.get('new_password')
+        if not pw:
+            raise ValidationError("A new password with at least 8 characters is required.")
+        attrs['password'] = pw
+        return attrs
+
+
+class VerifyEmailSerializer(serializers.Serializer):
+    token = serializers.CharField(required=False, allow_blank=True)
+

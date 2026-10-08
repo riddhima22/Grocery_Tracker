@@ -25,6 +25,31 @@ class Recipe(models.Model):
     allergen_warning = models.TextField(blank=True)
     
     created_at = models.DateTimeField(auto_now_add=True)
+    is_cooked = models.BooleanField(default=False)
+    cooked_at = models.DateTimeField(null=True, blank=True)
+    cooking_result = models.JSONField(default=dict, blank=True)
 
     def __str__(self):
         return self.name
+
+
+class CookEvent(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    recipe = models.ForeignKey(Recipe, on_delete=models.CASCADE, related_name='cook_events')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='cook_events')
+    idempotency_key = models.CharField(max_length=128, blank=True, null=True, db_index=True)
+    deduction_summary = models.JSONField(default=list)
+    deduction_errors = models.JSONField(default=list)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'idempotency_key'],
+                condition=models.Q(idempotency_key__isnull=False),
+                name='unique_user_recipe_cook_idempotency'
+            )
+        ]
+
+    def __str__(self):
+        return f"CookEvent for {self.recipe.name} by {self.user.email} at {self.created_at}"

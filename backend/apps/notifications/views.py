@@ -14,16 +14,16 @@ class DeviceTokenView(APIView):
         token = serializer.validated_data['token']
         
         # Save or update token
-        device_token, created = DeviceToken.objects.get_or_create(
-            user=request.user,
-            token=token
+        device_token, created = DeviceToken.objects.update_or_create(
+            token=token,
+            defaults={"user": request.user}
         )
         
         return Response({
             "success": True,
             "data": {"token": token},
             "message": "Device push token registered successfully."
-        }, status=status.HTTP_201_CREATED)
+        }, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
     def delete(self, request):
         token = request.data.get('token')

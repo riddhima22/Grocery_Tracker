@@ -2,6 +2,7 @@ import os
 import hashlib
 import logging
 import tempfile
+
 import cv2
 import numpy as np
 from PIL import Image, ImageStat, ImageOps
@@ -225,75 +226,9 @@ class ModelRouter:
             items = ai_result.get("items", [])
             
             # 5. Accuracy Alignment: Resolve date conflicts & append warnings
-            for item in items:
-                # Add validation warnings found during quality checks
-                item["warnings"] = list(set(item.get("warnings", []) + warnings))
+            items = self.align_item_dates(items, ocr_dates=ocr_dates, warnings=warnings)
 
-                # Date alignment logic
-                if ocr_dates and ocr_dates.get("expiry_date"):
-                    # Check if Gemini extracted a different date
-                    gemini_exp = item.get("expiry_date")
-                    ocr_exp = ocr_dates["expiry_date"].isoformat()
-                    
-                    if gemini_exp and gemini_exp != ocr_exp:
-                        # Conflict! Mark as Low confidence and prompt user choice
-                        item["date_confidence"] = "Low"
-                        item["date_source"] = "ocr_verified"
-                        item["raw_date_text"] = f"Conflict: Gemini found {gemini_exp} | OCR found {ocr_exp}"
-                        item["warnings"].append("Conflicting packaging date values detected between OCR and AI.")
-                    else:
-                        # Align item dates with OCR parsed dates
-                        item["expiry_date"] = ocr_exp
-                        item["manufacturing_date"] = ocr_dates["manufacturing_date"].isoformat() if ocr_dates.get("manufacturing_date") else None
-                        item["packed_date"] = ocr_dates["packed_date"].isoformat() if ocr_dates.get("packed_date") else None
-                        item["best_before_date"] = ocr_dates["best_before_date"].isoformat() if ocr_dates.get("best_before_date") else None
-                        item["date_type"] = ocr_dates.get("date_type", "unknown")
-                        item["date_source"] = ocr_dates.get("date_source", "unknown")
-                        item["date_confidence"] = ocr_dates.get("date_confidence", "Low")
-                        item["raw_date_text"] = ocr_dates.get("raw_date_text", "")
-                
-                # Expiry bounds safety check and fallback shelf-life prediction
-                if item.get("expiry_date"):
-                    try:
-                        exp = None
-                        d_str = str(item["expiry_date"]).strip()
-                        for fmt in ('%Y-%m-%d', '%d/%m/%Y', '%d-%m-%Y', '%m/%d/%Y', '%Y/%m/%d'):
-                            try:
-                                exp = timezone.datetime.strptime(d_str[:10], fmt).date()
-                                break
-                            except (ValueError, TypeError):
-                                pass
-                        if exp:
-                            item["expiry_date"] = exp.isoformat()
-                            if exp < timezone.now().date():
-                                item["warnings"].append("Detected date has already expired.")
-                        else:
-                            item["expiry_date"] = None
-                    except Exception:
-                        item["expiry_date"] = None
 
-                # Fallback to algorithmic shelf-life prediction if date is still missing
-                if not item.get("expiry_date"):
-                    try:
-                        from apps.groceries.prediction_engine import ShelfLifePredictionEngine
-                        prediction = ShelfLifePredictionEngine.predict({
-                            'category': item.get('category', 'default'),
-                            'storage_zone': item.get('storage_zone', 'pantry'),
-                            'purchase_date': timezone.now().date(),
-                        })
-                        item["expiry_date"] = prediction['predicted_expiry'].isoformat()
-                        item["date_type"] = "estimated"
-                        item["date_source"] = "calculated_shelf_life"
-                        if not item.get("storage_reason"):
-                            item["storage_reason"] = prediction.get('storage_recommendation_why', '')
-                        if not item.get("shelf_life_guidance"):
-                            item["shelf_life_guidance"] = prediction.get('storage_recommendation_how', '')
-                    except Exception as pred_err:
-                        logger.warning(f"Shelf life prediction fallback failed: {pred_err}")
-                        # Default 14 days
-                        item["expiry_date"] = (timezone.now().date() + timezone.timedelta(days=14)).isoformat()
-                        item["date_type"] = "estimated"
-                        item["date_source"] = "calculated_shelf_life"
 
             return {
                 "success": True,
@@ -324,3 +259,101 @@ class ModelRouter:
                         os.remove(tmp_path)
                 except Exception as ex:
                     logger.debug(f"Failed to remove temp file {tmp_path}: {ex}")
+
+    def align_item_dates(self, items: list, ocr_dates: dict = None, warnings: list = None) -> list:
+        """
+        Enforces strict date semantics on detected items:
+        1. Aligns with OCR parsed packaging dates and flags conflicts.
+        2. IF printed date detected: expiry_date is set, is_expiry_estimated is False.
+        3. IF NO printed date detected: expiry_date is None, is_expiry_estimated is True,
+           and estimated_consumption_date is calculated from shelf life.
+        """
+        warnings = warnings or []
+        ocr_dates = ocr_dates or {}
+
+        for item in items:
+            item["warnings"] = list(set(item.get("warnings", []) + warnings))
+
+            # Date alignment logic with OCR
+            if ocr_dates and ocr_dates.get("expiry_date"):
+                gemini_exp = item.get("expiry_date")
+                ocr_exp = ocr_dates["expiry_date"].isoformat()
+
+                if gemini_exp and gemini_exp != ocr_exp:
+                    item["date_confidence"] = "Low"
+                    item["date_source"] = "ocr_verified"
+                    item["raw_date_text"] = f"Conflict: Gemini found {gemini_exp} | OCR found {ocr_exp}"
+                    item["warnings"].append("Conflicting packaging date values detected between OCR and AI.")
+                else:
+                    item["expiry_date"] = ocr_exp
+                    item["manufacturing_date"] = ocr_dates["manufacturing_date"].isoformat() if ocr_dates.get("manufacturing_date") else None
+                    item["packed_date"] = ocr_dates["packed_date"].isoformat() if ocr_dates.get("packed_date") else None
+                    item["best_before_date"] = ocr_dates["best_before_date"].isoformat() if ocr_dates.get("best_before_date") else None
+                    item["date_type"] = ocr_dates.get("date_type", "unknown")
+                    item["date_source"] = ocr_dates.get("date_source", "unknown")
+                    item["date_confidence"] = ocr_dates.get("date_confidence", "Low")
+                    item["raw_date_text"] = ocr_dates.get("raw_date_text", "")
+
+            # Expiry bounds safety check and shelf-life semantics enforcement
+            has_printed_expiry = False
+            if item.get("expiry_date"):
+                try:
+                    exp = None
+                    d_str = str(item["expiry_date"]).strip()
+                    for fmt in ('%Y-%m-%d', '%d/%m/%Y', '%d-%m-%Y', '%m/%d/%Y', '%Y/%m/%d'):
+                        try:
+                            exp = timezone.datetime.strptime(d_str[:10], fmt).date()
+                            break
+                        except (ValueError, TypeError):
+                            pass
+                    if exp:
+                        item["expiry_date"] = exp.isoformat()
+                        item["is_expiry_estimated"] = False
+                        item["estimated_consumption_date"] = None
+                        has_printed_expiry = True
+                        if exp < timezone.now().date():
+                            item["warnings"].append("Detected date has already expired.")
+                    else:
+                        item["expiry_date"] = None
+                except Exception:
+                    item["expiry_date"] = None
+
+            # CRITICAL SEMANTIC RULE:
+            # If NO printed expiry exists on package, expiry_date MUST remain None!
+            # We calculate estimated_consumption_date separately and flag is_expiry_estimated = True.
+            if not has_printed_expiry:
+                item["expiry_date"] = None
+                item["is_expiry_estimated"] = True
+                item["date_type"] = "estimated"
+                item["date_source"] = "calculated_shelf_life"
+                try:
+                    from apps.groceries.prediction_engine import ShelfLifePredictionEngine
+                    prediction = ShelfLifePredictionEngine.predict({
+                        'category': item.get('category', 'default'),
+                        'storage_zone': item.get('storage_zone', 'pantry'),
+                        'purchase_date': timezone.now().date(),
+                    })
+                    item["estimated_consumption_date"] = prediction['predicted_expiry'].isoformat()
+                    if not item.get("storage_reason"):
+                        item["storage_reason"] = prediction.get('storage_recommendation_why', '')
+                    if not item.get("shelf_life_guidance"):
+                        item["shelf_life_guidance"] = prediction.get('storage_recommendation_how', '')
+                except Exception as pred_err:
+                    logger.warning(f"Shelf life prediction fallback failed: {pred_err}")
+                    item["estimated_consumption_date"] = (timezone.now().date() + timezone.timedelta(days=14)).isoformat()
+            else:
+                item["estimated_consumption_date"] = None
+                item["is_expiry_estimated"] = False
+
+        return items
+
+    def parse_grocery_response(self, json_data: dict, ocr_dates: dict = None, warnings: list = None) -> dict:
+        """Parses and aligns grocery items from a JSON dictionary."""
+        items = json_data.get("items", [])
+        aligned_items = self.align_item_dates(items, ocr_dates=ocr_dates, warnings=warnings)
+        return {
+            "success": True,
+            "items": aligned_items,
+            "warnings": warnings or []
+        }
+

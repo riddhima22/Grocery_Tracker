@@ -351,9 +351,10 @@ class _KitchenItemDetailViewState extends State<KitchenItemDetailView> with Sing
   }
 
   Widget _buildFreshnessMeter(Color freshnessColor) {
-    final remainingDays = _currentItem.expiryDate != null
-        ? _currentItem.expiryDate!.difference(DateTime.now()).inDays
+    final remainingDays = _currentItem.effectiveExpiryDate != null
+        ? _currentItem.effectiveExpiryDate!.difference(DateTime.now()).inDays
         : 0;
+
 
     return Container(
       padding: EdgeInsets.all(AppSpacing.md(context)),
@@ -608,9 +609,12 @@ class _KitchenItemDetailViewState extends State<KitchenItemDetailView> with Sing
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Estimated Expiry', style: AppTextStyles.caption(context)),
               Text(
-                _currentItem.expiryDate?.toIso8601String().substring(0, 10) ?? 'N/A',
+                _currentItem.isExpiryEstimated ? 'Estimated Consumption' : 'Printed Expiry Date',
+                style: AppTextStyles.caption(context),
+              ),
+              Text(
+                _currentItem.effectiveExpiryDate?.toIso8601String().substring(0, 10) ?? 'N/A',
                 style: AppTextStyles.bodySmall(context).copyWith(fontWeight: FontWeight.bold),
               )
             ],
@@ -618,6 +622,7 @@ class _KitchenItemDetailViewState extends State<KitchenItemDetailView> with Sing
         ],
       ),
     );
+
   }
 
   Widget _buildNutritionAllergensCard() {

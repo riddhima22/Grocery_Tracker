@@ -205,3 +205,160 @@ class GroceryAPITests(APITestCase):
             self.assertEqual(response.data['data']['barcode'], barcode)
             self.assertFalse(response.data['data']['found'])
 
+
+class ExpiryAndShelfLifeSemanticsTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email='expiry_test@example.com',
+            password='Password123!',
+            display_name='Expiry Tester'
+        )
+
+    def test_printed_expiry_date(self):
+        """When printed expiry is present, expiry_date is populated and is_expiry_estimated is False."""
+        future_date = timezone.localdate() + datetime.timedelta(days=10)
+        item = GroceryItem.objects.create(
+            user=self.user,
+            name='Canned Beans',
+            expiry_date=future_date,
+            date_type='expiry',
+            date_source='ocr_verified',
+            is_expiry_estimated=False
+        )
+        self.assertEqual(item.expiry_date, future_date)
+        self.assertFalse(item.is_expiry_estimated)
+        self.assertIsNone(item.estimated_consumption_date)
+        self.assertEqual(item.status, 'fresh')
+
+    def test_printed_best_before_date(self):
+        """Printed best before date is preserved cleanly."""
+        bb_date = timezone.localdate() + datetime.timedelta(days=20)
+        item = GroceryItem.objects.create(
+            user=self.user,
+            name='Biscuit Pack',
+            best_before_date=bb_date,
+            date_type='best_before',
+            date_source='ocr_verified',
+            is_expiry_estimated=False
+        )
+        self.assertEqual(item.best_before_date, bb_date)
+
+    def test_no_printed_date_estimated_shelf_life(self):
+        """When NO printed date exists, expiry_date MUST be None and estimated_consumption_date populated."""
+        est_date = timezone.localdate() + datetime.timedelta(days=7)
+        item = GroceryItem.objects.create(
+            user=self.user,
+            name='Fresh Apples',
+            expiry_date=None,
+            estimated_consumption_date=est_date,
+            date_type='estimated',
+            date_source='calculated_shelf_life',
+            is_expiry_estimated=True
+        )
+        self.assertIsNone(item.expiry_date)
+        self.assertTrue(item.is_expiry_estimated)
+        self.assertEqual(item.estimated_consumption_date, est_date)
+        # Status calculation should derive from estimated date
+        self.assertEqual(item.status, 'fresh')
+
+    def test_expired_item_status(self):
+        """Past printed date causes status='expired'."""
+        past_date = timezone.localdate() - datetime.timedelta(days=2)
+        item = GroceryItem.objects.create(
+            user=self.user,
+            name='Old Milk',
+            expiry_date=past_date,
+            is_expiry_estimated=False
+        )
+        self.assertEqual(item.status, 'expired')
+
+    def test_expired_estimated_item_status(self):
+        """Past estimated consumption date causes status='expired' even without printed expiry."""
+        past_date = timezone.localdate() - datetime.timedelta(days=1)
+        item = GroceryItem.objects.create(
+            user=self.user,
+            name='Old Spinach',
+            expiry_date=None,
+            estimated_consumption_date=past_date,
+            is_expiry_estimated=True
+        )
+        self.assertEqual(item.status, 'expired')
+
+    def test_model_router_enforces_semantic_null_expiry_date(self):
+        """AI router leaves expiry_date=None when unprinted and sets estimated_consumption_date."""
+        from integrations.ai.model_router import ModelRouter
+        router = ModelRouter()
+
+
+        # Simulated AI extraction with NO printed expiry (e.g. fresh banana)
+        raw_items = [{
+            "name": "Organic Banana",
+            "category": "Fruits",
+            "storage_zone": "counter",
+            "quantity": 1,
+            "unit": "bunch",
+            "expiry_date": None,
+            "raw_date_text": "",
+            "warnings": [],
+        }]
+
+        processed = router.parse_grocery_response(json_data={"items": raw_items})
+        self.assertTrue(processed['success'])
+        item = processed['items'][0]
+        # CRITICAL ASSERTIONS:
+        self.assertIsNone(item['expiry_date'], "expiry_date must be None when no printed date exists!")
+        self.assertTrue(item['is_expiry_estimated'])
+        self.assertIsNotNone(item['estimated_consumption_date'])
+        self.assertEqual(item['date_type'], 'estimated')
+        self.assertEqual(item['date_source'], 'calculated_shelf_life')
+
+    def test_model_router_preserves_printed_date(self):
+        """AI router preserves printed expiry date and sets is_expiry_estimated=False."""
+        from integrations.ai.model_router import ModelRouter
+        router = ModelRouter()
+
+
+        future_str = (timezone.localdate() + datetime.timedelta(days=30)).isoformat()
+        raw_items = [{
+            "name": "Almond Milk",
+            "category": "Dairy",
+            "storage_zone": "fridge",
+            "quantity": 1,
+            "unit": "L",
+            "expiry_date": future_str,
+            "raw_date_text": f"EXP {future_str}",
+            "warnings": [],
+        }]
+
+        processed = router.parse_grocery_response(json_data={"items": raw_items})
+        self.assertTrue(processed['success'])
+        item = processed['items'][0]
+        self.assertEqual(item['expiry_date'], future_str)
+        self.assertFalse(item['is_expiry_estimated'])
+        self.assertIsNone(item['estimated_consumption_date'])
+
+    def test_model_router_malformed_date_falls_back_to_estimated(self):
+        """AI router handles malformed date strings by setting expiry_date=None and calculating estimate."""
+        from integrations.ai.model_router import ModelRouter
+        router = ModelRouter()
+
+
+        raw_items = [{
+            "name": "Tomatoes",
+            "category": "Vegetables",
+            "storage_zone": "counter",
+            "quantity": 1,
+            "unit": "kg",
+            "expiry_date": "INVALID_DATE_STRING_999",
+            "raw_date_text": "garbage text",
+            "warnings": [],
+        }]
+
+        processed = router.parse_grocery_response(json_data={"items": raw_items})
+        self.assertTrue(processed['success'])
+        item = processed['items'][0]
+        self.assertIsNone(item['expiry_date'])
+        self.assertTrue(item['is_expiry_estimated'])
+        self.assertIsNotNone(item['estimated_consumption_date'])
+
+

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import '../../../data/models/user_model.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../../core/services/local_storage_service.dart';
+import '../../../core/services/notification_service.dart';
 import '../../../core/api/token_refresh_manager.dart';
 import '../../../core/utils/app_logger.dart';
 
@@ -219,9 +221,22 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> resendVerification() async {
     try {
-      await _authRepository.verifyEmail(); // mocks resend on this mock framework
+      await _authRepository.resendVerification();
     } catch (e) {
       AppLogger.error('Resend verification failed', e);
+    }
+  }
+
+  Future<bool> resetPassword({required String token, required String newPassword}) async {
+    _setState(AuthState.loading);
+    try {
+      await _authRepository.resetPassword(token: token, newPassword: newPassword);
+      _setState(AuthState.idle);
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString();
+      _setState(AuthState.error);
+      return false;
     }
   }
 
@@ -291,5 +306,22 @@ class AuthProvider extends ChangeNotifier {
     _state = state;
     _isLoading = state == AuthState.loading;
     notifyListeners();
+    if (state == AuthState.success) {
+      _registerFcmToken();
+    }
+  }
+
+  void _registerFcmToken() {
+    try {
+      FirebaseMessaging.instance.getToken().then((token) {
+        if (token != null && token.isNotEmpty) {
+          NotificationService().uploadFcmToken(token);
+        }
+      }).catchError((e) {
+        AppLogger.debug('FCM token registration skipped/failed: $e');
+      });
+    } catch (e) {
+      AppLogger.debug('FirebaseMessaging unavailable: $e');
+    }
   }
 }

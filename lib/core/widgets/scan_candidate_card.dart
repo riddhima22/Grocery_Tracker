@@ -131,7 +131,7 @@ class ScanCandidateCard extends StatelessWidget {
                       InkWell(
                         borderRadius: BorderRadius.circular(4),
                         onTap: () async {
-                          final initial = candidate.expiryDate ?? DateTime.now().add(const Duration(days: 7));
+                          final initial = candidate.effectiveExpiryDate ?? DateTime.now().add(const Duration(days: 7));
                           final picked = await showDatePicker(
                             context: context,
                             initialDate: initial,
@@ -150,15 +150,16 @@ class ScanCandidateCard extends StatelessWidget {
                               Icon(
                                 Icons.calendar_today_outlined, 
                                 size: 13, 
-                                color: candidate.expiryDate != null ? AppColors.primary : AppColors.warning,
+                                color: candidate.effectiveExpiryDate != null ? AppColors.primary : AppColors.warning,
                               ),
                               const SizedBox(width: 4),
                               Flexible(
                                 child: Builder(
                                   builder: (context) {
-                                    if (candidate.expiryDate == null) {
+                                    final effective = candidate.effectiveExpiryDate;
+                                    if (effective == null) {
                                       return Text(
-                                        'Expiry: Set Date',
+                                        'Date: Set Date',
                                         style: AppTextStyles.caption(context).copyWith(
                                           color: AppColors.warning,
                                           fontWeight: FontWeight.bold,
@@ -168,14 +169,16 @@ class ScanCandidateCard extends StatelessWidget {
                                         overflow: TextOverflow.ellipsis,
                                       );
                                     }
-                                    final daysLeft = candidate.expiryDate!.difference(DateTime.now()).inDays;
+                                    final daysLeft = effective.difference(DateTime.now()).inDays;
                                     final shelfText = daysLeft <= 0 
                                         ? 'today' 
                                         : (daysLeft == 1 ? '~1d' : '~$daysLeft days');
+                                    final bool isEstimated = candidate.isExpiryEstimated || candidate.expiryDate == null;
+                                    final String labelPrefix = isEstimated ? 'Estimated consumption' : 'Expiry';
                                     return Text(
-                                      'Expiry: ${candidate.expiryDate.toString().substring(0, 10)} ($shelfText)',
+                                      '$labelPrefix: ${effective.toString().substring(0, 10)} ($shelfText)',
                                       style: AppTextStyles.caption(context).copyWith(
-                                        color: AppColors.textPrimary,
+                                        color: isEstimated ? AppColors.textSecondary : AppColors.textPrimary,
                                         fontWeight: FontWeight.bold,
                                         decoration: TextDecoration.underline,
                                         decorationColor: AppColors.primary.withValues(alpha: 0.5),
@@ -190,6 +193,7 @@ class ScanCandidateCard extends StatelessWidget {
                           ),
                         ),
                       ),
+
                     ],
                   ),
                 ),

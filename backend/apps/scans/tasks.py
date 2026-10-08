@@ -197,24 +197,66 @@ def process_scan_session_task(self, session_id=None):
                 item_name = safe_str(item_data.get('name'), 'Unknown Item')[:150]
                 item_category = safe_str(item_data.get('category'), 'Vegetables')[:100]
 
-                # Resolve expiry date: use package date if extracted, otherwise compute realistic shelf life
+                # Resolve expiry date semantics: distinguish printed date from estimated consumption
                 expiry_dt = parse_date_str(item_data.get('expiry_date'))
+                estimated_dt = parse_date_str(item_data.get('estimated_consumption_date'))
+                raw_is_estimated = item_data.get('is_expiry_estimated')
                 date_type_val = safe_str(item_data.get('date_type'), 'unknown')[:30]
                 date_src_val = safe_str(item_data.get('date_source'), 'unknown')[:30]
                 raw_date_val = safe_str(item_data.get('raw_date_text'), '')
                 date_conf_val = safe_str(item_data.get('date_confidence'), 'Low')[:20]
                 shelf_guidance_val = safe_str(item_data.get('shelf_life_guidance'), '')
 
-                if expiry_dt is None:
-                    from apps.groceries.prediction_engine import calculate_item_shelf_life
-                    real_shelf_days = calculate_item_shelf_life(item_name, item_category, zone)
-                    expiry_dt = timezone.now().date() + datetime.timedelta(days=real_shelf_days)
+                is_flagged_estimated = (
+                    date_type_val == 'estimated' or
+                    date_src_val == 'calculated_shelf_life' or
+                    raw_is_estimated is True
+                )
+
+                if is_flagged_estimated:
+                    is_estimated = True
+                    if estimated_dt is None and expiry_dt is not None:
+                        estimated_dt = expiry_dt
+                        expiry_dt = None
                     date_type_val = 'estimated'
                     date_src_val = 'calculated_shelf_life'
-                    raw_date_val = f"Approx. {real_shelf_days} days shelf life ({zone})"
-                    date_conf_val = 'Medium'
-                    if not shelf_guidance_val:
-                        shelf_guidance_val = f"Estimated {real_shelf_days} days shelf life based on optimal {zone} storage."
+                    if estimated_dt is None:
+                        from apps.groceries.prediction_engine import calculate_item_shelf_life
+                        real_shelf_days = calculate_item_shelf_life(item_name, item_category, zone)
+                        if real_shelf_days:
+                            estimated_dt = timezone.now().date() + datetime.timedelta(days=real_shelf_days)
+                            raw_date_val = raw_date_val or f"Estimated ~{real_shelf_days} days shelf life ({zone})"
+                            if not shelf_guidance_val:
+                                shelf_guidance_val = f"Estimated {real_shelf_days} days shelf life based on optimal {zone} storage."
+                        else:
+                            estimated_dt = None
+                            is_estimated = False
+                elif expiry_dt is not None:
+                    # Packaging has a printed expiry date
+                    is_estimated = False
+                    estimated_dt = None
+                    if date_src_val == 'unknown':
+                        date_src_val = 'ocr_verified'
+                else:
+                    # No printed packaging date exists -> compute estimated shelf life
+                    from apps.groceries.prediction_engine import calculate_item_shelf_life
+                    real_shelf_days = calculate_item_shelf_life(item_name, item_category, zone)
+                    if real_shelf_days:
+                        is_estimated = True
+                        expiry_dt = None
+                        estimated_dt = timezone.now().date() + datetime.timedelta(days=real_shelf_days)
+                        date_type_val = 'estimated'
+                        date_src_val = 'calculated_shelf_life'
+                        date_conf_val = 'Medium'
+                        raw_date_val = raw_date_val or f"Estimated ~{real_shelf_days} days shelf life ({zone})"
+                        if not shelf_guidance_val:
+                            shelf_guidance_val = f"Estimated {real_shelf_days} days shelf life based on optimal {zone} storage."
+                    else:
+                        is_estimated = False
+                        expiry_dt = None
+                        estimated_dt = None
+
+                is_estimated = bool(is_estimated)
 
                 ScanCandidate.objects.create(
                     scan_session=session,
@@ -228,6 +270,8 @@ def process_scan_session_task(self, session_id=None):
                     unit=unit[:20],
                     storage_zone=zone[:20],
                     expiry_date=expiry_dt,
+                    estimated_consumption_date=estimated_dt,
+                    is_expiry_estimated=is_estimated,
                     manufacturing_date=parse_date_str(item_data.get('manufacturing_date')),
                     packed_date=parse_date_str(item_data.get('packed_date')),
                     best_before_date=parse_date_str(item_data.get('best_before_date')),
@@ -241,6 +285,7 @@ def process_scan_session_task(self, session_id=None):
                 )
                 candidate_count += 1
 
+
             # Mark all processed images as completed
             for scan_image in images:
                 scan_image.status = ScanImage.Statuses.COMPLETED
@@ -248,8 +293,19 @@ def process_scan_session_task(self, session_id=None):
                 successful_count += 1
 
     except Exception as e:
-        logger.error(f"Error processing images for session {session_id}: {str(e)}", exc_info=True)
-        # Directly mark images failed and record error message so client receives error immediately
+        retries = getattr(getattr(self, 'request', None), 'retries', 0)
+        max_retries = getattr(self, 'max_retries', 3)
+        if is_transient_error(e) and retries < max_retries and hasattr(self, 'retry'):
+            countdown = (2 ** retries) * 10
+            logger.warning(
+                f"Transient error for scan session {session_id} (attempt {retries + 1}/{max_retries}): {e}. "
+                f"Retrying in {countdown}s with exponential backoff..."
+            )
+            connection.close_if_unusable_or_obsolete()
+            raise self.retry(exc=e, countdown=countdown)
+
+        logger.error(f"Permanent error or max retries exceeded for session {session_id}: {str(e)}", exc_info=True)
+        # Directly mark images failed and record error message
         for scan_image in images:
             scan_image.status = ScanImage.Statuses.FAILED
             scan_image.error_message = str(e)
@@ -257,26 +313,33 @@ def process_scan_session_task(self, session_id=None):
             failed_count += 1
 
     finally:
-        # Update session status
-        session.successful_image_count = successful_count
-        session.failed_image_count = failed_count
-        session.candidate_count = candidate_count
-        
-        if failed_count == 0 and successful_count > 0:
-            session.status = ScanSession.Statuses.COMPLETED
-        elif successful_count > 0 and failed_count > 0:
-            session.status = ScanSession.Statuses.PARTIAL
+        # If task is retrying, don't finalize the session as failed
+        import sys
+        exc_type, _, _ = sys.exc_info()
+        if exc_type is not None and issubclass(exc_type, Retry):
+            logger.info(f"Task for session {session_id} scheduled for retry. Preserving status {session.status}.")
+            connection.close_if_unusable_or_obsolete()
         else:
-            session.status = ScanSession.Statuses.FAILED
+            # Update session status
+            session.successful_image_count = successful_count
+            session.failed_image_count = failed_count
+            session.candidate_count = candidate_count
             
-        session.completed_at = timezone.now()
-        session.save(update_fields=['status', 'successful_image_count', 'failed_image_count', 'candidate_count', 'completed_at'])
-        
-        elapsed = time.time() - start_time
-        logger.info(
-            f"Completed scan processing task for session {session_id} in {elapsed:.2f}s: "
-            f"status={session.status}, candidates={candidate_count}, failed_images={failed_count}"
-        )
-        connection.close_if_unusable_or_obsolete()
+            if failed_count == 0 and successful_count > 0:
+                session.status = ScanSession.Statuses.COMPLETED
+            elif successful_count > 0 and failed_count > 0:
+                session.status = ScanSession.Statuses.PARTIAL
+            else:
+                session.status = ScanSession.Statuses.FAILED
+                
+            session.completed_at = timezone.now()
+            session.save(update_fields=['status', 'successful_image_count', 'failed_image_count', 'candidate_count', 'completed_at'])
+            
+            elapsed = time.time() - start_time
+            logger.info(
+                f"Completed scan processing task for session {session_id} in {elapsed:.2f}s: "
+                f"status={session.status}, candidates={candidate_count}, failed_images={failed_count}"
+            )
+            connection.close_if_unusable_or_obsolete()
 
     return True

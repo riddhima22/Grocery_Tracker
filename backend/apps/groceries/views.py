@@ -89,7 +89,10 @@ class GroceryItemViewSet(viewsets.ModelViewSet):
             new_qty = old_qty + adjustment_val
             
             if new_qty < 0:
-                return Response({"success": False, "error": "Quantity cannot become negative."}, status=400)
+                return Response({
+                    "success": False, 
+                    "error": f"Insufficient inventory quantity: adjusting by {adjustment_val} would make stock negative (current stock: {old_qty} {item.unit})."
+                }, status=400)
 
             item.quantity = new_qty
             item.save()
@@ -126,8 +129,14 @@ class GroceryItemViewSet(viewsets.ModelViewSet):
                 except (ValueError, TypeError):
                     return Response({"success": False, "error": "Invalid consume quantity format."}, status=400)
 
-            if consume_val <= 0 or consume_val > old_qty:
-                return Response({"success": False, "error": "Invalid consume quantity bounds."}, status=400)
+            if consume_val <= 0:
+                return Response({"success": False, "error": "Consume quantity must be greater than zero."}, status=400)
+
+            if consume_val > old_qty:
+                return Response({
+                    "success": False,
+                    "error": f"Insufficient inventory quantity: requested {consume_val} {item.unit}, but only {old_qty} {item.unit} available."
+                }, status=400)
 
             new_qty = old_qty - consume_val
             item.quantity = new_qty
@@ -182,8 +191,14 @@ class GroceryItemViewSet(viewsets.ModelViewSet):
                 except (ValueError, TypeError):
                     return Response({"success": False, "error": "Invalid waste quantity format."}, status=400)
 
-            if waste_val <= 0 or waste_val > old_qty:
-                return Response({"success": False, "error": "Invalid waste quantity bounds."}, status=400)
+            if waste_val <= 0:
+                return Response({"success": False, "error": "Waste quantity must be greater than zero."}, status=400)
+
+            if waste_val > old_qty:
+                return Response({
+                    "success": False,
+                    "error": f"Insufficient inventory quantity: requested {waste_val} {item.unit}, but only {old_qty} {item.unit} available."
+                }, status=400)
 
             new_qty = old_qty - waste_val
             item.quantity = new_qty
@@ -228,9 +243,17 @@ class GroceryItemViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='use-first')
     def use_first(self, request):
-        # Fetch items close to expiry
-        queryset = self.get_queryset().filter(expiry_date__isnull=False).order_by('expiry_date')[:5]
-        serializer = GroceryItemSerializer(queryset, many=True)
+        # Fetch items close to effective expiry (printed expiry or estimated consumption)
+        items = list(self.get_queryset().filter(
+            models.Q(expiry_date__isnull=False) | models.Q(estimated_consumption_date__isnull=False),
+            quantity__gt=0
+        ).exclude(status='expired'))
+        
+        # Sort by effective date (earliest first)
+        items.sort(key=lambda x: (x.expiry_date or x.estimated_consumption_date))
+        selected_items = items[:5]
+        
+        serializer = GroceryItemSerializer(selected_items, many=True)
         return Response({
             "success": True,
             "data": serializer.data

@@ -128,9 +128,19 @@ class _ItemDetailPanelState extends State<ItemDetailPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final int? daysLeft = widget.item.expiryDate?.difference(DateTime.now()).inDays;
+    final effectiveDate = widget.item.effectiveExpiryDate;
+    final int? daysLeft = effectiveDate?.difference(DateTime.now()).inDays;
+    final int totalDays = effectiveDate != null
+        ? effectiveDate.difference(widget.item.purchaseDate).inDays
+        : 0;
+    final int elapsedDays = DateTime.now().difference(widget.item.purchaseDate).inDays;
+    final double timelineProgress = totalDays > 0
+        ? (elapsedDays / totalDays).clamp(0.0, 1.0)
+        : (daysLeft != null && daysLeft <= 0 ? 1.0 : 0.0);
 
     return Center(
+
+
       child: Container(
         constraints: const BoxConstraints(maxWidth: 550),
         padding: EdgeInsets.symmetric(
@@ -210,7 +220,11 @@ class _ItemDetailPanelState extends State<ItemDetailPanel> {
                               ),
                             ),
                             AppGap.xs(context),
-                            ExpiryBadge(expiryDate: widget.item.expiryDate),
+                            ExpiryBadge(
+                              expiryDate: widget.item.expiryDate,
+                              estimatedDate: widget.item.estimatedConsumptionDate ?? widget.item.predictedExpiry,
+                              isEstimated: widget.item.isExpiryEstimated,
+                            ),
                           ],
                         ),
                       ],
@@ -234,30 +248,33 @@ class _ItemDetailPanelState extends State<ItemDetailPanel> {
               ],
 
               // Expiry progress timeline
-              if (widget.item.expiryDate != null) ...[
+              if (effectiveDate != null) ...[
                 Text('Freshness Timeline', style: AppTextStyles.labelMedium(context)),
                 const SizedBox(height: 10),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text('Purchased', style: AppTextStyles.caption(context)),
-                    Text('Expiry Date', style: AppTextStyles.caption(context)),
+                    Text(
+                      widget.item.isExpiryEstimated ? 'Estimated Date' : 'Expiry Date',
+                      style: AppTextStyles.caption(context),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 4),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(AppRadius.chip(context) * 0.5),
                   child: LinearProgressIndicator(
-                    value: daysLeft == null || daysLeft <= 0 
-                        ? 1.0 
-                        : (14 - daysLeft.clamp(0, 14)) / 14, // mock progress estimate
+                    value: timelineProgress,
                     backgroundColor: AppColors.card,
-                    color: daysLeft != null && daysLeft <= 3 ? AppColors.danger : AppColors.success,
+                    color: (daysLeft != null && daysLeft <= 3) ? AppColors.danger : AppColors.success,
+
                     minHeight: 8.0,
                   ),
                 ),
                 AppGap.md(context),
               ],
+
 
               // AI Storage Tips
               Container(

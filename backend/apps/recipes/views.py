@@ -184,17 +184,69 @@ class RecipeViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='mark-cooked')
     def mark_cooked(self, request, pk=None):
-        recipe = self.get_object()
+        recipe_obj = self.get_object()
+        user = request.user
+        idempotency_key = request.data.get('idempotency_key') or request.headers.get('X-Idempotency-Key')
         
         with transaction.atomic():
-            user = request.user
-            
-            # Deduct items
+            # Row lock recipe to prevent concurrent double-cooking
+            recipe = Recipe.objects.select_for_update().get(pk=recipe_obj.pk)
+
+            # Check if this idempotency key was already processed
+            if idempotency_key:
+                from .models import CookEvent
+                existing_event = CookEvent.objects.filter(user=user, idempotency_key=idempotency_key).first()
+                if existing_event:
+                    return Response({
+                        "success": True,
+                        "data": {
+                            "recipes_cooked": user.recipes_cooked,
+                            "deduction_summary": existing_event.deduction_summary,
+                            "deduction_errors": existing_event.deduction_errors,
+                            "is_idempotent_replay": True
+                        },
+                        "message": f"Recipe '{recipe.name}' was already marked as cooked (idempotent replay)."
+                    })
+
+            # Check if recipe is already cooked
+            if recipe.is_cooked:
+                cached_res = recipe.cooking_result or {}
+                return Response({
+                    "success": True,
+                    "data": {
+                        "recipes_cooked": user.recipes_cooked,
+                        "deduction_summary": cached_res.get('deduction_summary', []),
+                        "deduction_errors": cached_res.get('deduction_errors', []),
+                        "already_cooked": True
+                    },
+                    "message": f"Recipe '{recipe.name}' was already marked as cooked."
+                })
+
+            # Deduct items from pantry
             summary, errors = deduct_pantry_items_bulk(user, recipe.ingredients_used, activity_source='recipe_cooked')
-            
+
+            # Mark recipe as cooked and cache result
+            recipe.is_cooked = True
+            recipe.cooked_at = timezone.now()
+            recipe.cooking_result = {
+                "deduction_summary": summary,
+                "deduction_errors": errors
+            }
+            recipe.save(update_fields=['is_cooked', 'cooked_at', 'cooking_result'])
+
             user.recipes_cooked += 1
             user.save(update_fields=['recipes_cooked'])
-            
+
+            if idempotency_key:
+                from .models import CookEvent
+                CookEvent.objects.create(
+                    recipe=recipe,
+                    user=user,
+                    idempotency_key=idempotency_key,
+                    deduction_summary=summary,
+                    deduction_errors=errors
+                )
+
             return Response({
                 "success": True,
                 "data": {

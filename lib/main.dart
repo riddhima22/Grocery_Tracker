@@ -19,6 +19,7 @@ import 'features/recipes/providers/recipe_provider.dart';
 import 'features/grocery_list/providers/grocery_list_provider.dart';
 import 'features/meals/providers/meal_provider.dart';
 import 'core/services/offline_sync_service.dart';
+import 'core/services/notification_service.dart';
 import 'core/api/api_client.dart';
 
 void main() async {
@@ -35,8 +36,10 @@ void main() async {
     if (!kIsWeb) {
       FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
     }
+    // Initialize push and local notifications
+    await NotificationService().initialize();
   } catch (e) {
-    debugPrint('Firebase initialization failed: $e');
+    debugPrint('Firebase/Notification initialization failed: $e');
   }
 
   // Enforce vertical portrait orientation only

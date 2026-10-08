@@ -194,3 +194,166 @@ class ScanUploadValidationTests(TestCase):
         self.assertFalse(res.data['success'])
 
 
+class ScanCandidateExpirySemanticsTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="expiry_test@example.com",
+            password="StrongPassword123!",
+            display_name="Expiry Tester"
+        )
+        self.session = ScanSession.objects.create(
+            user=self.user,
+            status=ScanSession.Statuses.COMPLETED
+        )
+
+    def test_case_1_expiry_estimated_yields_true(self):
+        """When expiry is estimated from shelf life, is_expiry_estimated must be True."""
+        candidate = ScanCandidate.objects.create(
+            scan_session=self.session,
+            name="Bananas",
+            category="Fruits",
+            storage_zone="counter",
+            estimated_consumption_date=datetime.date(2026, 10, 14),
+            date_type="estimated",
+            date_source="calculated_shelf_life",
+            is_expiry_estimated=None,  # explicitly testing None input
+        )
+        self.assertIs(candidate.is_expiry_estimated, True)
+        self.assertIsNone(candidate.expiry_date)
+        self.assertEqual(candidate.estimated_consumption_date, datetime.date(2026, 10, 14))
+
+    def test_case_2_expiry_explicitly_known_yields_false(self):
+        """When expiry is explicitly printed / known, is_expiry_estimated must be False."""
+        candidate = ScanCandidate.objects.create(
+            scan_session=self.session,
+            name="Cheddar Cheese",
+            category="Dairy",
+            storage_zone="fridge",
+            expiry_date=datetime.date(2026, 11, 20),
+            date_type="expiry",
+            date_source="ocr_verified",
+            is_expiry_estimated=None,  # explicitly testing None input
+        )
+        self.assertIs(candidate.is_expiry_estimated, False)
+        self.assertEqual(candidate.expiry_date, datetime.date(2026, 11, 20))
+        self.assertIsNone(candidate.estimated_consumption_date)
+
+    def test_case_3_calculation_returns_null_safely_resolves_to_false(self):
+        """When both expiry and shelf-life are NULL, safely resolve is_expiry_estimated to False."""
+        candidate = ScanCandidate.objects.create(
+            scan_session=self.session,
+            name="Unknown Bulk Item",
+            category="Other",
+            storage_zone="pantry",
+            expiry_date=None,
+            estimated_consumption_date=None,
+            is_expiry_estimated=None,  # explicitly testing None input
+        )
+        self.assertIs(candidate.is_expiry_estimated, False)
+        self.assertIsNone(candidate.expiry_date)
+        self.assertIsNone(candidate.estimated_consumption_date)
+
+    def test_case_4_red_onion_scan_from_screenshot_succeeds(self):
+        """
+        Simulate the exact payload from the failed Red Onion scan:
+        Red Onion with AI calculated shelf life date passed in expiry_date,
+        date_type='estimated', date_source='calculated_shelf_life', is_expiry_estimated=None.
+        Must succeed, not throw NOT NULL error, shift estimated date, and set is_expiry_estimated=True.
+        """
+        from apps.scans.serializers import ScanCandidateSerializer
+        
+        # Test 1: Direct model creation
+        candidate = ScanCandidate.objects.create(
+            scan_session=self.session,
+            name="Red Onion",
+            brand="",
+            description="Fresh whole red onions piled together, suitable for cooking and ...",
+            icon_key="vegetables",
+            category="Vegetables",
+            quantity=15.00,
+            unit="pcs",
+            storage_zone="basket",
+            expiry_date=datetime.date(2026, 11, 7),
+            date_type="estimated",
+            date_source="calculated_shelf_life",
+            date_confidence="Medium",
+            raw_date_text="Estimated based on item shelf life",
+            shelf_life_guidance="Keep away from direct sunlight and potatoes. Stored properly, th...",
+            storage_reason="Store in a cool, dark, and well-ventilated basket to prevent spr...",
+            confidence="High",
+            is_expiry_estimated=None,
+        )
+        self.assertIsNotNone(candidate.id)
+        self.assertIs(candidate.is_expiry_estimated, True)
+        self.assertIsNone(candidate.expiry_date)
+        self.assertEqual(candidate.estimated_consumption_date, datetime.date(2026, 11, 7))
+
+        # Test 2: Via Serializer
+        serializer = ScanCandidateSerializer(data={
+            "name": "Red Onion 2",
+            "category": "Vegetables",
+            "quantity": 5.0,
+            "unit": "pcs",
+            "storage_zone": "basket",
+            "expiry_date": None,
+            "estimated_consumption_date": "2026-11-07",
+            "date_type": "estimated",
+            "date_source": "calculated_shelf_life",
+            "is_expiry_estimated": None,
+        })
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        self.assertIs(serializer.validated_data["is_expiry_estimated"], True)
+
+    def test_tasks_processing_with_red_onion_item_data(self):
+        """Simulate task processing loop with the exact AI dictionary for Red Onion."""
+        from apps.scans.tasks import process_scan_session_task
+        from unittest.mock import patch, MagicMock
+
+        mock_router_result = {
+            "success": True,
+            "items": [
+                {
+                    "name": "Red Onion",
+                    "brand": "",
+                    "description": "Fresh whole red onions piled together, suitable for cooking and ...",
+                    "category": "Vegetables",
+                    "icon_key": "vegetables",
+                    "quantity": 15.0,
+                    "unit": "pcs",
+                    "storage_zone": "basket",
+                    "expiry_date": "2026-11-07",
+                    "estimated_consumption_date": None,
+                    "is_expiry_estimated": None,
+                    "date_type": "estimated",
+                    "date_source": "calculated_shelf_life",
+                    "date_confidence": "Medium",
+                    "raw_date_text": "Estimated based on item shelf life",
+                    "storage_reason": "Store in a cool, dark, and well-ventilated basket to prevent spr...",
+                    "shelf_life_guidance": "Keep away from direct sunlight and potatoes. Stored properly, th...",
+                    "confidence": "High",
+                }
+            ]
+        }
+
+        with patch("apps.scans.tasks.ModelRouter") as MockRouter:
+            mock_instance = MagicMock()
+            mock_instance.process_scan.return_value = mock_router_result
+            MockRouter.return_value = mock_instance
+
+            # Create pending image for session
+            from apps.scans.models import ScanImage
+            from django.core.files.uploadedfile import SimpleUploadedFile
+            img_file = SimpleUploadedFile("onion.jpg", b"fake-jpg", content_type="image/jpeg")
+            ScanImage.objects.create(scan_session=self.session, image=img_file, status=ScanImage.Statuses.PENDING)
+
+            success = process_scan_session_task(str(self.session.id))
+            self.assertTrue(success)
+
+            created_candidate = self.session.candidates.filter(name="Red Onion").first()
+            self.assertIsNotNone(created_candidate)
+            self.assertIs(created_candidate.is_expiry_estimated, True)
+            self.assertIsNone(created_candidate.expiry_date)
+            self.assertEqual(created_candidate.estimated_consumption_date, datetime.date(2026, 11, 7))
+
+
+

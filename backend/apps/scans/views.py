@@ -96,21 +96,11 @@ class ScanSessionViewSet(viewsets.ReadOnlyModelViewSet):
                     status=ScanImage.Statuses.PENDING
                 )
 
-        # Spawn background processing task.
-        # Run directly in a daemon thread so it succeeds on single-service deployments
-        # like Render without requiring a separate Celery worker container.
-        import threading
-        import logging
-        
-        task_logger = logging.getLogger('freshtrack.scans.views')
+        # Enqueue background processing via Celery
         try:
-            threading.Thread(
-                target=process_scan_session_task.apply,
-                kwargs={'args': (str(session.id),)},
-                daemon=True
-            ).start()
-        except Exception as thread_err:
-            task_logger.error(f"Thread start failed for session {session.id}: {thread_err}")
+            process_scan_session_task.delay(str(session.id))
+        except Exception as queue_err:
+            logger.warning(f"Celery delay failed, executing task synchronously as fallback: {queue_err}")
             process_scan_session_task.apply(args=(str(session.id),))
 
         return Response({
@@ -118,6 +108,7 @@ class ScanSessionViewSet(viewsets.ReadOnlyModelViewSet):
             "data": ScanSessionSerializer(session).data,
             "message": "Images uploaded and AI processing queued."
         }, status=status.HTTP_201_CREATED)
+
 
     @action(detail=True, methods=['get'])
     def candidates(self, request, pk=None):
@@ -132,97 +123,116 @@ class ScanSessionViewSet(viewsets.ReadOnlyModelViewSet):
     def confirm(self, request, pk=None):
         session = self.get_object()
         idempotency_key = request.data.get('idempotency_key')
-        
-        # Verify idempotency key if provided
-        if idempotency_key:
-            try:
-                key_uuid = uuid.UUID(str(idempotency_key))
-                if session.idempotency_key == key_uuid:
-                    # Already confirmed, return success idempotently
-                    confirmed_items = GroceryItem.objects.filter(user=request.user, ai_detected=True, created_at__gte=session.created_at)
-                    return Response({
-                        "success": True,
-                        "data": GroceryItemSerializer(confirmed_items, many=True).data,
-                        "message": "Scan already confirmed previously (idempotent)."
-                    })
-            except ValueError:
-                return Response({"success": False, "error": "Invalid idempotency key format."}, status=400)
-
-        # Get candidates to add (fallback to all candidates if selected_ids is empty)
-        selected_ids = request.data.get('candidate_ids', [])
-        if selected_ids:
-            candidates = session.candidates.filter(id__in=selected_ids)
-        else:
-            candidates = session.candidates.all()
-
-        if not candidates.exists():
-            return Response({"success": False, "error": "Selected candidates not found or already processed."}, status=400)
-
-        created_groceries = []
-
-        def sanitize_unit(u):
-            if not u: return 'pcs'
-            u_str = str(u).lower().strip()
-            if u_str in ['kg', 'g', 'l', 'ml', 'pcs', 'pack', 'bottle', 'box', 'dozen']:
-                return 'L' if u_str == 'l' else u_str
-            if u_str in ['packet', 'packets', 'pkt']: return 'pack'
-            if u_str in ['piece', 'pieces', 'pc']: return 'pcs'
-            if u_str in ['bunch', 'bunches']: return 'pcs'
-            if u_str in ['liter', 'liters', 'litre', 'litres']: return 'L'
-            if u_str in ['gram', 'grams', 'gm']: return 'g'
-            return 'pcs'
-
-        def sanitize_zone(z):
-            if not z: return 'pantry'
-            z_str = str(z).lower().strip()
-            if z_str in ['fridge', 'freezer', 'pantry', 'counter', 'cabinet', 'basket', 'spice']:
-                return z_str
-            if 'fridge' in z_str or 'refrigerator' in z_str or 'chiller' in z_str: return 'fridge'
-            if 'freezer' in z_str: return 'freezer'
-            if 'basket' in z_str: return 'basket'
-            if 'spice' in z_str: return 'spice'
-            if 'counter' in z_str: return 'counter'
-            return 'pantry'
-
-        def sanitize_confidence(c):
-            if not c: return 'Low'
-            c_str = str(c).strip().capitalize()
-            if c_str in ['High', 'Medium', 'Low']: return c_str
-            return 'Low'
-
-        from apps.groceries.prediction_engine import calculate_item_shelf_life
-        import datetime
-
-        def to_calendar_date(val):
-            if val is None:
-                return None
-            if isinstance(val, datetime.datetime):
-                return val.date()
-            if isinstance(val, datetime.date):
-                return val
-            if isinstance(val, str):
-                val = val.strip()
-                if not val:
-                    return None
-                try:
-                    return datetime.date.fromisoformat(val[:10])
-                except Exception:
-                    pass
-                try:
-                    from dateutil import parser
-                    return parser.parse(val).date()
-                except Exception:
-                    return None
-            return None
+        session_obj = session
 
         with transaction.atomic():
-            user = request.user
+            # Acquire row lock to ensure concurrency safety
+            session = ScanSession.objects.select_for_update().get(pk=session_obj.pk)
 
+            # Verify idempotency key if provided
+            if idempotency_key:
+                try:
+                    key_uuid = uuid.UUID(str(idempotency_key))
+                    if session.idempotency_key == key_uuid or session.created_groceries.exists():
+                        confirmed_items = session.created_groceries.all()
+                        return Response({
+                            "success": True,
+                            "data": GroceryItemSerializer(confirmed_items, many=True).data,
+                            "message": "Scan already confirmed previously (idempotent)."
+                        })
+                except ValueError:
+                    return Response({"success": False, "error": "Invalid idempotency key format."}, status=400)
+
+            if session.created_groceries.exists():
+                confirmed_items = session.created_groceries.all()
+                return Response({
+                    "success": True,
+                    "data": GroceryItemSerializer(confirmed_items, many=True).data,
+                    "message": "Scan session has already been confirmed."
+                })
+
+            # Get candidates to add (fallback to all candidates if selected_ids is empty)
+            selected_ids = request.data.get('candidate_ids', [])
+            if selected_ids:
+                candidates = session.candidates.filter(id__in=selected_ids)
+            else:
+                candidates = session.candidates.all()
+
+            if not candidates.exists():
+                return Response({"success": False, "error": "Selected candidates not found or already processed."}, status=400)
+
+            created_groceries = []
+
+            def sanitize_unit(u):
+                if not u: return 'pcs'
+                u_str = str(u).lower().strip()
+                if u_str in ['kg', 'g', 'l', 'ml', 'pcs', 'pack', 'bottle', 'box', 'dozen']:
+                    return 'L' if u_str == 'l' else u_str
+                if u_str in ['packet', 'packets', 'pkt']: return 'pack'
+                if u_str in ['piece', 'pieces', 'pc']: return 'pcs'
+                if u_str in ['bunch', 'bunches']: return 'pcs'
+                if u_str in ['liter', 'liters', 'litre', 'litres']: return 'L'
+                if u_str in ['gram', 'grams', 'gm']: return 'g'
+                return 'pcs'
+
+            def sanitize_zone(z):
+                if not z: return 'pantry'
+                z_str = str(z).lower().strip()
+                if z_str in ['fridge', 'freezer', 'pantry', 'counter', 'cabinet', 'basket', 'spice']:
+                    return z_str
+                if 'fridge' in z_str or 'refrigerator' in z_str or 'chiller' in z_str: return 'fridge'
+                if 'freezer' in z_str: return 'freezer'
+                if 'basket' in z_str: return 'basket'
+                if 'spice' in z_str: return 'spice'
+                if 'counter' in z_str: return 'counter'
+                return 'pantry'
+
+            def sanitize_confidence(c):
+                if not c: return 'Low'
+                c_str = str(c).strip().capitalize()
+                if c_str in ['High', 'Medium', 'Low']: return c_str
+                return 'Low'
+
+            from apps.groceries.prediction_engine import calculate_item_shelf_life
+            import datetime
+
+            def to_calendar_date(val):
+                if val is None:
+                    return None
+                if isinstance(val, datetime.datetime):
+                    return val.date()
+                if isinstance(val, datetime.date):
+                    return val
+                if isinstance(val, str):
+                    val = val.strip()
+                    if not val:
+                        return None
+                    try:
+                        return datetime.date.fromisoformat(val[:10])
+                    except Exception:
+                        pass
+                    try:
+                        from dateutil import parser
+                        return parser.parse(val).date()
+                    except Exception:
+                        return None
+                return None
+
+            user = request.user
             for candidate in candidates:
-                exp_date = to_calendar_date(candidate.expiry_date)
-                if not exp_date:
-                    days = calculate_item_shelf_life(candidate.name, candidate.category, candidate.storage_zone)
-                    exp_date = timezone.localdate() + datetime.timedelta(days=days)
+                # Semantic Expiry Rule:
+                # If package had a printed date, expiry_date is set and is_expiry_estimated is False.
+                # If no printed date, expiry_date remains None, estimated_consumption_date is populated.
+                is_estimated = candidate.is_expiry_estimated or (candidate.expiry_date is None)
+                if is_estimated:
+                    exp_date = None
+                    est_date = to_calendar_date(candidate.estimated_consumption_date)
+                    if not est_date:
+                        days = calculate_item_shelf_life(candidate.name, candidate.category, candidate.storage_zone)
+                        est_date = timezone.localdate() + datetime.timedelta(days=days)
+                else:
+                    exp_date = to_calendar_date(candidate.expiry_date)
+                    est_date = None
 
                 unit_val = sanitize_unit(candidate.unit)
                 zone_val = sanitize_zone(candidate.storage_zone)
@@ -234,9 +244,10 @@ class ScanSessionViewSet(viewsets.ReadOnlyModelViewSet):
                 bb_date = to_calendar_date(candidate.best_before_date)
                 purch_date = timezone.localdate()
 
-                # Add item to user kitchen/grocery list
+                # Add item with explicit relationship to this scan session
                 item = GroceryItem.objects.create(
                     user=request.user,
+                    scan_session=session,
                     name=candidate.name,
                     brand=candidate.brand,
                     description=candidate.description or f"Fresh {candidate.name} stored in {zone_val.capitalize()}.",
@@ -246,12 +257,16 @@ class ScanSessionViewSet(viewsets.ReadOnlyModelViewSet):
                     unit=unit_val,
                     storage_zone=zone_val,
                     expiry_date=exp_date,
+                    estimated_consumption_date=est_date,
+                    is_expiry_estimated=is_estimated,
+                    predicted_expiry=est_date or exp_date,
+                    recommended_consumption_date=est_date or exp_date,
                     manufacturing_date=mfg_date,
                     packed_date=pck_date,
                     best_before_date=bb_date,
                     purchase_date=purch_date,
-                    date_type=candidate.date_type or 'estimated',
-                    date_source=candidate.date_source or 'calculated_shelf_life',
+                    date_type=candidate.date_type or ('estimated' if is_estimated else 'expiry'),
+                    date_source=candidate.date_source or ('calculated_shelf_life' if is_estimated else 'ocr_verified'),
                     date_confidence=date_conf_val,
                     raw_date_text=candidate.raw_date_text,
                     storage_reason=candidate.storage_reason,
@@ -273,6 +288,7 @@ class ScanSessionViewSet(viewsets.ReadOnlyModelViewSet):
                 created_groceries.append(item)
 
             user.save(update_fields=['total_tracked'])
+
 
             # Set session completed & save key
             if idempotency_key:

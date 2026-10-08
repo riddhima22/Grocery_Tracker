@@ -69,6 +69,8 @@ class ScanCandidate(models.Model):
     storage_zone = models.CharField(max_length=20, default='pantry')
     
     expiry_date = models.DateField(null=True, blank=True)
+    estimated_consumption_date = models.DateField(null=True, blank=True)
+    is_expiry_estimated = models.BooleanField(default=False, db_default=False)
     manufacturing_date = models.DateField(null=True, blank=True)
     packed_date = models.DateField(null=True, blank=True)
     best_before_date = models.DateField(null=True, blank=True)
@@ -84,13 +86,48 @@ class ScanCandidate(models.Model):
     selected = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    def _resolve_is_expiry_estimated(self) -> bool:
+        """
+        Determines whether the expiry date is estimated:
+        - True when the expiry date/shelf life was estimated/calculated.
+        - False when the expiry date is not estimated (explicitly known/printed).
+        - False when both expiry and shelf-life are None (calculation returns NULL).
+        """
+        if self.expiry_date is None and self.estimated_consumption_date is None:
+            return False
+        if self.estimated_consumption_date is not None:
+            return True
+        if self.date_type == 'estimated' or self.date_source == 'calculated_shelf_life':
+            return True
+        return False
+
+    def clean(self):
+        super().clean()
+        if self.is_expiry_estimated is None:
+            self.is_expiry_estimated = self._resolve_is_expiry_estimated()
+        else:
+            self.is_expiry_estimated = bool(self.is_expiry_estimated)
+
     def save(self, *args, **kwargs):
         import datetime
-        for date_field in ('expiry_date', 'manufacturing_date', 'packed_date', 'best_before_date'):
+        for date_field in ('expiry_date', 'estimated_consumption_date', 'manufacturing_date', 'packed_date', 'best_before_date'):
             val = getattr(self, date_field, None)
             if isinstance(val, datetime.datetime):
                 setattr(self, date_field, val.date())
+
+        # If date is estimated, ensure date is in estimated_consumption_date
+        if (self.date_type == 'estimated' or self.date_source == 'calculated_shelf_life') and self.estimated_consumption_date is None and self.expiry_date is not None:
+            self.estimated_consumption_date = self.expiry_date
+            self.expiry_date = None
+
+        # Guard against NULL reaching the database
+        if self.is_expiry_estimated is None:
+            self.is_expiry_estimated = self._resolve_is_expiry_estimated()
+        else:
+            self.is_expiry_estimated = bool(self.is_expiry_estimated)
+
         super().save(*args, **kwargs)
+
 
     def __str__(self):
         return f"Candidate: {self.name} ({self.quantity} {self.unit})"

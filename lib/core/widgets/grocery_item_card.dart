@@ -92,7 +92,12 @@ class GroceryItemCard extends StatelessWidget {
               if (trailing != null)
                 trailing!
               else
-                ExpiryBadge(expiryDate: item.expiryDate),
+                ExpiryBadge(
+                  expiryDate: item.expiryDate,
+                  estimatedDate: item.estimatedConsumptionDate ?? item.predictedExpiry,
+                  isEstimated: item.isExpiryEstimated,
+                ),
+
             ],
           ),
         ),

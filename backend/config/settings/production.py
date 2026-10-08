@@ -21,6 +21,9 @@ SECURE_HSTS_PRELOAD = True
 CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=[])
 
+# Ensure production Celery uses real background worker queue
+CELERY_TASK_ALWAYS_EAGER = False
+
 # Ensure production PostgreSQL on Render enforces SSL
 if 'postgresql' in DATABASES['default']['ENGINE']:
     db_options = DATABASES['default'].setdefault('OPTIONS', {})

@@ -55,20 +55,22 @@ Detect and extract details for EVERY grocery item in the image(s):
    - "storage_reason": concise explanation why this storage zone is recommended for this item (e.g. "Chilling in the refrigerator crisper slows respiration and preserves crispness.").
    - "shelf_life_guidance": actionable storage tips to maximize shelf life (e.g. "Store in refrigerator crisper drawer away from ethylene-sensitive vegetables. Keeps fresh for 3-4 weeks.").
 
-3. Shelf Life & Expiration Date (Mandatory Date Calculation):
-   - "expiry_date": ALWAYS provide a valid "YYYY-MM-DD" date!
-     * If printed on the package (EXP / Best Before / Use By), use that extracted date.
-     * If NO printed packaging date is visible (e.g., fresh apples, bananas, loose vegetables, fresh bread, unlabelled items), calculate a realistic expiration date from Reference Date ({current_date}) based on standard shelf life when kept in the recommended storage_zone (e.g. fresh apples in fridge ~28 days, bananas on counter ~6 days, tomatoes ~7 days, onions in pantry ~30 days, bread ~6 days, milk ~7 days).
+3. Shelf Life & Expiration Date Semantics (CRITICAL BUSINESS RULE):
+   - "expiry_date": If visibly printed on the package (EXP / Best Before / Use By / Expiration), provide the exact extracted date in "YYYY-MM-DD" format.
+     * MANDATORY RULE: If NO printed date is visible on the package (e.g., fresh produce, loose fruits/vegetables, bulk grains, unlabelled items), set "expiry_date" to null! NEVER invent, fabricate, or convert an estimated date into a fake actual expiry_date.
+   - "estimated_consumption_date": If NO printed date is visible, calculate a realistic recommended consumption date from Reference Date ({current_date}) based on standard shelf life for the recommended storage_zone (e.g. fresh apples in fridge ~28 days, bananas on counter ~6 days, tomatoes ~7 days, onions in pantry ~30 days, bread ~6 days, milk ~7 days). If printed expiry_date exists, set to null.
+   - "is_expiry_estimated": boolean. true if date is calculated from shelf life; false if date was visibly detected/printed on packaging.
    - "manufacturing_date": the printed manufacturing date in "YYYY-MM-DD" format if visible, otherwise null.
    - "packed_date": the printed packed date in "YYYY-MM-DD" format if visible, otherwise null.
    - "best_before_date": the printed best before date in "YYYY-MM-DD" format if visible, otherwise null.
    - "date_type": choose from ['expiry', 'best_before', 'use_by', 'manufacturing', 'packed', 'estimated'].
    - "date_source": choose from ['ocr_verified', 'vision_detected', 'calculated_from_packaging', 'calculated_shelf_life', 'user_entered', 'unknown'].
-   - "raw_date_text": the exact raw text snippet of the date label if visible on pack (e.g., "EXP 18/07/2026"), or "Estimated based on item shelf life".
+   - "raw_date_text": the exact raw text snippet of the date label if visible on pack (e.g., "EXP 18/07/2026"), or "" if no date is printed.
    - "confidence": confidence in detection: ['High', 'Medium', 'Low'].
    - "date_confidence": confidence in date extraction: ['High', 'Medium', 'Low'].
    - "source_image_index": integer index (0-based) of the image this item was detected in.
    - "warnings": array of strings listing quality warnings if any.
+
 
 Return a valid JSON object matching the requested schema.
 """
