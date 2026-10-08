@@ -54,7 +54,10 @@ class AIServiceImpl implements IAIService {
 
   Map<String, dynamic> _localPredictionFallback(Map<String, dynamic> data) {
     final String category = (data['category'] ?? 'default').toString().toLowerCase();
-    final String zone = (data['storage_zone'] ?? 'pantry').toString().toLowerCase();
+    final String name = (data['name'] ?? '').toString().toLowerCase();
+    final bool isBeverage = category == 'beverages' || category == 'beverage' ||
+        ['carbonated', 'soda', 'coke', 'pepsi', 'sprite', 'fanta', 'drink', 'beverage'].any((k) => name.contains(k));
+    final String zone = isBeverage ? 'fridge' : (data['storage_zone'] ?? 'pantry').toString().toLowerCase();
     final double temp = double.tryParse(data['temperature']?.toString() ?? '20.0') ?? 20.0;
     final double humidity = double.tryParse(data['humidity']?.toString() ?? '50.0') ?? 50.0;
     final String ripeness = (data['ripeness'] ?? 'not_applicable').toString().toLowerCase();
@@ -125,7 +128,10 @@ class AIServiceImpl implements IAIService {
 
     String why = 'Clean, dry storage slows enzymatic spoilage.';
     String how = 'Place in sealed containers or zip bags.';
-    if (category == 'dairy') {
+    if (isBeverage || category == 'beverages') {
+      why = 'Chilling preserves carbonation fizz and refreshing flavor.';
+      how = 'Store upright on refrigerator shelves (2-5°C). Never freeze cans or glass bottles.';
+    } else if (category == 'dairy') {
       why = 'Cold temperature keeps bacteria dormant.';
       how = 'Keep in the main fridge compartments, not the door.';
     } else if (category == 'vegetables' || category == 'fruits') {

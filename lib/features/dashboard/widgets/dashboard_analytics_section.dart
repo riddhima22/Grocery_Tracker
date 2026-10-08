@@ -8,6 +8,7 @@ import 'dashboard_analytics_empty_state.dart';
 import 'kitchen_health_hero_card.dart';
 import 'kpi_card.dart';
 import 'ai_recommendation_card.dart';
+import '../../../core/utils/date_helpers.dart';
 
 class DashboardAnalyticsSection extends StatelessWidget {
   final KitchenProvider kitchen;
@@ -55,12 +56,15 @@ class DashboardAnalyticsSection extends StatelessWidget {
     // Prioritize immediate action on expiring items
     if (kitchen.expiringItems.isNotEmpty) {
       final firstExpiring = kitchen.expiringItems.first;
-      if (firstExpiring.expiryDate != null) {
-        final days = firstExpiring.expiryDate!.difference(DateTime.now()).inDays;
-        if (days <= 0) {
+      final effectiveDate = firstExpiring.effectiveExpiryDate;
+      if (effectiveDate != null) {
+        final days = DateHelpers.calendarDaysDifference(effectiveDate);
+        if (days < 0) {
+          list.add('${firstExpiring.name} has expired! Consume or discard.');
+        } else if (days == 0) {
           list.add('Consume ${firstExpiring.name} today to avoid spoilage.');
         } else if (days == 1) {
-          list.add('Consume ${firstExpiring.name} within 1 day to avoid spoilage.');
+          list.add('Consume ${firstExpiring.name} tomorrow (1 day left) to avoid spoilage.');
         } else {
           list.add('Consume ${firstExpiring.name} within $days days to avoid spoilage.');
         }

@@ -45,11 +45,11 @@ Detect and extract details for EVERY grocery item in the image(s):
 
 2. Optimal Storage Zone & Reason (Smart Placement):
    - "storage_zone": MUST choose the most suitable storage zone from:
-     * 'fridge': for perishables like apples, carrots, leafy greens, berries, milk, cheese, yogurt, fresh meat, opened condiments.
+     * 'fridge': for perishables like apples, carrots, leafy greens, berries, milk, cheese, yogurt, fresh meat, opened condiments, AND ALL beverages/drinks (especially carbonated drinks, sodas, soft drinks, cold drinks, juices, energy drinks, sparkling water, beers, cans, and beverage bottles). Carbonated drinks and cold beverages MUST ALWAYS be placed in 'fridge' to keep chilled and preserve carbonation and fizz.
      * 'counter': for bananas, whole tomatoes, citrus fruits, uncut avocados, fresh whole melons.
-     * 'pantry': for dry grains, pasta, lentils, flour, canned goods, honey, oils, unopened shelf-stable items.
+     * 'pantry': for dry grains, pasta, lentils, flour, canned goods, honey, oils, unopened shelf-stable dry items (NOT beverages, carbonated drinks, or cold drinks).
      * 'basket': for potatoes, onions, garlic, ginger, root vegetables.
-     * 'freezer': for frozen meats, ice cream, frozen vegetables/meals.
+     * 'freezer': for frozen meats, ice cream, frozen vegetables/meals (NEVER store carbonated drinks, soda cans, or glass bottles in the freezer to prevent explosions).
      * 'cabinet': for snacks, cookies, tea, coffee.
      * 'spice': for whole and ground spices, seasonings, salt.
    - "storage_reason": concise explanation why this storage zone is recommended for this item (e.g. "Chilling in the refrigerator crisper slows respiration and preserves crispness.").

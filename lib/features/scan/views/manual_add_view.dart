@@ -46,6 +46,7 @@ class _ManualAddViewState extends State<ManualAddView> {
   @override
   void initState() {
     super.initState();
+    _nameController.addListener(_onNameChanged);
     if (widget.initialZone != null && _zones.contains(widget.initialZone!.toLowerCase())) {
       _storageZone = widget.initialZone!.toLowerCase();
     }
@@ -67,8 +68,26 @@ class _ManualAddViewState extends State<ManualAddView> {
     }
   }
 
+  void _onNameChanged() {
+    final text = _nameController.text.toLowerCase().trim();
+    if (text.isEmpty) return;
+    final isBeverage = [
+      'soda', 'coke', 'coca-cola', 'pepsi', 'sprite', 'fanta', 'carbonated',
+      'cold drink', 'soft drink', 'energy drink', 'red bull', 'sting', 'beer',
+      'limca', 'thums up', 'dew', '7up', 'mirinda'
+    ].any((k) => text.contains(k));
+
+    if (isBeverage && (_category != 'Beverages' || _storageZone != 'fridge')) {
+      setState(() {
+        _category = 'Beverages';
+        _storageZone = 'fridge';
+      });
+    }
+  }
+
   @override
   void dispose() {
+    _nameController.removeListener(_onNameChanged);
     _nameController.dispose();
     _brandController.dispose();
     _descController.dispose();
@@ -198,6 +217,7 @@ class _ManualAddViewState extends State<ManualAddView> {
                   Text('Category', style: AppTextStyles.labelMedium(context)),
                   const SizedBox(height: 6),
                   DropdownButtonFormField<String>(
+                    key: ValueKey('cat_$_category'),
                     initialValue: _category,
                     decoration: const InputDecoration(
                       contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -207,7 +227,23 @@ class _ManualAddViewState extends State<ManualAddView> {
                       return DropdownMenuItem(value: c, child: Text(c, style: AppTextStyles.bodyMedium(context)));
                     }).toList(),
                     onChanged: (val) {
-                      if (val != null) setState(() => _category = val);
+                      if (val != null) {
+                        setState(() {
+                          _category = val;
+                          final lower = val.toLowerCase();
+                          if (lower == 'beverages' || lower == 'dairy' || lower == 'meat') {
+                            _storageZone = 'fridge';
+                          } else if (lower == 'spices') {
+                            _storageZone = 'spice';
+                          } else if (lower == 'fruits') {
+                            _storageZone = 'counter';
+                          } else if (lower == 'vegetables') {
+                            _storageZone = 'fridge';
+                          } else if (lower == 'grains' || lower == 'snacks') {
+                            _storageZone = 'pantry';
+                          }
+                        });
+                      }
                     },
                   ),
                   AppGap.sm(context),
@@ -254,6 +290,7 @@ class _ManualAddViewState extends State<ManualAddView> {
                   Text('Storage Zone', style: AppTextStyles.labelMedium(context)),
                   const SizedBox(height: 6),
                   DropdownButtonFormField<String>(
+                    key: ValueKey('zone_$_storageZone'),
                     initialValue: _storageZone,
                     decoration: const InputDecoration(
                       contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),

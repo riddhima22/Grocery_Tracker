@@ -8,6 +8,7 @@ import '../../config/category_icon_mapper.dart';
 import '../../data/models/scan_candidate_model.dart';
 import 'ai_confidence_badge.dart';
 import 'quantity_stepper.dart';
+import '../utils/date_helpers.dart';
 
 class ScanCandidateCard extends StatelessWidget {
   final ScanCandidateModel candidate;
@@ -169,11 +170,8 @@ class ScanCandidateCard extends StatelessWidget {
                                         overflow: TextOverflow.ellipsis,
                                       );
                                     }
-                                    final daysLeft = effective.difference(DateTime.now()).inDays;
-                                    final shelfText = daysLeft <= 0 
-                                        ? 'today' 
-                                        : (daysLeft == 1 ? '~1d' : '~$daysLeft days');
                                     final bool isEstimated = candidate.isExpiryEstimated || candidate.expiryDate == null;
+                                    final shelfText = DateHelpers.formatCandidateShelfText(effective, isEstimated: isEstimated);
                                     final String labelPrefix = isEstimated ? 'Estimated consumption' : 'Expiry';
                                     return Text(
                                       '$labelPrefix: ${effective.toString().substring(0, 10)} ($shelfText)',

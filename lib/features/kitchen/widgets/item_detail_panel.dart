@@ -12,6 +12,7 @@ import '../../../core/extensions/responsive_context_extension.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/confirm_dialog.dart';
 import '../../../core/widgets/expiry_badge.dart';
+import '../../../core/utils/date_helpers.dart';
 
 class ItemDetailPanel extends StatefulWidget {
   final GroceryModel item;
@@ -129,11 +130,13 @@ class _ItemDetailPanelState extends State<ItemDetailPanel> {
   @override
   Widget build(BuildContext context) {
     final effectiveDate = widget.item.effectiveExpiryDate;
-    final int? daysLeft = effectiveDate?.difference(DateTime.now()).inDays;
+    final int? daysLeft = effectiveDate != null
+        ? DateHelpers.calendarDaysDifference(effectiveDate)
+        : null;
     final int totalDays = effectiveDate != null
-        ? effectiveDate.difference(widget.item.purchaseDate).inDays
+        ? DateHelpers.calendarDaysDifference(effectiveDate, widget.item.purchaseDate)
         : 0;
-    final int elapsedDays = DateTime.now().difference(widget.item.purchaseDate).inDays;
+    final int elapsedDays = DateHelpers.calendarDaysDifference(DateTime.now(), widget.item.purchaseDate);
     final double timelineProgress = totalDays > 0
         ? (elapsedDays / totalDays).clamp(0.0, 1.0)
         : (daysLeft != null && daysLeft <= 0 ? 1.0 : 0.0);

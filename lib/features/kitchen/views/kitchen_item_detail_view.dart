@@ -12,6 +12,7 @@ import '../../../core/extensions/responsive_context_extension.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/confirm_dialog.dart';
 import '../../../core/services/ai_service.dart';
+import '../../../core/utils/date_helpers.dart';
 
 class KitchenItemDetailView extends StatefulWidget {
   final GroceryModel item;
@@ -352,7 +353,7 @@ class _KitchenItemDetailViewState extends State<KitchenItemDetailView> with Sing
 
   Widget _buildFreshnessMeter(Color freshnessColor) {
     final remainingDays = _currentItem.effectiveExpiryDate != null
-        ? _currentItem.effectiveExpiryDate!.difference(DateTime.now()).inDays
+        ? DateHelpers.calendarDaysDifference(_currentItem.effectiveExpiryDate!)
         : 0;
 
 
@@ -403,7 +404,9 @@ class _KitchenItemDetailViewState extends State<KitchenItemDetailView> with Sing
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                remainingDays <= 0 ? 'Expired' : '$remainingDays days',
+                _currentItem.effectiveExpiryDate != null
+                    ? DateHelpers.formatRemainingDaysCount(_currentItem.effectiveExpiryDate!)
+                    : 'No Expiry',
                 style: AppTextStyles.displayMedium(context).copyWith(
                   fontSize: 28.0,
                   fontWeight: FontWeight.bold,

@@ -236,6 +236,17 @@ class ScanSessionViewSet(viewsets.ReadOnlyModelViewSet):
 
                 unit_val = sanitize_unit(candidate.unit)
                 zone_val = sanitize_zone(candidate.storage_zone)
+                is_beverage = (
+                    candidate.category.lower() in ['beverages', 'beverage'] or
+                    any(k in candidate.name.lower() for k in [
+                        'carbonated', 'soda', 'coke', 'coca-cola', 'pepsi', 'sprite',
+                        'fanta', 'thums up', 'limca', 'mountain dew', '7up', 'dr pepper',
+                        'cold drink', 'soft drink', 'sparkling water', 'tonic water',
+                        'energy drink', 'red bull', 'sting', 'monster', 'beer'
+                    ])
+                )
+                if is_beverage:
+                    zone_val = 'fridge'
                 conf_val = sanitize_confidence(candidate.confidence)
                 date_conf_val = sanitize_confidence(candidate.date_confidence)
 

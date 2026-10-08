@@ -3,6 +3,7 @@ import '../../config/app_colors.dart';
 import '../../config/app_text_styles.dart';
 import '../../config/app_radius.dart';
 import '../../core/extensions/responsive_context_extension.dart';
+import '../utils/date_helpers.dart';
 
 class ExpiryBadge extends StatelessWidget {
   final DateTime? expiryDate;
@@ -41,20 +42,9 @@ class ExpiryBadge extends StatelessWidget {
       );
     }
 
-    final difference = effectiveDate.difference(DateTime.now()).inDays;
-    Color badgeColor;
-    String label;
-
-    if (difference < 0) {
-      badgeColor = AppColors.danger;
-      label = estimated ? 'Past Est.' : 'Expired';
-    } else if (difference <= 3) {
-      badgeColor = AppColors.warning;
-      label = estimated ? '~${difference}d (Est)' : '${difference}d left';
-    } else {
-      badgeColor = AppColors.success;
-      label = estimated ? '~${difference}d (Est)' : '${difference}d left';
-    }
+    final badgeInfo = DateHelpers.formatExpiryBadge(effectiveDate, isEstimated: estimated);
+    final badgeColor = badgeInfo.color;
+    final label = badgeInfo.label;
 
     return Container(
       padding: EdgeInsets.symmetric(horizontal: paddingH, vertical: paddingV),

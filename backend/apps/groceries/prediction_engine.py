@@ -161,6 +161,11 @@ class ShelfLifePredictionEngine:
             why = "Extremely fast oxidation and enzymatic decay occurs at ambient temperatures."
             how = "Keep on the lowest shelf of the refrigerator in a leak-proof container, or freeze instantly."
             explanation = "High moisture and protein content promote rapid micro-organism growth. Low temperature is critical."
+        elif category in ['beverages', 'beverage']:
+            why = "Chilling preserves carbonation fizz, inhibits gas loss, and maintains crisp flavor."
+            how = "Store upright on refrigerator shelves (2-5°C). Never freeze unopened carbonated cans or glass bottles as gas expansion will cause them to rupture."
+            shelf_life_note = f"Keeps crisp and refreshing for roughly {math_ceil(remaining_days)} days in refrigerator; consume within 2-3 days once opened."
+            explanation = "Refrigeration stabilizes dissolved CO2 in carbonated beverages and maintains peak beverage quality."
 
         if opened:
             explanation += " Exposure to oxygen has accelerated oxidation. Shelf life is significantly reduced."
@@ -207,7 +212,12 @@ REALISTIC_ITEM_SHELF_LIFE_DAYS = {
     'jam': 90, 'honey': 365, 'tea': 240, 'coffee': 240,
 
     # Snacks & Beverages
-    'biscuit': 90, 'biscuits': 90, 'cookies': 60, 'chips': 60, 'juice': 20, 'soda': 60,
+    'biscuit': 90, 'biscuits': 90, 'cookies': 60, 'chips': 60, 'juice': 20,
+    'soda': 60, 'carbonated': 60, 'coke': 60, 'coca-cola': 60, 'pepsi': 60,
+    'sprite': 60, 'fanta': 60, 'thums up': 60, 'limca': 60, 'mountain dew': 60,
+    '7up': 60, 'dr pepper': 60, 'soft drink': 60, 'cold drink': 60,
+    'sparkling water': 90, 'tonic water': 90, 'club soda': 90, 'energy drink': 90,
+    'red bull': 90, 'monster': 90, 'sting': 90, 'beer': 60,
 }
 
 

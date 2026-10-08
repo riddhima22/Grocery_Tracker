@@ -1,4 +1,5 @@
 import '../../data/models/grocery_model.dart';
+import '../utils/date_helpers.dart';
 
 class AISearchService {
   /// Parses natural language search queries and filters list of groceries
@@ -44,15 +45,13 @@ class AISearchService {
       if (isSpice && !category.contains('spice') && !name.contains('pepper') && !name.contains('salt') && !name.contains('chili') && !name.contains('garlic')) return false;
 
       // Check Expiry / Freshness tokens
+      final effectiveDate = item.effectiveExpiryDate;
       if (isExpiringTomorrow) {
-        if (item.expiryDate == null) return false;
-        final tomorrow = DateTime.now().add(const Duration(days: 1));
-        final diff = item.expiryDate!.difference(DateTime.now()).inDays;
-        if (diff != 1 && (item.expiryDate!.year != tomorrow.year || item.expiryDate!.month != tomorrow.month || item.expiryDate!.day != tomorrow.day)) {
-          return false;
-        }
+        if (effectiveDate == null) return false;
+        final diff = DateHelpers.calendarDaysDifference(effectiveDate);
+        if (diff != 1) return false;
       } else if (isExpiringSoon) {
-        if (status != 'expiring' && (item.expiryDate == null || item.expiryDate!.difference(DateTime.now()).inDays > 3)) return false;
+        if (status != 'expiring' && (effectiveDate == null || DateHelpers.calendarDaysDifference(effectiveDate) > 3)) return false;
       } else if (isExpired) {
         if (status != 'expired') return false;
       } else if (isFresh) {

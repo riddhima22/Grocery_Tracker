@@ -197,6 +197,22 @@ def process_scan_session_task(self, session_id=None):
                 item_name = safe_str(item_data.get('name'), 'Unknown Item')[:150]
                 item_category = safe_str(item_data.get('category'), 'Vegetables')[:100]
 
+                # Intelligent storage zone placement: Carbonated drinks & beverages MUST be in fridge
+                is_beverage_or_carbonated = (
+                    item_category.lower() in ['beverages', 'beverage'] or
+                    any(k in item_name.lower() for k in [
+                        'carbonated', 'soda', 'coke', 'coca-cola', 'pepsi', 'sprite',
+                        'fanta', 'thums up', 'limca', 'mountain dew', '7up', 'dr pepper',
+                        'cold drink', 'soft drink', 'sparkling water', 'tonic water',
+                        'energy drink', 'red bull', 'sting', 'monster', 'beer'
+                    ])
+                )
+                if is_beverage_or_carbonated:
+                    if item_category.lower() not in ['beverages', 'beverage']:
+                        item_category = 'Beverages'
+                    zone = 'fridge'
+                    icon_key = 'beverage'
+
                 # Resolve expiry date semantics: distinguish printed date from estimated consumption
                 expiry_dt = parse_date_str(item_data.get('expiry_date'))
                 estimated_dt = parse_date_str(item_data.get('estimated_consumption_date'))
@@ -279,8 +295,14 @@ def process_scan_session_task(self, session_id=None):
                     date_source=date_src_val,
                     date_confidence=date_conf_val,
                     raw_date_text=raw_date_val,
-                    storage_reason=safe_str(item_data.get('storage_reason'), ''),
-                    shelf_life_guidance=shelf_guidance_val,
+                    storage_reason=safe_str(item_data.get('storage_reason'), '') or (
+                        "Keep chilled in refrigerator to preserve carbonation and refreshing fizz."
+                        if is_beverage_or_carbonated else ""
+                    ),
+                    shelf_life_guidance=shelf_guidance_val or (
+                        "Store upright in refrigerator at 2-5°C. Never freeze carbonated cans or glass bottles."
+                        if is_beverage_or_carbonated else ""
+                    ),
                     confidence=safe_str(item_data.get('confidence'), 'High')[:20],
                 )
                 candidate_count += 1
