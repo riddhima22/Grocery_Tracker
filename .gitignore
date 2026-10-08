@@ -42,6 +42,7 @@ migrate_working_dir/
 backend/db.sqlite3
 backend/media/
 backend/data/
+backend/staticfiles/
 *.sqlite3
 
 # Symbolication related
