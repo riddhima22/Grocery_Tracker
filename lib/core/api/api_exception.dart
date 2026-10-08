@@ -12,6 +12,11 @@ class NetworkException extends ApiException {
   NetworkException(super.message);
 }
 
+class CertificateVerificationException extends ApiException {
+  final dynamic technicalDetails;
+  CertificateVerificationException(super.message, [this.technicalDetails]);
+}
+
 class TimeoutException extends ApiException {
   TimeoutException(super.message);
 }

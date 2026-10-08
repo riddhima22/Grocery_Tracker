@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:dio/dio.dart';
 import 'api_exception.dart';
 import '../utils/app_logger.dart';
@@ -6,6 +7,26 @@ class ApiErrorMapper {
   static ApiException map(DioException error) {
     AppLogger.error('API Error: ${error.type} - ${error.message} - ${error.response?.data}');
     
+    // 1. Explicitly check for TLS / SSL Certificate and Handshake failures
+    final rawError = error.error;
+    final errorStr = '${error.message} ${error.error}'.toLowerCase();
+    final isCertError = rawError is HandshakeException ||
+        rawError is TlsException ||
+        rawError is CertificateException ||
+        errorStr.contains('certificate_verify_failed') ||
+        errorStr.contains('handshake error') ||
+        errorStr.contains('handshakeexception') ||
+        errorStr.contains('cert_authority_invalid') ||
+        errorStr.contains('self signed certificate');
+
+    if (isCertError) {
+      AppLogger.error('TLS/SSL Certificate Verification Failure: ${error.message} (Raw: $rawError)');
+      return CertificateVerificationException(
+        'Secure connection to the server failed. Please try again later.',
+        rawError?.toString() ?? error.message,
+      );
+    }
+
     switch (error.type) {
       case DioExceptionType.connectionTimeout:
       case DioExceptionType.sendTimeout:

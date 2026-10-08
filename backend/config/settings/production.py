@@ -5,7 +5,9 @@ DEBUG = False
 # Setup production hosts via env list (default to Render domain if unset)
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['grocery-tracker-backend-rcwl.onrender.com', 'localhost', '127.0.0.1'])
 
-# Security Headers
+# Security Headers & Proxy Configuration
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_HOST = True
 SECURE_SSL_REDIRECT = env.bool('SECURE_SSL_REDIRECT', default=True)
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True

@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'api_endpoints.dart';
@@ -61,6 +62,23 @@ class ApiClient {
     return publicEndpoints.any((endpoint) => path.contains(endpoint));
   }
 
+  static bool _isCertificateOrHandshakeError(DioException err) {
+    final rawError = err.error;
+    if (rawError is HandshakeException ||
+        rawError is TlsException ||
+        rawError is CertificateException) {
+      return true;
+    }
+    final errorStr = '${err.message} ${err.error}'.toLowerCase();
+    return errorStr.contains('certificate_verify_failed') ||
+        errorStr.contains('handshake error') ||
+        errorStr.contains('handshakeexception') ||
+        errorStr.contains('cert_authority_invalid') ||
+        errorStr.contains('self signed certificate') ||
+        errorStr.contains('tlsexception') ||
+        errorStr.contains('certificateexception');
+  }
+
   Interceptor _authInterceptor() => InterceptorsWrapper(
         onRequest: (options, handler) async {
           // Do NOT attach Authorization header to unauthenticated/public auth endpoints
@@ -77,12 +95,14 @@ class ApiClient {
           final path = options.path;
 
           // 1. Cold start / server timeout auto-retry (e.g. Render waking up)
-          final isTimeoutOrNetworkError =
-              err.type == DioExceptionType.receiveTimeout ||
-              err.type == DioExceptionType.connectionTimeout ||
-              err.type == DioExceptionType.connectionError ||
-              (err.response?.statusCode != null &&
-                  [502, 503, 504].contains(err.response!.statusCode));
+          // Do NOT retry certificate / TLS verification failures
+          final isCertError = _isCertificateOrHandshakeError(err);
+          final isTimeoutOrNetworkError = !isCertError &&
+              (err.type == DioExceptionType.receiveTimeout ||
+               err.type == DioExceptionType.connectionTimeout ||
+               err.type == DioExceptionType.connectionError ||
+               (err.response?.statusCode != null &&
+                   [502, 503, 504].contains(err.response!.statusCode)));
 
           if (isTimeoutOrNetworkError && options.extra['isColdStartRetry'] != true) {
             options.extra['isColdStartRetry'] = true;
