@@ -12,7 +12,9 @@ import '../features/scan/views/manual_add_view.dart';
 import '../features/scan/views/barcode_scanner_view.dart';
 import '../features/recipes/views/recipe_detail_view.dart';
 import '../features/recipes/views/recipes_view.dart';
+import '../features/kitchen/views/kitchen_item_detail_view.dart';
 import '../data/models/recipe_model.dart';
+import '../data/models/grocery_model.dart';
 
 class AppPages {
   static Map<String, WidgetBuilder> get routes => {
@@ -39,6 +41,13 @@ class AppPages {
     AppRoutes.recipeDetail: (context) {
       final recipe = ModalRoute.of(context)!.settings.arguments as RecipeModel;
       return RecipeDetailView(recipe: recipe);
+    },
+    AppRoutes.itemDetail: (context) {
+      final args = ModalRoute.of(context)!.settings.arguments;
+      if (args is GroceryModel) {
+        return KitchenItemDetailView(item: args);
+      }
+      throw ArgumentError('Expected GroceryModel for itemDetail route, got: $args');
     },
     AppRoutes.recipes: (context) {
       final args = ModalRoute.of(context)?.settings.arguments;

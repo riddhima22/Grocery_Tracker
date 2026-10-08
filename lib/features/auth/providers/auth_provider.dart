@@ -187,6 +187,9 @@ class AuthProvider extends ChangeNotifier {
   Future<void> logout() async {
     _setState(AuthState.loading);
     try {
+      await NotificationService().unregisterFcmToken();
+    } catch (_) {}
+    try {
       await _authRepository.logout();
     } catch (_) {}
     try {

@@ -2,8 +2,14 @@ from rest_framework.test import APITestCase
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from apps.groceries.models import GroceryItem
+from apps.grocery_lists.models import GroceryList, GroceryListItem
 from .models import DeviceToken
-from .tasks import send_expiry_alerts_task, _send_push_notification
+from .tasks import (
+    send_expiry_alerts_task,
+    send_low_stock_alerts_task,
+    send_shopping_reminder_task,
+    _send_push_notification,
+)
 from unittest.mock import patch, MagicMock
 import datetime
 
@@ -20,17 +26,35 @@ class NotificationTests(APITestCase):
 
     def test_register_device_token(self):
         url = "/api/v1/notifications/device-token/"
-        res = self.client.post(url, {"token": "fcm_test_token_12345"}, format="json")
+        payload = {
+            "token": "fcm_test_token_12345",
+            "platform": "android",
+            "device_id": "device_xyz_99"
+        }
+        res = self.client.post(url, payload, format="json")
         self.assertEqual(res.status_code, 201)
-        self.assertTrue(DeviceToken.objects.filter(user=self.user, token="fcm_test_token_12345").exists())
+        record = DeviceToken.objects.filter(user=self.user, token="fcm_test_token_12345").first()
+        self.assertIsNotNone(record)
+        self.assertEqual(record.platform, "android")
+        self.assertEqual(record.device_id, "device_xyz_99")
+        self.assertTrue(record.is_active)
 
     def test_register_duplicate_device_token_is_idempotent(self):
         url = "/api/v1/notifications/device-token/"
-        res1 = self.client.post(url, {"token": "fcm_test_token_dup"}, format="json")
+        res1 = self.client.post(url, {"token": "fcm_test_token_dup", "platform": "android"}, format="json")
         self.assertEqual(res1.status_code, 201)
-        res2 = self.client.post(url, {"token": "fcm_test_token_dup"}, format="json")
+        res2 = self.client.post(url, {"token": "fcm_test_token_dup", "platform": "android"}, format="json")
         self.assertEqual(res2.status_code, 200)
         self.assertEqual(DeviceToken.objects.filter(token="fcm_test_token_dup").count(), 1)
+
+    def test_delete_device_token_on_logout(self):
+        url = "/api/v1/notifications/device-token/"
+        DeviceToken.objects.create(user=self.user, token="fcm_logout_token", platform="android", device_id="dev_1")
+        
+        # Test delete by token
+        res = self.client.delete(url, {"token": "fcm_logout_token"}, format="json")
+        self.assertEqual(res.status_code, 200)
+        self.assertFalse(DeviceToken.objects.filter(token="fcm_logout_token").exists())
 
     def test_update_notification_preferences(self):
         url = "/api/v1/notifications/preferences/"
@@ -86,6 +110,36 @@ class NotificationTests(APITestCase):
         self.assertTrue(item_printed.notified_3d)
         self.assertTrue(item_estimated.notified_1d)
         self.assertEqual(item_past.status, 'expired')
+
+    def test_send_low_stock_alerts_task(self):
+        GroceryItem.objects.create(
+            user=self.user,
+            name="Sugar",
+            quantity=0.5,
+            unit="kg",
+            status='fresh'
+        )
+        DeviceToken.objects.create(user=self.user, token="test_token_low_stock")
+
+        with patch('apps.notifications.tasks._send_push_notification') as mock_push:
+            send_low_stock_alerts_task()
+            self.assertEqual(mock_push.call_count, 1)
+            # Verify payload type
+            _, kwargs = mock_push.call_args
+            data = kwargs.get('data') or mock_push.call_args[0][3]
+            self.assertEqual(data.get('type'), 'low_stock')
+
+    def test_send_shopping_reminder_task(self):
+        g_list = GroceryList.objects.create(user=self.user, status=GroceryList.Statuses.ACTIVE)
+        GroceryListItem.objects.create(grocery_list=g_list, name="Apples", quantity=4, purchased=False)
+        DeviceToken.objects.create(user=self.user, token="test_token_shopping")
+
+        with patch('apps.notifications.tasks._send_push_notification') as mock_push:
+            send_shopping_reminder_task()
+            self.assertEqual(mock_push.call_count, 1)
+            _, kwargs = mock_push.call_args
+            data = kwargs.get('data') or mock_push.call_args[0][3]
+            self.assertEqual(data.get('type'), 'shopping_reminder')
 
     def test_fcm_unregistered_token_cleanup(self):
         token_obj = DeviceToken.objects.create(user=self.user, token="unregistered_fcm_token_xyz")
