@@ -172,7 +172,7 @@ class ScanCandidateCard extends StatelessWidget {
                                     }
                                     final bool isEstimated = candidate.isExpiryEstimated || candidate.expiryDate == null;
                                     final shelfText = DateHelpers.formatCandidateShelfText(effective, isEstimated: isEstimated);
-                                    final String labelPrefix = isEstimated ? 'Estimated consumption' : 'Expiry';
+                                    final String labelPrefix = isEstimated ? 'Est. Consume' : 'Expiry';
                                     return Text(
                                       '$labelPrefix: ${effective.toString().substring(0, 10)} ($shelfText)',
                                       style: AppTextStyles.caption(context).copyWith(
@@ -181,8 +181,8 @@ class ScanCandidateCard extends StatelessWidget {
                                         decoration: TextDecoration.underline,
                                         decorationColor: AppColors.primary.withValues(alpha: 0.5),
                                       ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
+                                      maxLines: 2,
+                                      softWrap: true,
                                     );
                                   },
                                 ),

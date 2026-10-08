@@ -612,9 +612,11 @@ class _KitchenItemDetailViewState extends State<KitchenItemDetailView> with Sing
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                _currentItem.isExpiryEstimated ? 'Estimated Consumption' : 'Printed Expiry Date',
-                style: AppTextStyles.caption(context),
+              Expanded(
+                child: Text(
+                  _currentItem.isExpiryEstimated ? 'Estimated Consumption' : 'Printed Expiry Date',
+                  style: AppTextStyles.caption(context),
+                ),
               ),
               Text(
                 _currentItem.effectiveExpiryDate?.toIso8601String().substring(0, 10) ?? 'N/A',
