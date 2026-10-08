@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
 import 'package:google_sign_in/google_sign_in.dart';
 import '../providers/auth_provider.dart';
 import '../../onboarding/providers/onboarding_provider.dart';
+import '../../scan/providers/scan_provider.dart';
 import '../../../config/app_colors.dart';
 import '../../../config/app_spacing.dart';
 import '../../../config/app_radius.dart';
@@ -47,6 +48,7 @@ class _LoginViewState extends State<LoginView> {
     );
 
     if (success && mounted) {
+      context.read<ScanProvider>().resetState();
       final onboarding = context.read<OnboardingProvider>();
       if (!onboarding.onboardingComplete) {
         Navigator.pushReplacementNamed(context, AppRoutes.onboarding);
@@ -93,6 +95,7 @@ class _LoginViewState extends State<LoginView> {
         );
 
         if (success && mounted) {
+          context.read<ScanProvider>().resetState();
           final onboarding = context.read<OnboardingProvider>();
           if (!onboarding.onboardingComplete) {
             Navigator.pushReplacementNamed(context, AppRoutes.onboarding);

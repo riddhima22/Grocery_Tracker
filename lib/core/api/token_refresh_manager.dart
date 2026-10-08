@@ -4,6 +4,16 @@ import '../services/secure_storage_service.dart';
 import 'api_endpoints.dart';
 import '../utils/app_logger.dart';
 
+class RefreshTokenException implements Exception {
+  final bool isSessionExpired;
+  final String message;
+
+  RefreshTokenException(this.message, {this.isSessionExpired = false});
+
+  @override
+  String toString() => message;
+}
+
 class TokenRefreshManager {
   static final TokenRefreshManager _instance = TokenRefreshManager._internal();
   factory TokenRefreshManager() => _instance;
@@ -26,10 +36,11 @@ class TokenRefreshManager {
     try {
       AppLogger.info('Starting token refresh request...');
       final refreshToken = await _secureStorage.getRefreshToken();
-      if (refreshToken == null) {
+      if (refreshToken == null || refreshToken.isEmpty) {
         AppLogger.warning('No refresh token found in storage.');
-        if (!completer.isCompleted) completer.complete(null);
-        return null;
+        final err = RefreshTokenException('No refresh token found in storage.', isSessionExpired: true);
+        if (!completer.isCompleted) completer.completeError(err);
+        throw err;
       }
 
       // Perform request using a clean Dio instance to avoid interceptor recursion
@@ -55,18 +66,18 @@ class TokenRefreshManager {
         } else if (response.data is Map<String, dynamic>) {
           dataMap = response.data as Map<String, dynamic>;
         } else {
-          throw Exception('Invalid token refresh response type');
+          throw RefreshTokenException('Invalid token refresh response type');
         }
 
         final newAccess = dataMap['access'] as String?;
         final newRefresh = dataMap['refresh'] as String?; // Optional depending on settings rotation
         
         if (newAccess == null) {
-          throw Exception('Access token not found in refresh response');
+          throw RefreshTokenException('Access token not found in refresh response');
         }
 
         await _secureStorage.saveAccessToken(newAccess);
-        if (newRefresh != null) {
+        if (newRefresh != null && newRefresh.isNotEmpty) {
           await _secureStorage.saveRefreshToken(newRefresh);
         }
         
@@ -74,14 +85,32 @@ class TokenRefreshManager {
         if (!completer.isCompleted) completer.complete(newAccess);
         return newAccess;
       } else {
-        AppLogger.warning('Token refresh returned invalid status: ${response.statusCode}');
-        if (!completer.isCompleted) completer.complete(null);
-        return null;
+        final err = RefreshTokenException('Token refresh returned invalid status: ${response.statusCode}');
+        if (!completer.isCompleted) completer.completeError(err);
+        throw err;
       }
+    } on DioException catch (dioErr) {
+      final statusCode = dioErr.response?.statusCode;
+      if (statusCode == 401 || statusCode == 403) {
+        AppLogger.warning('Refresh token rejected by server (HTTP $statusCode). Session expired.');
+        final err = RefreshTokenException('Refresh token is invalid or expired.', isSessionExpired: true);
+        if (!completer.isCompleted) completer.completeError(err);
+        throw err;
+      }
+
+      AppLogger.warning('Token refresh encountered transient error: ${dioErr.type} ${dioErr.message}');
+      final err = RefreshTokenException('Transient network error during token refresh: ${dioErr.message}', isSessionExpired: false);
+      if (!completer.isCompleted) completer.completeError(err);
+      throw err;
     } catch (e, stack) {
       AppLogger.error('Token refresh failed', e, stack);
-      if (!completer.isCompleted) completer.complete(null);
-      return null;
+      if (e is RefreshTokenException) {
+        if (!completer.isCompleted) completer.completeError(e);
+        rethrow;
+      }
+      final err = RefreshTokenException('Token refresh failed: $e', isSessionExpired: false);
+      if (!completer.isCompleted) completer.completeError(err);
+      throw err;
     } finally {
       _isRefreshing = false;
       _refreshCompleter = null;

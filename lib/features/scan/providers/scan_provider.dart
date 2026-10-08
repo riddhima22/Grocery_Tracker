@@ -64,6 +64,16 @@ class ScanProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Resets scan provider state completely (e.g. on auth changes)
+  void resetState() => clearImages();
+
+  /// Clears any stale error state so opening the scan view starts in idle mode
+  void resetIfError() {
+    if (_uiState == ScanUIState.error) {
+      clearImages();
+    }
+  }
+
   Future<void> startAnalysis() async {
     if (_selectedImages.isEmpty) return;
     

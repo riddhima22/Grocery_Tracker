@@ -116,14 +116,22 @@ class ApiClient {
                 final response = await _dio.fetch(options);
                 return handler.resolve(response);
               }
+            } on RefreshTokenException catch (refreshErr) {
+              if (refreshErr.isSessionExpired) {
+                // Only kick user to login if refresh token is genuinely expired or invalid
+                AppLogger.error('Session expired permanently. Redirecting to Login screen...');
+                await _secureStorage.clearTokens();
+                AppNavigation.toAndRemoveUntil(AppRoutes.login);
+                return handler.next(err);
+              } else {
+                // Transient error: do NOT kick user to login screen!
+                AppLogger.warning('Token refresh failed due to network/server timeout. User session preserved.');
+                return handler.next(err);
+              }
             } catch (e) {
-              AppLogger.error('Token refresh retry failed', e);
+              AppLogger.error('Token refresh retry encountered unexpected error', e);
+              return handler.next(err);
             }
-
-            // If refresh fails or returns null, clear state and kick user to login
-            AppLogger.error('Token refresh failed. Redirecting to Login screen...');
-            await _secureStorage.clearTokens();
-            AppNavigation.toAndRemoveUntil(AppRoutes.login);
           }
           handler.next(err);
         },

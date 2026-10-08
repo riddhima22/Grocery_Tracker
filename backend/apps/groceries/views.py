@@ -263,9 +263,25 @@ class GroceryItemViewSet(viewsets.ModelViewSet):
     def stats(self, request):
         queryset = self.get_queryset()
         total = queryset.count()
-        fresh = queryset.filter(status='fresh').count()
-        expiring = queryset.filter(status='expiring').count()
-        expired = queryset.filter(status='expired').count()
+        today = timezone.localdate()
+        expiring_threshold = today + timezone.timedelta(days=3)
+
+        fresh = 0
+        expiring = 0
+        expired = 0
+
+        for item in queryset:
+            if item.status in ['consumed', 'wasted']:
+                continue
+            effective_date = item.expiry_date or item.estimated_consumption_date or item.predicted_expiry
+            if effective_date is None:
+                fresh += 1
+            elif effective_date < today:
+                expired += 1
+            elif effective_date <= expiring_threshold:
+                expiring += 1
+            else:
+                fresh += 1
         
         return Response({
             "success": True,

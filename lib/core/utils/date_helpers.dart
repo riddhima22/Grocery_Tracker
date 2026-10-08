@@ -11,13 +11,57 @@ class DateHelpers {
     return targetDay.difference(fromDay).inDays;
   }
 
-  /// Formats the remaining shelf life text for detail views (e.g., '1 day left', '5 days left', 'Expires today', 'Expired').
+  /// Calculates the effective expiration moment for [target].
+  /// If [target] is midnight (00:00:00), treats it as expiring at the end of the day (23:59:59).
+  static DateTime effectiveExpiryMoment(DateTime target) {
+    if (target.hour == 0 && target.minute == 0 && target.second == 0) {
+      return DateTime(target.year, target.month, target.day, 23, 59, 59);
+    }
+    return target;
+  }
+
+  /// Computes remaining time until expiration.
+  static Duration remainingDuration(DateTime target) {
+    final moment = effectiveExpiryMoment(target);
+    return moment.difference(DateTime.now());
+  }
+
+  /// Formats concise intraday time left (e.g. '8 hr left', '45 min left', '30 sec left', 'Expired').
+  static String formatIntradayTimeLeft(DateTime target) {
+    final rem = remainingDuration(target);
+    if (rem.isNegative) return 'Expired';
+    if (rem.inHours >= 1) {
+      return '${rem.inHours} hr left';
+    }
+    if (rem.inMinutes >= 1) {
+      return '${rem.inMinutes} min left';
+    }
+    final secs = rem.inSeconds.clamp(1, 59);
+    return '$secs sec left';
+  }
+
+  /// Formats verbose intraday time left for detail views (e.g. '8 hr 15 min left', '45 min left', '30 sec left').
+  static String formatIntradayTimeLeftVerbose(DateTime target) {
+    final rem = remainingDuration(target);
+    if (rem.isNegative) return 'Expired';
+    if (rem.inHours >= 1) {
+      final mins = rem.inMinutes % 60;
+      return mins > 0 ? '${rem.inHours} hr $mins min left' : '${rem.inHours} hr left';
+    }
+    if (rem.inMinutes >= 1) {
+      final secs = rem.inSeconds % 60;
+      return secs > 0 ? '${rem.inMinutes} min $secs sec left' : '${rem.inMinutes} min left';
+    }
+    return '${rem.inSeconds.clamp(1, 59)} sec left';
+  }
+
+  /// Formats the remaining shelf life text for detail views.
   static String formatRemainingDaysText(DateTime target) {
     final diff = calendarDaysDifference(target);
     if (diff < 0) {
       return 'Expired';
     } else if (diff == 0) {
-      return 'Expires today';
+      return formatIntradayTimeLeftVerbose(target);
     } else if (diff == 1) {
       return '1 day left';
     } else {
@@ -25,13 +69,14 @@ class DateHelpers {
     }
   }
 
-  /// Formats concise shelf life text for candidate cards (e.g., 'today', 'tomorrow', '~1d left', '~5 days', 'expired').
+  /// Formats concise shelf life text for candidate cards.
   static String formatCandidateShelfText(DateTime target, {bool isEstimated = false}) {
     final diff = calendarDaysDifference(target);
     if (diff < 0) {
       return 'expired';
     } else if (diff == 0) {
-      return 'today';
+      final text = formatIntradayTimeLeft(target);
+      return isEstimated ? '~$text' : text;
     } else if (diff == 1) {
       return isEstimated ? '~1d (tomorrow)' : 'tomorrow (1d)';
     } else {
@@ -39,13 +84,13 @@ class DateHelpers {
     }
   }
 
-  /// Formats shelf life text for detail counter display (e.g., 'Expired', 'Expires today', '1 day left', '5 days left').
+  /// Formats shelf life text for detail counter display.
   static String formatRemainingDaysCount(DateTime target) {
     final diff = calendarDaysDifference(target);
     if (diff < 0) {
       return 'Expired';
     } else if (diff == 0) {
-      return 'Expires today';
+      return formatIntradayTimeLeftVerbose(target);
     } else if (diff == 1) {
       return '1 day left';
     } else {
@@ -62,13 +107,14 @@ class DateHelpers {
         color: AppColors.danger,
       );
     } else if (diff == 0) {
+      final timeStr = formatIntradayTimeLeft(target);
       return (
-        label: isEstimated ? 'Today (Est)' : 'Expires today',
+        label: isEstimated ? '$timeStr (Est)' : timeStr,
         color: AppColors.danger,
       );
     } else if (diff == 1) {
       return (
-        label: isEstimated ? '~1d (Est)' : '1d left',
+        label: isEstimated ? '~1d left' : '1d left',
         color: AppColors.warning,
       );
     } else if (diff <= 3) {

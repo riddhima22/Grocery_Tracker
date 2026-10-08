@@ -1,3 +1,5 @@
+import '../../../core/utils/date_helpers.dart';
+
 class GroceryModel {
   final String id;
   final String name;
@@ -19,7 +21,19 @@ class GroceryModel {
   final String? scanSessionId;
 
   final DateTime purchaseDate;
-  final String status;
+  final String _rawStatus;
+
+  String get status {
+    if (_rawStatus == 'consumed' || _rawStatus == 'wasted') {
+      return _rawStatus;
+    }
+    final exp = effectiveExpiryDate;
+    if (exp == null) return _rawStatus.isNotEmpty ? _rawStatus : 'fresh';
+    final diff = DateHelpers.calendarDaysDifference(exp);
+    if (diff < 0) return 'expired';
+    if (diff <= 3) return 'expiring';
+    return 'fresh';
+  }
 
   final int? caloriesPer100g;
   final List<String> allergens;
@@ -58,7 +72,7 @@ class GroceryModel {
     this.dateConfidence = 'Low',
     this.scanSessionId,
     required this.purchaseDate,
-    required this.status,
+    String status = 'fresh',
     this.caloriesPer100g,
     this.allergens = const [],
     this.aiDetected = false,
@@ -75,7 +89,7 @@ class GroceryModel {
     this.storageRecommendationHow = '',
     this.storageRecommendationShelfLife = '',
     this.aiExplanation = '',
-  });
+  }) : _rawStatus = status;
 
   /// Semantic date helper: returns printed expiryDate if detected,
   /// otherwise returns estimated consumption or predicted shelf-life date.
@@ -156,6 +170,7 @@ class GroceryModel {
     'date_type': dateType,
     'date_source': dateSource,
     'purchase_date': purchaseDate.toIso8601String().substring(0, 10),
+    'status': status,
     'calories_per_100g': caloriesPer100g,
     'allergens': allergens,
     'ripeness': ripeness,

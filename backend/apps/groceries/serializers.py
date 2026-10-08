@@ -4,10 +4,26 @@ from rest_framework.exceptions import ValidationError
 import math
 
 class GroceryItemSerializer(serializers.ModelSerializer):
+    status = serializers.SerializerMethodField()
+
     class Meta:
         model = GroceryItem
         fields = '__all__'
         read_only_fields = ('id', 'user', 'status', 'created_at', 'updated_at', 'notified_3d', 'notified_1d')
+
+    def get_status(self, obj):
+        if obj.status in ['consumed', 'wasted']:
+            return obj.status
+        effective_date = obj.expiry_date or obj.estimated_consumption_date or obj.predicted_expiry
+        if effective_date is None:
+            return 'fresh'
+        from django.utils import timezone
+        days_left = (effective_date - timezone.localdate()).days
+        if days_left < 0:
+            return 'expired'
+        elif days_left <= 3:
+            return 'expiring'
+        return 'fresh'
 
     def validate_quantity(self, value):
         if value is None:

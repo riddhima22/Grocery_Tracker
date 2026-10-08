@@ -180,8 +180,9 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
     final greeting = _getGreeting();
     final name = auth.user?.displayName ?? 'Chef';
 
-    // Apply natural language AI search filter on expiring items or all items
-    final filteredExpiring = AISearchService.filter(kitchen.expiringItems, _searchQuery);
+    // Apply natural language AI search filter on urgent items (expired first, then expiring)
+    final urgentItems = [...kitchen.expiredItems, ...kitchen.expiringItems];
+    final filteredExpiring = AISearchService.filter(urgentItems, _searchQuery);
 
     return AppScaffold(
       body: kitchen.isLoading && kitchen.items.isEmpty
@@ -257,6 +258,12 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
                              _buildLogMealAction(),
                              AppGap.md(context),
 
+                             // Expired Warning Banner (Dynamic)
+                             if (kitchen.expiredCount > 0) ...[
+                               _buildExpiredAlertBanner(kitchen.expiredCount),
+                               AppGap.sm(context),
+                             ],
+
                              // Expiry Warning Banner (Dynamic)
                              if (kitchen.expiringCount > 0) ...[
                                _buildExpiryAlertBanner(kitchen.expiringCount),
@@ -280,7 +287,9 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
 
                              // Upcoming Expiry (Filtered by AI search query)
                              AppSectionHeader(
-                               title: _searchQuery.isEmpty ? 'Upcoming Expiry' : 'Search Results',
+                               title: _searchQuery.isEmpty 
+                                   ? (kitchen.expiredCount > 0 ? 'Expired & Upcoming Expiry' : 'Upcoming Expiry')
+                                   : 'Search Results',
                                actionText: 'View All',
                                onActionPressed: () {
                                  // Navigate to kitchen tab
@@ -306,7 +315,7 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
                                    child: Center(
                                      child: Text(
                                        _searchQuery.isEmpty 
-                                           ? 'No expiring items currently. Everything is fresh!'
+                                           ? 'No expired or expiring items. Everything is fresh!'
                                            : 'No matching grocery items found.',
                                        style: AppTextStyles.bodyMedium(context).copyWith(color: AppColors.textSecondary),
                                      ),
@@ -440,6 +449,49 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
             const Icon(Icons.arrow_forward_ios, color: Colors.white, size: 16),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildExpiredAlertBanner(int expiredCount) {
+    return Container(
+      padding: EdgeInsets.all(AppSpacing.sm(context)),
+      decoration: BoxDecoration(
+        color: AppColors.danger.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(AppRadius.card(context)),
+        border: Border.all(color: AppColors.danger.withValues(alpha: 0.5), width: 1.5),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: AppColors.danger.withValues(alpha: 0.2),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.warning_rounded, color: AppColors.danger, size: 20),
+          ),
+          AppGap.sm(context),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Expired Items ($expiredCount)',
+                  style: AppTextStyles.labelMedium(context).copyWith(
+                    color: AppColors.danger,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '$expiredCount ${expiredCount == 1 ? "item has" : "items have"} expired. Please remove or dispose of them.',
+                  style: AppTextStyles.bodySmall(context).copyWith(color: AppColors.textPrimary),
+                ),
+              ],
+            ),
+          )
+        ],
       ),
     );
   }
