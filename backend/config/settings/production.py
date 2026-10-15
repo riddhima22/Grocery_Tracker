@@ -31,3 +31,13 @@ if 'postgresql' in DATABASES['default']['ENGINE']:
     db_options = DATABASES['default'].setdefault('OPTIONS', {})
     if 'sslmode' not in db_options:
         db_options['sslmode'] = env.str('DB_SSLMODE', default='require')
+
+# Production Shared Redis Cache for cross-worker throttling and session state
+if env('REDIS_URL', default=None):
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+            'LOCATION': env('REDIS_URL'),
+            'TIMEOUT': 300,
+        }
+    }

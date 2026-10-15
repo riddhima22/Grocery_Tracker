@@ -167,7 +167,7 @@ class ApiErrorMapper {
         );
 
       case DioExceptionType.cancel:
-        return ApiException('Request was cancelled.');
+        return RequestCancelledException();
 
       default:
         return UnknownApiException('Something went wrong. Please try again.');

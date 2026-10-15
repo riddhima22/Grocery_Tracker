@@ -58,3 +58,7 @@ class ServerException extends ApiException {
 class UnknownApiException extends ApiException {
   UnknownApiException(super.message);
 }
+
+class RequestCancelledException extends ApiException {
+  RequestCancelledException([super.message = 'Request was cancelled.']);
+}

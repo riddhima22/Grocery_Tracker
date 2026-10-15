@@ -265,12 +265,14 @@ class ApiClient {
     String path, {
     Map<String, dynamic>? queryParameters,
     Options? options,
+    CancelToken? cancelToken,
   }) async {
     try {
       return await _dio.get(
         path,
         queryParameters: queryParameters,
         options: options,
+        cancelToken: cancelToken,
       );
     } on DioException catch (e) {
       throw ApiErrorMapper.map(e);
@@ -282,6 +284,7 @@ class ApiClient {
     dynamic data,
     Map<String, dynamic>? queryParameters,
     Options? options,
+    CancelToken? cancelToken,
   }) async {
     try {
       return await _dio.post(
@@ -289,31 +292,62 @@ class ApiClient {
         data: data,
         queryParameters: queryParameters,
         options: options,
+        cancelToken: cancelToken,
       );
     } on DioException catch (e) {
       throw ApiErrorMapper.map(e);
     }
   }
 
-  Future<Response> put(String path, {dynamic data, Options? options}) async {
+  Future<Response> put(
+    String path, {
+    dynamic data,
+    Options? options,
+    CancelToken? cancelToken,
+  }) async {
     try {
-      return await _dio.put(path, data: data, options: options);
+      return await _dio.put(
+        path,
+        data: data,
+        options: options,
+        cancelToken: cancelToken,
+      );
     } on DioException catch (e) {
       throw ApiErrorMapper.map(e);
     }
   }
 
-  Future<Response> patch(String path, {dynamic data, Options? options}) async {
+  Future<Response> patch(
+    String path, {
+    dynamic data,
+    Options? options,
+    CancelToken? cancelToken,
+  }) async {
     try {
-      return await _dio.patch(path, data: data, options: options);
+      return await _dio.patch(
+        path,
+        data: data,
+        options: options,
+        cancelToken: cancelToken,
+      );
     } on DioException catch (e) {
       throw ApiErrorMapper.map(e);
     }
   }
 
-  Future<Response> delete(String path, {dynamic data, Options? options}) async {
+  Future<Response> delete(
+    String path, {
+    dynamic data,
+    Options? options,
+    CancelToken? cancelToken,
+  }) async {
     try {
-      return await _dio.delete(path, data: data, options: options);
+      return await _dio.delete(
+        path,
+        data: data,
+        options: options,
+        cancelToken: cancelToken,
+      );
     } on DioException catch (e) {
       throw ApiErrorMapper.map(e);
     }

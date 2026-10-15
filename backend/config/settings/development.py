@@ -33,3 +33,11 @@ if 'test' in sys.argv:
             'NAME': ':memory:',
         }
     }
+
+# Local cache for development and testing
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'freshtrack-dev-cache',
+    }
+}

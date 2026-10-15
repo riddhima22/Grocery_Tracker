@@ -68,5 +68,34 @@ void main() {
 
       expect(mapped, isA<NetworkException>());
     });
+
+    test('maps cancel to RequestCancelledException', () {
+      final dioException = DioException(
+        requestOptions: RequestOptions(path: '/groceries/'),
+        type: DioExceptionType.cancel,
+      );
+
+      final mapped = ApiErrorMapper.map(dioException);
+
+      expect(mapped, isA<RequestCancelledException>());
+      expect(mapped.message, 'Request was cancelled.');
+    });
+
+    test('maps 429 to RateLimitException with server message', () {
+      final dioException = DioException(
+        requestOptions: RequestOptions(path: '/groceries/'),
+        type: DioExceptionType.badResponse,
+        response: Response(
+          requestOptions: RequestOptions(path: '/groceries/'),
+          statusCode: 429,
+          data: {'message': 'Too many requests. Please slow down.'},
+        ),
+      );
+
+      final mapped = ApiErrorMapper.map(dioException);
+
+      expect(mapped, isA<RateLimitException>());
+      expect(mapped.message, 'Too many requests. Please slow down.');
+    });
   });
 }

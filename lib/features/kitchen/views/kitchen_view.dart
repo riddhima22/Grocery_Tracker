@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -28,6 +29,7 @@ class KitchenView extends StatefulWidget {
 
 class _KitchenViewState extends State<KitchenView> {
   final TextEditingController _searchController = TextEditingController();
+  Timer? _searchDebounceTimer;
   String _searchQuery = '';
 
   @override
@@ -40,6 +42,7 @@ class _KitchenViewState extends State<KitchenView> {
 
   @override
   void dispose() {
+    _searchDebounceTimer?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -88,6 +91,7 @@ class _KitchenViewState extends State<KitchenView> {
                       ? IconButton(
                           icon: const Icon(Icons.clear),
                           onPressed: () {
+                            _searchDebounceTimer?.cancel();
                             setState(() {
                               _searchController.clear();
                               _searchQuery = '';
@@ -103,9 +107,17 @@ class _KitchenViewState extends State<KitchenView> {
                 ),
                 style: AppTextStyles.bodyMedium(context),
                 onChanged: (val) {
-                  setState(() {
-                    _searchQuery = val;
-                  });
+                  _searchDebounceTimer?.cancel();
+                  _searchDebounceTimer = Timer(
+                    const Duration(milliseconds: 250),
+                    () {
+                      if (mounted) {
+                        setState(() {
+                          _searchQuery = val;
+                        });
+                      }
+                    },
+                  );
                 },
               ),
             ),
