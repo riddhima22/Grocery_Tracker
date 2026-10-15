@@ -6,7 +6,7 @@ import '../utils/app_logger.dart';
 class ApiErrorMapper {
   static ApiException map(DioException error) {
     AppLogger.error('API Error: ${error.type} - ${error.message} - ${error.response?.data}');
-    
+
     // 1. Explicitly check for TLS / SSL Certificate and Handshake failures
     final rawError = error.error;
     final errorStr = '${error.message} ${error.error}'.toLowerCase();
@@ -32,29 +32,39 @@ class ApiErrorMapper {
       case DioExceptionType.sendTimeout:
       case DioExceptionType.receiveTimeout:
         return TimeoutException('Connection timed out. Please try again.');
-        
+
       case DioExceptionType.badResponse:
         final response = error.response;
         final statusCode = response?.statusCode;
         final data = response?.data;
-        
+
         String serverMessage = 'An unexpected error occurred.';
         Map<String, dynamic>? fields;
-        
+        bool isHtmlResponse = false;
+
         if (data is Map) {
-          // 1. Check if the error is wrapped in our custom envelope
-          if (data.containsKey('error') && data['error'] is Map) {
-            final errObj = data['error'];
-            serverMessage = errObj['message'] ?? serverMessage;
-            if (errObj['fields'] is Map) {
-              fields = Map<String, dynamic>.from(errObj['fields']);
-            }
+          // 1. Check top-level message string (our standardized API format)
+          if (data.containsKey('message') && data['message'] is String && (data['message'] as String).isNotEmpty) {
+            serverMessage = data['message'] as String;
           }
-          // 2. Check for standard DRF detail field (e.g. SimpleJWT error or DRF detail)
+
+          // 2. Check if the error is wrapped in our custom envelope
+          if (data.containsKey('error') && data['error'] is Map) {
+            final errObj = data['error'] as Map;
+            if (errObj['message'] is String && (errObj['message'] as String).isNotEmpty) {
+              serverMessage = errObj['message'] as String;
+            }
+            if (errObj['fields'] is Map) {
+              fields = Map<String, dynamic>.from(errObj['fields'] as Map);
+            }
+          } else if (data.containsKey('error') && data['error'] is String && (data['error'] as String).isNotEmpty) {
+            serverMessage = data['error'] as String;
+          }
+          // 3. Check for standard DRF detail field (e.g. SimpleJWT error or DRF detail)
           else if (data.containsKey('detail')) {
             serverMessage = data['detail'].toString();
           }
-          // 3. Check for standard DRF validation errors with lists
+          // 4. Check for standard DRF validation errors with lists
           else if (data.containsKey('non_field_errors')) {
             final nfe = data['non_field_errors'];
             if (nfe is List && nfe.isNotEmpty) {
@@ -62,9 +72,9 @@ class ApiErrorMapper {
             } else {
               serverMessage = nfe.toString();
             }
-          } 
-          // 4. Handle raw key-value field validation lists (e.g., {"email": ["Enter a valid email"]})
-          else {
+          }
+          // 5. Handle raw key-value field validation lists (e.g., {"email": ["Enter a valid email"]})
+          else if (!data.containsKey('message')) {
             final fieldErrors = <String, dynamic>{};
             data.forEach((key, val) {
               if (val is List && val.isNotEmpty) {
@@ -75,18 +85,23 @@ class ApiErrorMapper {
             });
             if (fieldErrors.isNotEmpty) {
               fields = fieldErrors;
-              // Set message to the first validation error
               final firstKey = fieldErrors.keys.first;
               final firstError = fieldErrors[firstKey];
-              // Capitalize first key letter for readability, e.g. "Email: This field must be unique."
               final cleanKey = firstKey.substring(0, 1).toUpperCase() + firstKey.substring(1);
               serverMessage = '$cleanKey: $firstError';
             }
           }
         } else if (data is String && data.isNotEmpty) {
-          serverMessage = data;
+          final trimmed = data.trim();
+          // Detect HTML error responses (e.g., Gunicorn or Web Server 500 HTML)
+          if (trimmed.startsWith('<') && (trimmed.contains('<html') || trimmed.contains('<!doctype') || trimmed.contains('<head') || trimmed.contains('<body'))) {
+            isHtmlResponse = true;
+            serverMessage = 'Server error. Please try again later.';
+          } else {
+            serverMessage = trimmed;
+          }
         }
-        
+
         switch (statusCode) {
           case 400:
             return ValidationException(serverMessage, fields: fields, statusCode: statusCode);
@@ -100,23 +115,29 @@ class ApiErrorMapper {
             return ConflictException(serverMessage);
           case 413:
             return PayloadTooLargeException('The uploaded file is too large.');
+          case 422:
+            return ValidationException(serverMessage, fields: fields, statusCode: statusCode);
           case 429:
             return RateLimitException(serverMessage);
           case 500:
           case 502:
           case 503:
           case 504:
-            return ServerException('Server error. Please try again later.');
+            final defaultMsg = statusCode == 504 ? 'Gateway timeout. Please try again later.' : 'Server error. Please try again later.';
+            final safeMsg = (isHtmlResponse || serverMessage.contains('<') || serverMessage.isEmpty)
+                ? defaultMsg
+                : serverMessage;
+            return ServerException(safeMsg);
           default:
             return ApiException(serverMessage, statusCode);
         }
-        
+
       case DioExceptionType.connectionError:
         return NetworkException('No internet connection. Check your network and try again.');
-        
+
       case DioExceptionType.cancel:
         return ApiException('Request was cancelled.');
-        
+
       default:
         return UnknownApiException('Something went wrong. Please try again.');
     }

@@ -1,13 +1,16 @@
 from rest_framework import viewsets, status, filters
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from django.db import transaction
+from django.db import models, transaction
 from django.utils import timezone
 from django.db.models import Sum, Count
 from .models import GroceryItem, GroceryActivity
 from .serializers import GroceryItemSerializer
 from common.exceptions import ResourceNotFoundException, ForbiddenException
 import decimal
+import logging
+
+logger = logging.getLogger('freshtrack.groceries')
 
 class GroceryItemViewSet(viewsets.ModelViewSet):
     serializer_class = GroceryItemSerializer

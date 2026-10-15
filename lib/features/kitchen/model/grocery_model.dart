@@ -1,4 +1,5 @@
 import '../../../core/utils/date_helpers.dart';
+import '../../../core/services/unit_classification_service.dart';
 
 class GroceryModel {
   final String id;
@@ -7,11 +8,17 @@ class GroceryModel {
   final String description;
   final String iconKey;
   final String category;
-
   final double quantity;
   final String unit;
-  final String storageZone;
+  final String unitCategory;
+  final String packageType;
+  final double? netContentValue;
+  final String netContentUnit;
+  final int? packageCount;
+  final String identificationSource;
+  final String unitConfidence;
 
+  final String storageZone;
   final DateTime? expiryDate;
   final DateTime? estimatedConsumptionDate;
   final bool isExpiryEstimated;
@@ -19,14 +26,12 @@ class GroceryModel {
   final String dateSource;
   final String dateConfidence;
   final String? scanSessionId;
-
   final DateTime purchaseDate;
   final String _rawStatus;
 
+  /// Dynamic client-side status derived strictly from calendar days difference.
   String get status {
-    if (_rawStatus == 'consumed' || _rawStatus == 'wasted') {
-      return _rawStatus;
-    }
+    if (_rawStatus == 'consumed' || _rawStatus == 'wasted') return _rawStatus;
     final exp = effectiveExpiryDate;
     if (exp == null) return _rawStatus.isNotEmpty ? _rawStatus : 'fresh';
     final diff = DateHelpers.calendarDaysDifference(exp);
@@ -63,6 +68,13 @@ class GroceryModel {
     this.category = 'Uncategorized',
     required this.quantity,
     required this.unit,
+    this.unitCategory = 'count',
+    this.packageType = '',
+    this.netContentValue,
+    this.netContentUnit = '',
+    this.packageCount,
+    this.identificationSource = 'manual',
+    this.unitConfidence = 'High',
     required this.storageZone,
     this.expiryDate,
     this.estimatedConsumptionDate,
@@ -95,6 +107,17 @@ class GroceryModel {
   /// otherwise returns estimated consumption or predicted shelf-life date.
   DateTime? get effectiveExpiryDate => expiryDate ?? estimatedConsumptionDate ?? predictedExpiry;
 
+  /// Formatted quantity representation (e.g. "1 packet (50 g)", "1 bottle (1 L)", "500 g")
+  String get displayQuantityText {
+    final qtyStr = quantity % 1 == 0 ? quantity.toInt().toString() : quantity.toString();
+    final pType = packageType.isNotEmpty ? packageType : unit;
+    if (netContentValue != null && netContentUnit.isNotEmpty) {
+      final netStr = netContentValue! % 1 == 0 ? netContentValue!.toInt().toString() : netContentValue!.toString();
+      return '$qtyStr $pType ($netStr $netContentUnit)';
+    }
+    return '$qtyStr $unit';
+  }
+
   factory GroceryModel.fromJson(Map<String, dynamic> json) {
     final DateTime? parsedExpiry =
         json['expiry_date'] != null ? DateTime.tryParse(json['expiry_date']) : null;
@@ -110,15 +133,54 @@ class GroceryModel {
       isEstimated = false;
     }
 
+    final name = json['name'] ?? '';
+    final category = json['category'] ?? 'Uncategorized';
+    final rawUnit = json['unit'];
+
+    // Smart unit classification fallback if unit is missing or legacy pcs default
+    String resolvedUnit = rawUnit?.toString() ?? '';
+    String resolvedCategory = json['unit_category']?.toString() ?? '';
+    String resolvedPackageType = json['package_type']?.toString() ?? '';
+    double? resolvedNetVal = double.tryParse(json['net_content_value']?.toString() ?? '');
+    String resolvedNetUnit = json['net_content_unit']?.toString() ?? '';
+    int? resolvedPackCount = int.tryParse(json['package_count']?.toString() ?? '');
+    String resolvedUnitConf = json['unit_confidence']?.toString() ?? 'High';
+
+    if (resolvedUnit.isEmpty || (resolvedUnit == 'pcs' && resolvedCategory.isEmpty)) {
+      final classified = UnitClassificationService.classifyProduct(
+        productName: name,
+        category: category,
+        aiPredictedUnit: rawUnit?.toString(),
+        source: 'database',
+      );
+      resolvedUnit = classified.unit;
+      resolvedCategory = classified.unitCategory;
+      resolvedPackageType = classified.packageType;
+      resolvedNetVal = classified.netContentValue;
+      resolvedNetUnit = classified.netContentUnit;
+      resolvedPackCount = classified.packageCount;
+      resolvedUnitConf = classified.unitConfidence;
+    }
+
+    final rawQty = double.tryParse(json['quantity']?.toString() ?? '');
+    final double finalQty = rawQty != null && rawQty > 0 ? rawQty : 1.0;
+
     return GroceryModel(
       id: json['id'] ?? '',
-      name: json['name'] ?? '',
+      name: name,
       brand: json['brand'] ?? '',
       description: json['description'] ?? '',
       iconKey: json['icon_key'] ?? 'grocery',
-      category: json['category'] ?? 'Uncategorized',
-      quantity: double.tryParse(json['quantity']?.toString() ?? '1.0') ?? 1.0,
-      unit: json['unit'] ?? 'pcs',
+      category: category,
+      quantity: finalQty,
+      unit: resolvedUnit,
+      unitCategory: resolvedCategory,
+      packageType: resolvedPackageType,
+      netContentValue: resolvedNetVal,
+      netContentUnit: resolvedNetUnit,
+      packageCount: resolvedPackCount,
+      identificationSource: json['identification_source'] ?? 'manual',
+      unitConfidence: resolvedUnitConf,
       storageZone: json['storage_zone'] ?? 'pantry',
       expiryDate: parsedExpiry,
       estimatedConsumptionDate: parsedEstimated,
@@ -163,6 +225,13 @@ class GroceryModel {
     'category': category,
     'quantity': quantity,
     'unit': unit,
+    'unit_category': unitCategory,
+    'package_type': packageType,
+    'net_content_value': netContentValue,
+    'net_content_unit': netContentUnit,
+    'package_count': packageCount,
+    'identification_source': identificationSource,
+    'unit_confidence': unitConfidence,
     'storage_zone': storageZone,
     'expiry_date': expiryDate?.toIso8601String().substring(0, 10),
     'estimated_consumption_date': estimatedConsumptionDate?.toIso8601String().substring(0, 10),
@@ -187,4 +256,71 @@ class GroceryModel {
     'storage_recommendation_shelf_life': storageRecommendationShelfLife,
     'ai_explanation': aiExplanation,
   };
+
+  GroceryModel copyWith({
+    String? name,
+    String? brand,
+    String? description,
+    String? iconKey,
+    String? category,
+    double? quantity,
+    String? unit,
+    String? unitCategory,
+    String? packageType,
+    double? netContentValue,
+    String? netContentUnit,
+    int? packageCount,
+    String? identificationSource,
+    String? unitConfidence,
+    String? storageZone,
+    DateTime? expiryDate,
+    DateTime? estimatedConsumptionDate,
+    bool? isExpiryEstimated,
+    DateTime? purchaseDate,
+    String? status,
+  }) {
+    return GroceryModel(
+      id: id,
+      name: name ?? this.name,
+      brand: brand ?? this.brand,
+      description: description ?? this.description,
+      iconKey: iconKey ?? this.iconKey,
+      category: category ?? this.category,
+      quantity: quantity ?? this.quantity,
+      unit: unit ?? this.unit,
+      unitCategory: unitCategory ?? this.unitCategory,
+      packageType: packageType ?? this.packageType,
+      netContentValue: netContentValue ?? this.netContentValue,
+      netContentUnit: netContentUnit ?? this.netContentUnit,
+      packageCount: packageCount ?? this.packageCount,
+      identificationSource: identificationSource ?? this.identificationSource,
+      unitConfidence: unitConfidence ?? this.unitConfidence,
+      storageZone: storageZone ?? this.storageZone,
+      expiryDate: expiryDate ?? this.expiryDate,
+      estimatedConsumptionDate: estimatedConsumptionDate ?? this.estimatedConsumptionDate,
+      isExpiryEstimated: isExpiryEstimated ?? this.isExpiryEstimated,
+      dateType: dateType,
+      dateSource: dateSource,
+      dateConfidence: dateConfidence,
+      scanSessionId: scanSessionId,
+      purchaseDate: purchaseDate ?? this.purchaseDate,
+      status: status ?? this.status,
+      caloriesPer100g: caloriesPer100g,
+      allergens: allergens,
+      aiDetected: aiDetected,
+      aiConfidence: aiConfidence,
+      ripeness: ripeness,
+      temperature: temperature,
+      humidity: humidity,
+      isOpened: isOpened,
+      freshnessScore: freshnessScore,
+      predictedExpiry: predictedExpiry,
+      recommendedConsumptionDate: recommendedConsumptionDate,
+      confidenceScore: confidenceScore,
+      storageRecommendationWhy: storageRecommendationWhy,
+      storageRecommendationHow: storageRecommendationHow,
+      storageRecommendationShelfLife: storageRecommendationShelfLife,
+      aiExplanation: aiExplanation,
+    );
+  }
 }

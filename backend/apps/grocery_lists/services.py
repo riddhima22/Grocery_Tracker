@@ -25,11 +25,16 @@ def add_to_active_grocery_list(
 
     try:
         # 1. Get or create the user's active grocery list
-        active_list, _ = GroceryList.objects.get_or_create(
+        active_list = GroceryList.objects.filter(
             user=user,
-            status=GroceryList.Statuses.ACTIVE,
-            defaults={'generation_reason': 'Smart replenishment'}
-        )
+            status=GroceryList.Statuses.ACTIVE
+        ).order_by('-created_at').first()
+        if not active_list:
+            active_list = GroceryList.objects.create(
+                user=user,
+                status=GroceryList.Statuses.ACTIVE,
+                generation_reason='Smart replenishment'
+            )
 
         # 2. Check if item already exists in the active list
         existing = GroceryListItem.objects.filter(

@@ -11,6 +11,9 @@ from apps.groceries.serializers import GroceryItemSerializer
 from common.exceptions import ResourceNotFoundException, ForbiddenException
 import uuid
 import os
+import logging
+
+logger = logging.getLogger('freshtrack.scans.views')
 
 class ScanSessionViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = ScanSessionSerializer
@@ -166,13 +169,14 @@ class ScanSessionViewSet(viewsets.ReadOnlyModelViewSet):
             def sanitize_unit(u):
                 if not u: return 'pcs'
                 u_str = str(u).lower().strip()
-                if u_str in ['kg', 'g', 'l', 'ml', 'pcs', 'pack', 'bottle', 'box', 'dozen']:
+                if u_str in ['kg', 'g', 'l', 'ml', 'pcs', 'pack', 'packet', 'bottle', 'box', 'dozen', 'jar', 'can', 'pouch']:
                     return 'L' if u_str == 'l' else u_str
-                if u_str in ['packet', 'packets', 'pkt']: return 'pack'
+                if u_str in ['pkt']: return 'packet'
                 if u_str in ['piece', 'pieces', 'pc']: return 'pcs'
                 if u_str in ['bunch', 'bunches']: return 'pcs'
                 if u_str in ['liter', 'liters', 'litre', 'litres']: return 'L'
                 if u_str in ['gram', 'grams', 'gm']: return 'g'
+                if u_str in ['kilogram', 'kilograms', 'kgs']: return 'kg'
                 return 'pcs'
 
             def sanitize_zone(z):
@@ -266,6 +270,13 @@ class ScanSessionViewSet(viewsets.ReadOnlyModelViewSet):
                     category=candidate.category,
                     quantity=candidate.quantity,
                     unit=unit_val,
+                    unit_category=candidate.unit_category,
+                    package_type=candidate.package_type,
+                    net_content_value=candidate.net_content_value,
+                    net_content_unit=candidate.net_content_unit,
+                    package_count=candidate.package_count,
+                    identification_source=candidate.identification_source or 'camera_ai',
+                    unit_confidence=candidate.unit_confidence,
                     storage_zone=zone_val,
                     expiry_date=exp_date,
                     estimated_consumption_date=est_date,

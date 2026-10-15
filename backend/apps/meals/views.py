@@ -67,8 +67,17 @@ class MealLogViewSet(viewsets.ModelViewSet):
                 'error': "The image couldn't be analyzed — try a clearer photo or a different angle."
             }, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
+            logger.error(f"Meal inference failed: {e}", exc_info=True)
             meal_log.delete()
-            return Response({'error': 'Meal inference failed.', 'details': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({
+                'success': False,
+                'message': 'Meal inference failed. Please try again later.',
+                'error': {
+                    'code': 'MEAL_INFERENCE_FAILED',
+                    'message': 'Meal inference failed.',
+                    'details': str(e),
+                }
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         meal_log.name = ai_output.get('meal_name', 'Unknown Meal')
         if ai_output.get('description') and not text_description:
@@ -83,7 +92,7 @@ class MealLogViewSet(viewsets.ModelViewSet):
                 if p_item_id:
                     try:
                         pantry_item_ref = GroceryItem.objects.get(id=p_item_id, user=user)
-                    except GroceryItem.DoesNotExist:
+                    except (GroceryItem.DoesNotExist, Exception):
                         pass
                 
                 candidates.append(MealIngredientCandidate(

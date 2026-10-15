@@ -42,11 +42,16 @@ class GroceryListViewSet(viewsets.ModelViewSet):
         from decimal import Decimal
         
         # 1. Get or create the active grocery list (Preserve existing active items!)
-        active_list, _ = GroceryList.objects.get_or_create(
+        active_list = GroceryList.objects.filter(
             user=user,
-            status=GroceryList.Statuses.ACTIVE,
-            defaults={'generation_reason': 'Smart replenishment analysis'}
-        )
+            status=GroceryList.Statuses.ACTIVE
+        ).order_by('-created_at').first()
+        if not active_list:
+            active_list = GroceryList.objects.create(
+                user=user,
+                status=GroceryList.Statuses.ACTIVE,
+                generation_reason='Smart replenishment analysis'
+            )
 
         existing_names = set(
             GroceryListItem.objects.filter(grocery_list=active_list, purchased=False)

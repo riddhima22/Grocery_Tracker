@@ -16,6 +16,7 @@ import '../../../core/widgets/app_scaffold.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_text_field.dart';
 import '../../../core/widgets/scan_candidate_card.dart';
+import '../../../core/services/unit_classification_service.dart';
 import '../../../core/extensions/responsive_context_extension.dart';
 
 class ScanView extends StatefulWidget {
@@ -391,7 +392,10 @@ class _ScanViewState extends State<ScanView> with SingleTickerProviderStateMixin
                   scan.toggleCandidateSelection(candidate.id, val ?? true);
                 },
                 onQuantityChanged: (qty) {
-                  scan.updateCandidate(candidate.id, {'quantity': qty});
+                  scan.updateCandidateQuantity(candidate.id, qty);
+                },
+                onUnitChanged: (unit) {
+                  scan.updateCandidateUnit(candidate.id, unit);
                 },
                 onExpiryChanged: (date) {
                   scan.updateCandidate(candidate.id, {
@@ -430,8 +434,25 @@ class _ScanViewState extends State<ScanView> with SingleTickerProviderStateMixin
     final nameController = TextEditingController(text: candidate.name);
     final brandController = TextEditingController(text: candidate.brand);
     final descController = TextEditingController(text: candidate.description);
+    final qtyController = TextEditingController(
+      text: candidate.quantity % 1 == 0 ? candidate.quantity.toInt().toString() : candidate.quantity.toString(),
+    );
+    final netValController = TextEditingController(
+      text: candidate.netContentValue != null
+          ? (candidate.netContentValue! % 1 == 0 ? candidate.netContentValue!.toInt().toString() : candidate.netContentValue!.toString())
+          : '',
+    );
     final zoneController = TextEditingController(text: candidate.storageZone);
+
+    String selectedCategory = candidate.category;
+    String selectedUnit = candidate.unit;
+    String selectedNetUnit = candidate.netContentUnit;
     DateTime? selectedExpiry = candidate.expiryDate;
+
+    const categories = [
+      'Vegetables', 'Fruits', 'Dairy', 'Bakery', 'Meat', 'Grains', 'Snacks', 'Beverages', 'Spices', 'Other'
+    ];
+    const units = UnitClassificationService.allUnits;
 
     showDialog(
       context: context,
@@ -452,6 +473,170 @@ class _ScanViewState extends State<ScanView> with SingleTickerProviderStateMixin
                 AppGap.sm(ctx),
                 AppTextField(controller: brandController, label: 'Brand Name'),
                 AppGap.sm(ctx),
+                
+                // Category Selector
+                Text(
+                  'Category',
+                  style: AppTextStyles.labelMedium(ctx).copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                AppGap.xs(ctx),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  decoration: BoxDecoration(
+                    color: AppColors.card,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.cardBorder),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      isExpanded: true,
+                      value: categories.contains(selectedCategory) ? selectedCategory : 'Other',
+                      dropdownColor: AppColors.surface,
+                      items: categories.map((cat) => DropdownMenuItem(value: cat, child: Text(cat, style: AppTextStyles.bodyMedium(ctx)))).toList(),
+                      onChanged: (newCat) {
+                        if (newCat != null) {
+                          setDialogState(() {
+                            selectedCategory = newCat;
+                            // Smart auto-suggest unit if current was uncertain
+                            if (candidate.isUncertain) {
+                              final suggested = UnitClassificationService.classifyProduct(
+                                productName: nameController.text,
+                                category: newCat,
+                              );
+                              selectedUnit = suggested.unit;
+                            }
+                          });
+                        }
+                      },
+                    ),
+                  ),
+                ),
+                AppGap.sm(ctx),
+
+                // Quantity and Unit Row
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: AppTextField(
+                        controller: qtyController,
+                        label: 'Quantity',
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 3,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Unit',
+                            style: AppTextStyles.labelMedium(ctx).copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          AppGap.xs(ctx),
+                          Container(
+                            height: 48,
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            decoration: BoxDecoration(
+                              color: AppColors.card,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: AppColors.cardBorder),
+                            ),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<String>(
+                                isExpanded: true,
+                                value: units.contains(selectedUnit) ? selectedUnit : units.first,
+                                dropdownColor: AppColors.surface,
+                                items: units.map((u) => DropdownMenuItem(value: u, child: Text(u, style: AppTextStyles.bodyMedium(ctx)))).toList(),
+                                onChanged: (newUnit) {
+                                  if (newUnit != null) {
+                                    final currentVal = double.tryParse(qtyController.text);
+                                    if (currentVal != null) {
+                                      final converted = UnitClassificationService.convertQuantity(currentVal, selectedUnit, newUnit);
+                                      if (converted != null) {
+                                        qtyController.text = converted % 1 == 0 ? converted.toInt().toString() : converted.toString();
+                                      }
+                                    }
+                                    setDialogState(() {
+                                      selectedUnit = newUnit;
+                                    });
+                                  }
+                                },
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                AppGap.sm(ctx),
+
+                // Package Net Content (e.g. 50 g or 1 L)
+                if (UnitClassificationService.unitCategories[selectedUnit] == UnitClassificationService.categoryPackage) ...[
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        flex: 3,
+                        child: AppTextField(
+                          controller: netValController,
+                          label: 'Net Size/Weight',
+                          hint: 'e.g. 50 or 500',
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 2,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Size Unit',
+                              style: AppTextStyles.labelMedium(ctx).copyWith(
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                            AppGap.xs(ctx),
+                            Container(
+                              height: 48,
+                              padding: const EdgeInsets.symmetric(horizontal: 10),
+                              decoration: BoxDecoration(
+                                color: AppColors.card,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: AppColors.cardBorder),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  isExpanded: true,
+                                  value: ['g', 'kg', 'ml', 'L', ''].contains(selectedNetUnit) ? selectedNetUnit : '',
+                                  dropdownColor: AppColors.surface,
+                                  items: const [
+                                    DropdownMenuItem(value: '', child: Text('None')),
+                                    DropdownMenuItem(value: 'g', child: Text('g')),
+                                    DropdownMenuItem(value: 'kg', child: Text('kg')),
+                                    DropdownMenuItem(value: 'ml', child: Text('ml')),
+                                    DropdownMenuItem(value: 'L', child: Text('L')),
+                                  ],
+                                  onChanged: (u) => setDialogState(() => selectedNetUnit = u ?? ''),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  AppGap.sm(ctx),
+                ],
+
                 AppTextField(controller: descController, label: 'Description', maxLines: 2),
                 AppGap.sm(ctx),
                 AppTextField(controller: zoneController, label: 'Storage Zone (fridge, pantry, basket etc.)'),
@@ -506,10 +691,24 @@ class _ScanViewState extends State<ScanView> with SingleTickerProviderStateMixin
             ),
             TextButton(
               onPressed: () {
+                final qtyParsed = double.tryParse(qtyController.text) ?? candidate.quantity;
+                final netValParsed = double.tryParse(netValController.text);
+                final unitCat = UnitClassificationService.unitCategories[selectedUnit] ?? 'count';
+                final pType = unitCat == UnitClassificationService.categoryPackage ? selectedUnit : '';
+
                 final Map<String, dynamic> updateData = {
-                  'name': nameController.text,
-                  'brand': brandController.text,
-                  'description': descController.text,
+                  'name': nameController.text.trim(),
+                  'brand': brandController.text.trim(),
+                  'category': selectedCategory,
+                  'quantity': qtyParsed,
+                  'unit': selectedUnit,
+                  'unit_category': unitCat,
+                  'package_type': pType,
+                  'net_content_value': netValParsed,
+                  'net_content_unit': selectedNetUnit,
+                  'unit_confidence': 'High',
+                  'is_uncertain': false,
+                  'description': descController.text.trim(),
                   'storage_zone': zoneController.text.toLowerCase().trim(),
                 };
                 if (selectedExpiry != null) {

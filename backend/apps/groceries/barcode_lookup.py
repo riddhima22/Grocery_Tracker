@@ -177,7 +177,13 @@ def lookup_open_food_facts(barcode: str):
         brand = (product.get('brands') or '').strip()
         category = map_category_from_text(product.get('categories') or '')
         storage_zone = CATEGORY_STORAGE_ZONE_MAP.get(category, GroceryItem.StorageZones.PANTRY)
-        unit = parse_unit_from_quantity(product.get('quantity') or '')
+        from .unit_classifier import classify_product_unit
+        classification = classify_product_unit(
+            product_name=name,
+            category=category,
+            explicit_quantity_str=product.get('quantity') or '',
+            source='barcode'
+        )
         calories_per_100g = parse_calories(product.get('nutriments') or {})
         allergens = clean_allergens(product.get('allergens_tags') or [])
 
@@ -186,7 +192,15 @@ def lookup_open_food_facts(barcode: str):
             "name": name,
             "brand": brand,
             "category": category,
-            "unit": unit,
+            "quantity": classification['quantity'],
+            "unit": classification['unit'],
+            "unit_category": classification['unit_category'],
+            "package_type": classification['package_type'],
+            "net_content_value": classification['net_content_value'],
+            "net_content_unit": classification['net_content_unit'],
+            "package_count": classification['package_count'],
+            "unit_confidence": classification['unit_confidence'],
+            "is_uncertain": classification['is_uncertain'],
             "calories_per_100g": calories_per_100g,
             "allergens": allergens,
             "storage_zone": storage_zone,

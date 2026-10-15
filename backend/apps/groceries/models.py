@@ -23,6 +23,10 @@ class GroceryItem(models.Model):
         BOTTLE = 'bottle', 'bottle'
         BOX = 'box', 'box'
         DOZEN = 'dozen', 'dozen'
+        PACKET = 'packet', 'packet'
+        JAR = 'jar', 'jar'
+        CAN = 'can', 'can'
+        POUCH = 'pouch', 'pouch'
 
     class Confidence(models.TextChoices):
         HIGH = 'High', 'High'
@@ -47,6 +51,13 @@ class GroceryItem(models.Model):
     
     quantity = models.DecimalField(max_digits=7, decimal_places=2, default=1.0)
     unit = models.CharField(max_length=20, choices=Units.choices, default=Units.PCS)
+    unit_category = models.CharField(max_length=30, blank=True, default='')
+    package_type = models.CharField(max_length=30, blank=True, default='')
+    net_content_value = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True)
+    net_content_unit = models.CharField(max_length=20, blank=True, default='')
+    package_count = models.PositiveIntegerField(null=True, blank=True)
+    identification_source = models.CharField(max_length=30, blank=True, default='')
+    unit_confidence = models.CharField(max_length=20, blank=True, default='High')
     storage_zone = models.CharField(max_length=20, choices=StorageZones.choices, default=StorageZones.PANTRY)
     storage_notes = models.TextField(blank=True)
     scan_session = models.ForeignKey('scans.ScanSession', on_delete=models.SET_NULL, null=True, blank=True, related_name='created_groceries')
