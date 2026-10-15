@@ -158,36 +158,77 @@ class ApiClient {
       );
 
   Interceptor _logInterceptor() {
-    if (kReleaseMode) {
-      // In production release mode, disable all payload/header logging
-      return LogInterceptor(
-        request: false,
-        requestHeader: false,
-        requestBody: false,
-        responseHeader: false,
-        responseBody: false,
-        error: false,
-      );
-    }
+    return InterceptorsWrapper(
+      onRequest: (options, handler) {
+        if (!kReleaseMode) {
+          final method = options.method.toUpperCase();
+          final uri = options.uri.toString();
+          final qParams = options.queryParameters.isNotEmpty ? options.queryParameters : null;
+          final sanitizedBody = _sanitizeLogData(options.data);
+          AppLogger.debug('--> $method $uri${qParams != null ? '\nQuery: $qParams' : ''}\nBody: $sanitizedBody');
+        }
+        handler.next(options);
+      },
+      onResponse: (response, handler) {
+        if (!kReleaseMode) {
+          final method = response.requestOptions.method.toUpperCase();
+          final uri = response.requestOptions.uri.toString();
+          final status = response.statusCode;
+          final sanitizedBody = _sanitizeLogData(response.data);
+          AppLogger.debug('<-- $status $method $uri\nResponse Body: $sanitizedBody');
+        }
+        handler.next(response);
+      },
+      onError: (err, handler) {
+        final options = err.requestOptions;
+        final method = options.method.toUpperCase();
+        final uri = options.uri.toString();
+        final status = err.response?.statusCode ?? 'NO_STATUS';
+        final errType = err.type;
+        final qParams = options.queryParameters.isNotEmpty ? options.queryParameters : null;
+        final sanitizedReqBody = _sanitizeLogData(options.data);
+        final sanitizedRespBody = _sanitizeLogData(err.response?.data);
 
-    return LogInterceptor(
-      requestHeader: false,
-      requestBody: true,
-      responseHeader: false,
-      responseBody: false,
-      logPrint: (obj) {
-        String msg = obj.toString();
-        // Redact authorization headers
-        msg = msg.replaceAll(RegExp(r'Bearer\s+[a-zA-Z0-9_\-\.]+'), 'Bearer [REDACTED]');
-        // Redact passwords, tokens, and credentials in json payloads
-        msg = msg.replaceAll(
-          RegExp(r'"(password|token|refresh|access|id_token|secret)":\s*"[^"]*"', caseSensitive: false),
-          r'"$1": "[REDACTED]"',
+        AppLogger.error(
+          '[HTTP Error] $method $uri | Status: $status | Type: $errType'
+          '${qParams != null ? '\nQuery: $qParams' : ''}\n'
+          'Request Body: $sanitizedReqBody\n'
+          'Response Body: $sanitizedRespBody',
+          err.error,
         );
-        AppLogger.debug(msg);
+        handler.next(err);
       },
     );
   }
+
+  static dynamic _sanitizeLogData(dynamic data) {
+    if (data == null) return 'null';
+    if (data is FormData) {
+      final fields = data.fields.map((f) {
+        final keyLower = f.key.toLowerCase();
+        if (keyLower.contains('password') || keyLower.contains('token') || keyLower.contains('secret')) {
+          return '${f.key}: [REDACTED]';
+        }
+        return '${f.key}: ${f.value}';
+      }).toList();
+      final files = data.files.map((f) => '${f.key}: File(${f.value.filename}, ${f.value.length}b)').toList();
+      return 'FormData(fields: $fields, files: $files)';
+    }
+    String str = data.toString();
+    // Redact Bearer tokens
+    str = str.replaceAll(RegExp(r'Bearer\s+[a-zA-Z0-9_\-\.]+'), 'Bearer [REDACTED]');
+    // Redact passwords, tokens, credentials
+    str = str.replaceAll(
+      RegExp(r'"(password|token|refresh|access|id_token|secret)":\s*"[^"]*"', caseSensitive: false),
+      r'"$1": "[REDACTED]"',
+    );
+    // Truncate large HTML error payloads cleanly to prevent log bloat
+    if (str.length > 500 && (str.contains('<html') || str.contains('<!doctype') || str.contains('<head'))) {
+      return '${str.substring(0, 300)}... [HTML Truncated]';
+    }
+    return str;
+  }
+
 
   Future<Response> get(String path, {Map<String, dynamic>? queryParameters, Options? options}) async {
     try {

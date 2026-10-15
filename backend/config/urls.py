@@ -60,3 +60,9 @@ urlpatterns = [
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+
+# Root level error handlers to ensure JSON responses on 400, 403, 404, and 500
+handler400 = 'common.views.bad_request_400'
+handler403 = 'common.views.permission_denied_403'
+handler404 = 'common.views.not_found_404'
+handler500 = 'common.views.server_error_500'

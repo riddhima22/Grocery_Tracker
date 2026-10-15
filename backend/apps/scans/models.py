@@ -66,6 +66,13 @@ class ScanCandidate(models.Model):
     
     quantity = models.DecimalField(max_digits=7, decimal_places=2, default=1.0)
     unit = models.CharField(max_length=20, default='pcs')
+    unit_category = models.CharField(max_length=30, blank=True, default='')
+    package_type = models.CharField(max_length=30, blank=True, default='')
+    net_content_value = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True)
+    net_content_unit = models.CharField(max_length=20, blank=True, default='')
+    package_count = models.PositiveIntegerField(null=True, blank=True)
+    identification_source = models.CharField(max_length=30, blank=True, default='')
+    unit_confidence = models.CharField(max_length=20, blank=True, default='High')
     storage_zone = models.CharField(max_length=20, default='pantry')
     
     expiry_date = models.DateField(null=True, blank=True)

@@ -8,6 +8,7 @@ import '../../../data/models/scan_candidate_model.dart';
 import '../../../data/models/grocery_model.dart';
 import '../../../data/repositories/scan_repository.dart';
 import '../../../core/utils/app_logger.dart';
+import '../../../core/services/unit_classification_service.dart';
 import '../../kitchen/providers/kitchen_provider.dart';
 
 enum ScanUIState { idle, selecting, uploading, analyzing, review, success, error }
@@ -208,9 +209,17 @@ class ScanProvider extends ChangeNotifier {
       _candidates[index] = old.copyWith(
         name: data['name']?.toString(),
         brand: data['brand']?.toString(),
+        category: data['category']?.toString(),
         description: data['description']?.toString(),
         storageZone: data['storage_zone']?.toString(),
         quantity: newQty,
+        unit: data['unit']?.toString(),
+        unitCategory: data['unit_category']?.toString(),
+        packageType: data['package_type']?.toString(),
+        netContentValue: double.tryParse(data['net_content_value']?.toString() ?? ''),
+        netContentUnit: data['net_content_unit']?.toString(),
+        unitConfidence: data['unit_confidence']?.toString(),
+        isUncertain: data['is_uncertain'] == true,
         expiryDate: newExpiry,
       );
       // Immediately notify UI for instant 0ms responsiveness
@@ -227,6 +236,25 @@ class ScanProvider extends ChangeNotifier {
     } catch (e) {
       AppLogger.error('Failed to update candidate details', e);
     }
+  }
+
+  void updateCandidateQuantity(String id, double newQty) {
+    updateCandidate(id, {'quantity': newQty});
+  }
+
+  void updateCandidateUnit(String id, String newUnit) {
+    final index = _candidates.indexWhere((c) => c.id == id);
+    if (index == -1) return;
+    final old = _candidates[index];
+    final convertedQty = UnitClassificationService.convertQuantity(old.quantity, old.unit, newUnit) ?? old.quantity;
+    final cat = UnitClassificationService.unitCategories[newUnit] ?? old.unitCategory;
+    updateCandidate(id, {
+      'unit': newUnit,
+      'quantity': convertedQty,
+      'unit_category': cat,
+      'unit_confidence': 'High',
+      'is_uncertain': false,
+    });
   }
 
   void removeCandidate(String id) {

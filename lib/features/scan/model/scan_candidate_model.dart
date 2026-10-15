@@ -1,3 +1,5 @@
+import '../../../core/services/unit_classification_service.dart';
+
 class ScanCandidateModel {
   final String id;
   final String scanSession;
@@ -10,6 +12,15 @@ class ScanCandidateModel {
 
   final double quantity;
   final String unit;
+  final String unitCategory;
+  final String packageType;
+  final double? netContentValue;
+  final String netContentUnit;
+  final int? packageCount;
+  final String identificationSource;
+  final String unitConfidence;
+  final bool isUncertain;
+
   final String storageZone;
 
   final DateTime? expiryDate;
@@ -36,6 +47,14 @@ class ScanCandidateModel {
     required this.category,
     required this.quantity,
     required this.unit,
+    this.unitCategory = 'count',
+    this.packageType = '',
+    this.netContentValue,
+    this.netContentUnit = '',
+    this.packageCount,
+    this.identificationSource = 'camera_ai',
+    this.unitConfidence = 'High',
+    this.isUncertain = false,
     required this.storageZone,
     this.expiryDate,
     this.estimatedConsumptionDate,
@@ -54,6 +73,17 @@ class ScanCandidateModel {
   /// Semantic date helper: returns printed expiryDate if detected,
   /// otherwise returns estimatedConsumptionDate.
   DateTime? get effectiveExpiryDate => expiryDate ?? estimatedConsumptionDate;
+
+  /// Display string with package details (e.g. "Chips — 1 packet (50 g)")
+  String get displayQuantityText {
+    final qtyStr = quantity % 1 == 0 ? quantity.toInt().toString() : quantity.toString();
+    final pType = packageType.isNotEmpty ? packageType : unit;
+    if (netContentValue != null && netContentUnit.isNotEmpty) {
+      final netStr = netContentValue! % 1 == 0 ? netContentValue!.toInt().toString() : netContentValue!.toString();
+      return '$qtyStr $pType ($netStr $netContentUnit)';
+    }
+    return '$qtyStr $unit';
+  }
 
   factory ScanCandidateModel.fromJson(Map<String, dynamic> json) {
     DateTime? parsedExpiry;
@@ -76,16 +106,59 @@ class ScanCandidateModel {
       isEstimated = false;
     }
 
+    final name = json['name'] ?? '';
+    final category = json['category'] ?? 'Vegetables';
+    final rawUnit = json['unit'];
+
+    // Smart unit classification fallback if unit is empty or default 'pcs'
+    String resolvedUnit = rawUnit?.toString() ?? '';
+    String resolvedCategory = json['unit_category']?.toString() ?? '';
+    String resolvedPackageType = json['package_type']?.toString() ?? '';
+    double? resolvedNetVal = double.tryParse(json['net_content_value']?.toString() ?? '');
+    String resolvedNetUnit = json['net_content_unit']?.toString() ?? '';
+    int? resolvedPackCount = int.tryParse(json['package_count']?.toString() ?? '');
+    String resolvedUnitConf = json['unit_confidence']?.toString() ?? 'High';
+    bool resolvedUncertain = json['is_uncertain'] == true || resolvedUnitConf.toLowerCase() == 'uncertain';
+
+    if (resolvedUnit.isEmpty || (resolvedUnit == 'pcs' && resolvedCategory.isEmpty)) {
+      final classified = UnitClassificationService.classifyProduct(
+        productName: name,
+        category: category,
+        aiPredictedUnit: rawUnit?.toString(),
+        aiConfidence: json['confidence'] ?? 'High',
+        source: 'camera_ai',
+      );
+      resolvedUnit = classified.unit;
+      resolvedCategory = classified.unitCategory;
+      resolvedPackageType = classified.packageType;
+      resolvedNetVal = classified.netContentValue;
+      resolvedNetUnit = classified.netContentUnit;
+      resolvedPackCount = classified.packageCount;
+      resolvedUnitConf = classified.unitConfidence;
+      resolvedUncertain = classified.isUncertain;
+    }
+
+    final rawQty = double.tryParse(json['quantity']?.toString() ?? '');
+    final double finalQty = rawQty != null && rawQty > 0 ? rawQty : 1.0;
+
     return ScanCandidateModel(
       id: json['id'] ?? '',
       scanSession: json['scan_session'] ?? '',
-      name: json['name'] ?? '',
+      name: name,
       brand: json['brand'] ?? '',
       description: json['description'] ?? '',
       iconKey: json['icon_key'] ?? 'grocery',
-      category: json['category'] ?? 'Vegetables',
-      quantity: double.tryParse(json['quantity']?.toString() ?? '1.0') ?? 1.0,
-      unit: json['unit'] ?? 'pcs',
+      category: category,
+      quantity: finalQty,
+      unit: resolvedUnit,
+      unitCategory: resolvedCategory,
+      packageType: resolvedPackageType,
+      netContentValue: resolvedNetVal,
+      netContentUnit: resolvedNetUnit,
+      packageCount: resolvedPackCount,
+      identificationSource: json['identification_source'] ?? 'camera_ai',
+      unitConfidence: resolvedUnitConf,
+      isUncertain: resolvedUncertain,
       storageZone: json['storage_zone'] ?? 'pantry',
       expiryDate: parsedExpiry,
       estimatedConsumptionDate: parsedEstimated,
@@ -110,6 +183,14 @@ class ScanCandidateModel {
     'category': category,
     'quantity': quantity,
     'unit': unit,
+    'unit_category': unitCategory,
+    'package_type': packageType,
+    'net_content_value': netContentValue,
+    'net_content_unit': netContentUnit,
+    'package_count': packageCount,
+    'identification_source': identificationSource,
+    'unit_confidence': unitConfidence,
+    'is_uncertain': isUncertain,
     'storage_zone': storageZone,
     'expiry_date': expiryDate?.toIso8601String().substring(0, 10),
     'estimated_consumption_date': estimatedConsumptionDate?.toIso8601String().substring(0, 10),
@@ -132,6 +213,14 @@ class ScanCandidateModel {
     String? category,
     double? quantity,
     String? unit,
+    String? unitCategory,
+    String? packageType,
+    double? netContentValue,
+    String? netContentUnit,
+    int? packageCount,
+    String? identificationSource,
+    String? unitConfidence,
+    bool? isUncertain,
     String? storageZone,
     DateTime? expiryDate,
     DateTime? estimatedConsumptionDate,
@@ -155,6 +244,14 @@ class ScanCandidateModel {
       category: category ?? this.category,
       quantity: quantity ?? this.quantity,
       unit: unit ?? this.unit,
+      unitCategory: unitCategory ?? this.unitCategory,
+      packageType: packageType ?? this.packageType,
+      netContentValue: netContentValue ?? this.netContentValue,
+      netContentUnit: netContentUnit ?? this.netContentUnit,
+      packageCount: packageCount ?? this.packageCount,
+      identificationSource: identificationSource ?? this.identificationSource,
+      unitConfidence: unitConfidence ?? this.unitConfidence,
+      isUncertain: isUncertain ?? this.isUncertain,
       storageZone: storageZone ?? this.storageZone,
       expiryDate: expiryDate ?? this.expiryDate,
       estimatedConsumptionDate: estimatedConsumptionDate ?? this.estimatedConsumptionDate,

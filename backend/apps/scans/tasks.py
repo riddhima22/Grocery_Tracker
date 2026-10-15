@@ -171,15 +171,8 @@ def process_scan_session_task(self, session_id=None):
                 except (ValueError, TypeError):
                     pass
 
-                unit = safe_str(item_data.get('unit'), 'pcs').lower()
-                allowed_units = ['kg', 'g', 'l', 'ml', 'pcs', 'pack', 'bottle', 'box', 'dozen', 'bunch', 'packet']
-                if unit not in allowed_units:
-                    if unit in ('liter', 'liters', 'l'):
-                        unit = 'l'
-                    elif unit in ('gram', 'grams', 'g'):
-                        unit = 'g'
-                    else:
-                        unit = 'pcs'
+                item_name = safe_str(item_data.get('name'), 'Unknown Item')[:150]
+                item_category = safe_str(item_data.get('category'), 'Vegetables')[:100]
 
                 zone = safe_str(item_data.get('storage_zone'), 'pantry').lower()
                 allowed_zones = ['fridge', 'freezer', 'pantry', 'counter', 'cabinet', 'basket', 'spice']
@@ -193,9 +186,6 @@ def process_scan_session_task(self, session_id=None):
                 warnings_list = item_data.get('warnings')
                 if not isinstance(warnings_list, list):
                     warnings_list = []
-
-                item_name = safe_str(item_data.get('name'), 'Unknown Item')[:150]
-                item_category = safe_str(item_data.get('category'), 'Vegetables')[:100]
 
                 # Intelligent storage zone placement: Carbonated drinks & beverages MUST be in fridge
                 is_beverage_or_carbonated = (
@@ -212,6 +202,34 @@ def process_scan_session_task(self, session_id=None):
                         item_category = 'Beverages'
                     zone = 'fridge'
                     icon_key = 'beverage'
+
+                # Smart Unit Classification Service:
+                # Determines correct unit based on metadata, package size, category, and product name.
+                from apps.groceries.unit_classifier import classify_product_unit
+                ai_unit_raw = safe_str(item_data.get('unit'), '').lower()
+                ai_conf_raw = safe_str(item_data.get('confidence'), 'High')
+                unit_classification = classify_product_unit(
+                    product_name=item_name,
+                    category=item_category,
+                    explicit_quantity_str=safe_str(item_data.get('quantity_str'), ''),
+                    ai_predicted_unit=ai_unit_raw,
+                    ai_confidence=ai_conf_raw,
+                    source='camera_ai'
+                )
+
+                final_unit = unit_classification['unit']
+                final_unit_category = unit_classification['unit_category']
+                final_package_type = unit_classification['package_type']
+                final_net_value = unit_classification['net_content_value']
+                final_net_unit = unit_classification['net_content_unit']
+                final_package_count = unit_classification['package_count']
+                final_unit_conf = unit_classification['unit_confidence']
+
+                # Use parsed quantity or default from classification
+                if quantity <= 1.0 and unit_classification['quantity'] > 1.0:
+                    quantity = unit_classification['quantity']
+                elif quantity > 1.0 and unit_classification['unit_category'] == 'package':
+                    final_package_count = int(quantity)
 
                 # Resolve expiry date semantics: distinguish printed date from estimated consumption
                 expiry_dt = parse_date_str(item_data.get('expiry_date'))
@@ -274,38 +292,59 @@ def process_scan_session_task(self, session_id=None):
 
                 is_estimated = bool(is_estimated)
 
-                ScanCandidate.objects.create(
+                # Deduplication: Avoid creating duplicate entries when the same product is scanned repeatedly
+                existing = ScanCandidate.objects.filter(
                     scan_session=session,
-                    source_image=source_image,
-                    name=item_name,
-                    brand=safe_str(item_data.get('brand'), '')[:100],
-                    description=safe_str(item_data.get('description'), '') or f"Fresh {item_name} stored in {zone}.",
-                    icon_key=icon_key[:50],
-                    category=item_category,
-                    quantity=quantity,
-                    unit=unit[:20],
-                    storage_zone=zone[:20],
-                    expiry_date=expiry_dt,
-                    estimated_consumption_date=estimated_dt,
-                    is_expiry_estimated=is_estimated,
-                    manufacturing_date=parse_date_str(item_data.get('manufacturing_date')),
-                    packed_date=parse_date_str(item_data.get('packed_date')),
-                    best_before_date=parse_date_str(item_data.get('best_before_date')),
-                    date_type=date_type_val,
-                    date_source=date_src_val,
-                    date_confidence=date_conf_val,
-                    raw_date_text=raw_date_val,
-                    storage_reason=safe_str(item_data.get('storage_reason'), '') or (
-                        "Keep chilled in refrigerator to preserve carbonation and refreshing fizz."
-                        if is_beverage_or_carbonated else ""
-                    ),
-                    shelf_life_guidance=shelf_guidance_val or (
-                        "Store upright in refrigerator at 2-5°C. Never freeze carbonated cans or glass bottles."
-                        if is_beverage_or_carbonated else ""
-                    ),
-                    confidence=safe_str(item_data.get('confidence'), 'High')[:20],
-                )
-                candidate_count += 1
+                    name__iexact=item_name,
+                    brand__iexact=safe_str(item_data.get('brand'), '')[:100],
+                    unit__iexact=final_unit
+                ).first()
+
+                if existing:
+                    existing.quantity = float(existing.quantity) + float(quantity)
+                    if final_package_count and existing.package_count:
+                        existing.package_count += final_package_count
+                    existing.save(update_fields=['quantity', 'package_count'])
+                else:
+                    ScanCandidate.objects.create(
+                        scan_session=session,
+                        source_image=source_image,
+                        name=item_name,
+                        brand=safe_str(item_data.get('brand'), '')[:100],
+                        description=safe_str(item_data.get('description'), '') or f"Fresh {item_name} stored in {zone}.",
+                        icon_key=icon_key[:50],
+                        category=item_category,
+                        quantity=quantity,
+                        unit=final_unit[:20],
+                        unit_category=final_unit_category,
+                        package_type=final_package_type,
+                        net_content_value=final_net_value,
+                        net_content_unit=final_net_unit,
+                        package_count=final_package_count,
+                        identification_source='camera_ai',
+                        unit_confidence=final_unit_conf,
+                        storage_zone=zone[:20],
+                        expiry_date=expiry_dt,
+                        estimated_consumption_date=estimated_dt,
+                        is_expiry_estimated=is_estimated,
+                        manufacturing_date=parse_date_str(item_data.get('manufacturing_date')),
+                        packed_date=parse_date_str(item_data.get('packed_date')),
+                        best_before_date=parse_date_str(item_data.get('best_before_date')),
+                        date_type=date_type_val,
+                        date_source=date_src_val,
+                        date_confidence=date_conf_val,
+                        raw_date_text=raw_date_val,
+                        storage_reason=safe_str(item_data.get('storage_reason'), '') or (
+                            "Keep chilled in refrigerator to preserve carbonation and refreshing fizz."
+                            if is_beverage_or_carbonated else ""
+                        ),
+                        shelf_life_guidance=shelf_guidance_val or (
+                            "Store upright in refrigerator at 2-5°C. Never freeze carbonated cans or glass bottles."
+                            if is_beverage_or_carbonated else ""
+                        ),
+                        confidence=safe_str(item_data.get('confidence'), 'High')[:20],
+                    )
+                    candidate_count += 1
 
 
             # Mark all processed images as completed

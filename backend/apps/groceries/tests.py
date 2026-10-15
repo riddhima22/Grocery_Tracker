@@ -362,3 +362,160 @@ class ExpiryAndShelfLifeSemanticsTests(APITestCase):
         self.assertIsNotNone(item['estimated_consumption_date'])
 
 
+class SmartUnitClassificationBackendTests(APITestCase):
+    """Automated backend test suite covering the 14 smart quantity & unit detection scenarios."""
+
+    def test_scenario_1_loose_potato_weight_based(self):
+        from apps.groceries.unit_classifier import classify_product_unit, UnitCategory
+        res = classify_product_unit(product_name='Potato', category='Vegetables')
+        self.assertEqual(res['unit'], 'kg')
+        self.assertEqual(res['unit_category'], UnitCategory.WEIGHT)
+        self.assertNotEqual(res['unit'], 'pcs')
+
+    def test_scenario_2_onion_barcode_weight_based(self):
+        from apps.groceries.unit_classifier import classify_product_unit, UnitCategory
+        res = classify_product_unit(product_name='Red Onion', category='Vegetables')
+        self.assertIn(res['unit'], ['kg', 'g'])
+        self.assertEqual(res['unit_category'], UnitCategory.WEIGHT)
+        self.assertNotEqual(res['unit'], 'pcs')
+
+    def test_scenario_3_branded_50g_chips_packet(self):
+        from apps.groceries.unit_classifier import classify_product_unit, UnitCategory
+        res = classify_product_unit(
+            product_name="Lay's Classic Potato Chips",
+            category='Snacks',
+            explicit_quantity_str='50 g'
+        )
+        self.assertEqual(res['quantity'], 1.0)
+        self.assertEqual(res['unit'], 'packet')
+        self.assertEqual(res['unit_category'], UnitCategory.PACKAGE)
+        self.assertEqual(res['net_content_value'], 50.0)
+        self.assertEqual(res['net_content_unit'], 'g')
+
+    def test_scenario_4_two_packets_biscuits(self):
+        from apps.groceries.unit_classifier import classify_product_unit, UnitCategory
+        res = classify_product_unit(
+            product_name="Oreo Biscuit 2 pack",
+            category='Snacks'
+        )
+        self.assertEqual(res['quantity'], 2.0)
+        self.assertEqual(res['unit'], 'packet')
+        self.assertEqual(res['package_count'], 2)
+
+    def test_scenario_5_cooking_oil_bottle(self):
+        from apps.groceries.unit_classifier import classify_product_unit, UnitCategory
+        res = classify_product_unit(
+            product_name="Fortune Sunflower Cooking Oil 1L Bottle",
+            category='Beverages',
+            explicit_quantity_str='1 L'
+        )
+        self.assertEqual(res['quantity'], 1.0)
+        self.assertEqual(res['unit'], 'bottle')
+        self.assertEqual(res['unit_category'], UnitCategory.PACKAGE)
+        self.assertEqual(res['net_content_value'], 1.0)
+        self.assertEqual(res['net_content_unit'], 'L')
+
+    def test_scenario_6_loose_dal_weight_based(self):
+        from apps.groceries.unit_classifier import classify_product_unit, UnitCategory
+        res = classify_product_unit(product_name="Toor Dal", category='Grains')
+        self.assertEqual(res['unit'], 'g')
+        self.assertEqual(res['unit_category'], UnitCategory.WEIGHT)
+        self.assertNotEqual(res['unit'], 'pcs')
+
+    def test_scenario_7_six_eggs_count(self):
+        from apps.groceries.unit_classifier import classify_product_unit, UnitCategory
+        res = classify_product_unit(product_name="Farm Fresh Brown Eggs 6 pcs", category='Dairy')
+        self.assertEqual(res['unit'], 'pcs')
+        self.assertEqual(res['quantity'], 6.0)
+        self.assertEqual(res['unit_category'], UnitCategory.COUNT)
+
+    def test_scenario_8_unknown_category_fallback(self):
+        from apps.groceries.unit_classifier import classify_product_unit
+        res = classify_product_unit(product_name="XYZ Unknown Widget 999", category='')
+        self.assertTrue(res['is_uncertain'])
+        self.assertEqual(res['unit_confidence'], 'uncertain')
+
+    def test_scenario_9_low_confidence_ai_detection(self):
+        from apps.groceries.unit_classifier import classify_product_unit
+        res = classify_product_unit(
+            product_name="Something Blurry",
+            category="Vegetables",
+            ai_confidence="Low"
+        )
+        self.assertTrue(res['is_uncertain'])
+        self.assertEqual(res['unit_confidence'], 'Low')
+
+    def test_scenario_10_quantity_conversion_g_to_kg(self):
+        from apps.groceries.unit_classifier import convert_quantity_units
+        from decimal import Decimal
+        val, ok = convert_quantity_units(Decimal('500'), 'g', 'kg')
+        self.assertTrue(ok)
+        self.assertEqual(val, Decimal('0.5'))
+
+        val2, ok2 = convert_quantity_units(Decimal('1.5'), 'kg', 'g')
+        self.assertTrue(ok2)
+        self.assertEqual(val2, Decimal('1500'))
+
+    def test_scenario_11_quantity_conversion_ml_to_L(self):
+        from apps.groceries.unit_classifier import convert_quantity_units
+        from decimal import Decimal
+        val, ok = convert_quantity_units(Decimal('500'), 'ml', 'L')
+        self.assertTrue(ok)
+        self.assertEqual(val, Decimal('0.5'))
+
+        val2, ok2 = convert_quantity_units(Decimal('2'), 'L', 'ml')
+        self.assertTrue(ok2)
+        self.assertEqual(val2, Decimal('2000'))
+
+    def test_prevention_cross_category_conversions(self):
+        from apps.groceries.unit_classifier import convert_quantity_units
+        from decimal import Decimal
+        val, ok = convert_quantity_units(Decimal('500'), 'g', 'L')
+        self.assertFalse(ok)
+        self.assertIsNone(val)
+
+    def test_scenario_12_legacy_product_records(self):
+        from apps.groceries.models import GroceryItem
+        user = User.objects.create_user(email='legacy@example.com', password='Password123!', display_name='Legacy User')
+        item = GroceryItem.objects.create(
+            user=user,
+            name='Legacy Item',
+            quantity=3.0,
+            unit='pcs',
+            storage_zone='pantry'
+        )
+        self.assertEqual(item.quantity, 3.0)
+        self.assertEqual(item.unit, 'pcs')
+        # Edit and save
+        item.unit = 'kg'
+        item.quantity = 1.0
+        item.save()
+        item.refresh_from_db()
+        self.assertEqual(item.unit, 'kg')
+        self.assertEqual(item.quantity, 1.0)
+
+    def test_scenario_13_scan_session_deduplication(self):
+        from apps.scans.models import ScanSession, ScanCandidate
+        user = User.objects.create_user(email='scan_dedup@example.com', password='Password123!', display_name='Scan User')
+        session = ScanSession.objects.create(user=user)
+        c1 = ScanCandidate.objects.create(
+            scan_session=session,
+            name='Red Onion',
+            quantity=1.0,
+            unit='kg',
+            storage_zone='pantry'
+        )
+        # Adding identical item in view or task increments quantity
+        c1.quantity += 1.0
+        c1.save()
+        c1.refresh_from_db()
+        self.assertEqual(c1.quantity, 2.0)
+
+    def test_scenario_14_barcode_failure_safe_fallback(self):
+        from apps.groceries.barcode_lookup import lookup_open_food_facts
+        # Random non-existent barcode should gracefully return None without crashing
+        res = lookup_open_food_facts("000000000000000000")
+        self.assertIsNone(res)
+
+
+

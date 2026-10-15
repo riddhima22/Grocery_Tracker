@@ -11,6 +11,7 @@ import '../../../config/app_routes.dart';
 import '../../../core/widgets/app_scaffold.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_retry_state.dart';
+import '../../../core/services/unit_classification_service.dart';
 import '../../../core/extensions/responsive_context_extension.dart';
 
 class GroceryListView extends StatefulWidget {
@@ -41,8 +42,9 @@ class _GroceryListViewState extends State<GroceryListView> {
     final name = _addItemController.text.trim();
     if (name.isEmpty) return;
 
+    final classified = UnitClassificationService.classifyProduct(productName: name);
     final provider = context.read<GroceryListProvider>();
-    final success = await provider.addItem(name, 1.0, 'pcs');
+    final success = await provider.addItem(name, classified.quantity, classified.unit);
     if (!mounted) return;
     if (success) {
       _addItemController.clear();
