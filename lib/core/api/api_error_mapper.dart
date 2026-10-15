@@ -5,12 +5,15 @@ import '../utils/app_logger.dart';
 
 class ApiErrorMapper {
   static ApiException map(DioException error) {
-    AppLogger.error('API Error: ${error.type} - ${error.message} - ${error.response?.data}');
+    AppLogger.error(
+      'API Error: ${error.type} - ${error.message} - ${error.response?.data}',
+    );
 
     // 1. Explicitly check for TLS / SSL Certificate and Handshake failures
     final rawError = error.error;
     final errorStr = '${error.message} ${error.error}'.toLowerCase();
-    final isCertError = rawError is HandshakeException ||
+    final isCertError =
+        rawError is HandshakeException ||
         rawError is TlsException ||
         rawError is CertificateException ||
         errorStr.contains('certificate_verify_failed') ||
@@ -20,7 +23,9 @@ class ApiErrorMapper {
         errorStr.contains('self signed certificate');
 
     if (isCertError) {
-      AppLogger.error('TLS/SSL Certificate Verification Failure: ${error.message} (Raw: $rawError)');
+      AppLogger.error(
+        'TLS/SSL Certificate Verification Failure: ${error.message} (Raw: $rawError)',
+      );
       return CertificateVerificationException(
         'Secure connection to the server failed. Please try again later.',
         rawError?.toString() ?? error.message,
@@ -44,20 +49,25 @@ class ApiErrorMapper {
 
         if (data is Map) {
           // 1. Check top-level message string (our standardized API format)
-          if (data.containsKey('message') && data['message'] is String && (data['message'] as String).isNotEmpty) {
+          if (data.containsKey('message') &&
+              data['message'] is String &&
+              (data['message'] as String).isNotEmpty) {
             serverMessage = data['message'] as String;
           }
 
           // 2. Check if the error is wrapped in our custom envelope
           if (data.containsKey('error') && data['error'] is Map) {
             final errObj = data['error'] as Map;
-            if (errObj['message'] is String && (errObj['message'] as String).isNotEmpty) {
+            if (errObj['message'] is String &&
+                (errObj['message'] as String).isNotEmpty) {
               serverMessage = errObj['message'] as String;
             }
             if (errObj['fields'] is Map) {
               fields = Map<String, dynamic>.from(errObj['fields'] as Map);
             }
-          } else if (data.containsKey('error') && data['error'] is String && (data['error'] as String).isNotEmpty) {
+          } else if (data.containsKey('error') &&
+              data['error'] is String &&
+              (data['error'] as String).isNotEmpty) {
             serverMessage = data['error'] as String;
           }
           // 3. Check for standard DRF detail field (e.g. SimpleJWT error or DRF detail)
@@ -87,14 +97,20 @@ class ApiErrorMapper {
               fields = fieldErrors;
               final firstKey = fieldErrors.keys.first;
               final firstError = fieldErrors[firstKey];
-              final cleanKey = firstKey.substring(0, 1).toUpperCase() + firstKey.substring(1);
+              final cleanKey =
+                  firstKey.substring(0, 1).toUpperCase() +
+                  firstKey.substring(1);
               serverMessage = '$cleanKey: $firstError';
             }
           }
         } else if (data is String && data.isNotEmpty) {
           final trimmed = data.trim();
           // Detect HTML error responses (e.g., Gunicorn or Web Server 500 HTML)
-          if (trimmed.startsWith('<') && (trimmed.contains('<html') || trimmed.contains('<!doctype') || trimmed.contains('<head') || trimmed.contains('<body'))) {
+          if (trimmed.startsWith('<') &&
+              (trimmed.contains('<html') ||
+                  trimmed.contains('<!doctype') ||
+                  trimmed.contains('<head') ||
+                  trimmed.contains('<body'))) {
             isHtmlResponse = true;
             serverMessage = 'Server error. Please try again later.';
           } else {
@@ -104,7 +120,11 @@ class ApiErrorMapper {
 
         switch (statusCode) {
           case 400:
-            return ValidationException(serverMessage, fields: fields, statusCode: statusCode);
+            return ValidationException(
+              serverMessage,
+              fields: fields,
+              statusCode: statusCode,
+            );
           case 401:
             return UnauthorizedException(serverMessage);
           case 403:
@@ -116,15 +136,24 @@ class ApiErrorMapper {
           case 413:
             return PayloadTooLargeException('The uploaded file is too large.');
           case 422:
-            return ValidationException(serverMessage, fields: fields, statusCode: statusCode);
+            return ValidationException(
+              serverMessage,
+              fields: fields,
+              statusCode: statusCode,
+            );
           case 429:
             return RateLimitException(serverMessage);
           case 500:
           case 502:
           case 503:
           case 504:
-            final defaultMsg = statusCode == 504 ? 'Gateway timeout. Please try again later.' : 'Server error. Please try again later.';
-            final safeMsg = (isHtmlResponse || serverMessage.contains('<') || serverMessage.isEmpty)
+            final defaultMsg = statusCode == 504
+                ? 'Gateway timeout. Please try again later.'
+                : 'Server error. Please try again later.';
+            final safeMsg =
+                (isHtmlResponse ||
+                    serverMessage.contains('<') ||
+                    serverMessage.isEmpty)
                 ? defaultMsg
                 : serverMessage;
             return ServerException(safeMsg);
@@ -133,7 +162,9 @@ class ApiErrorMapper {
         }
 
       case DioExceptionType.connectionError:
-        return NetworkException('No internet connection. Check your network and try again.');
+        return NetworkException(
+          'No internet connection. Check your network and try again.',
+        );
 
       case DioExceptionType.cancel:
         return ApiException('Request was cancelled.');

@@ -25,7 +25,7 @@ class _SignupViewState extends State<SignupView> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  
+
   String _passwordStrength = '';
   Color _strengthColor = AppColors.danger;
 
@@ -80,11 +80,11 @@ class _SignupViewState extends State<SignupView> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    
+
     if (_passwordController.text != _confirmPasswordController.text) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Passwords do not match.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Passwords do not match.')));
       return;
     }
 
@@ -134,7 +134,7 @@ class _SignupViewState extends State<SignupView> {
                     ),
                   ),
                   AppGap.lg(context),
-                  
+
                   AppErrorBanner(
                     errorMessage: auth.errorMessage,
                     onClose: () {
@@ -142,7 +142,7 @@ class _SignupViewState extends State<SignupView> {
                     },
                   ),
                   AppGap.sm(context),
-                  
+
                   AppTextField(
                     controller: _nameController,
                     label: 'Full Name',
@@ -165,7 +165,7 @@ class _SignupViewState extends State<SignupView> {
                     isPassword: true,
                     validator: Validators.validatePassword,
                   ),
-                  
+
                   // Password Strength Indicator
                   if (_passwordStrength.isNotEmpty) ...[
                     AppGap.xs(context),
@@ -173,11 +173,16 @@ class _SignupViewState extends State<SignupView> {
                       children: [
                         Text(
                           'Strength: ',
-                          style: AppTextStyles.caption(context).copyWith(color: AppColors.textSecondary),
+                          style: AppTextStyles.caption(
+                            context,
+                          ).copyWith(color: AppColors.textSecondary),
                         ),
                         Text(
                           _passwordStrength,
-                          style: AppTextStyles.caption(context).copyWith(color: _strengthColor, fontWeight: FontWeight.bold),
+                          style: AppTextStyles.caption(context).copyWith(
+                            color: _strengthColor,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ],
                     ),
@@ -185,17 +190,27 @@ class _SignupViewState extends State<SignupView> {
                     Row(
                       children: List.generate(4, (index) {
                         bool active = false;
-                        if (_passwordStrength == 'Weak' && index == 0) active = true;
-                        if (_passwordStrength == 'Fair' && index <= 1) active = true;
-                        if (_passwordStrength == 'Good' && index <= 2) active = true;
-                        if (_passwordStrength == 'Strong') active = true;
-                        
+                        if (_passwordStrength == 'Weak' && index == 0) {
+                          active = true;
+                        }
+                        if (_passwordStrength == 'Fair' && index <= 1) {
+                          active = true;
+                        }
+                        if (_passwordStrength == 'Good' && index <= 2) {
+                          active = true;
+                        }
+                        if (_passwordStrength == 'Strong') {
+                          active = true;
+                        }
+
                         return Expanded(
                           child: Container(
                             margin: const EdgeInsets.symmetric(horizontal: 2.0),
                             height: 4.0,
                             decoration: BoxDecoration(
-                              color: active ? _strengthColor : AppColors.cardBorder,
+                              color: active
+                                  ? _strengthColor
+                                  : AppColors.cardBorder,
                               borderRadius: BorderRadius.circular(2.0),
                             ),
                           ),
@@ -219,13 +234,13 @@ class _SignupViewState extends State<SignupView> {
                     onFieldSubmitted: (_) => _submit(),
                   ),
                   AppGap.md(context),
-                  
+
                   AppButton(
                     text: 'Create Account',
                     isLoading: auth.isLoading,
                     onPressed: auth.isLoading ? null : _submit,
                   ),
-                  
+
                   AppGap.sm(context),
                   Center(
                     child: Text(
@@ -235,11 +250,14 @@ class _SignupViewState extends State<SignupView> {
                     ),
                   ),
                   AppGap.lg(context),
-                  
+
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text('Already have an account? ', style: AppTextStyles.bodyMedium(context)),
+                      Text(
+                        'Already have an account? ',
+                        style: AppTextStyles.bodyMedium(context),
+                      ),
                       GestureDetector(
                         onTap: () {
                           Navigator.pushNamed(context, AppRoutes.login);

@@ -23,7 +23,8 @@ class TimeoutException extends ApiException {
 
 class ValidationException extends ApiException {
   final Map<String, dynamic>? fields;
-  ValidationException(String message, {this.fields, int? statusCode}) : super(message, statusCode);
+  ValidationException(String message, {this.fields, int? statusCode})
+    : super(message, statusCode);
 }
 
 class UnauthorizedException extends ApiException {

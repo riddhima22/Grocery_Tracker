@@ -275,7 +275,7 @@ def _classify_product_unit_internal(
             }
 
         if any(k in name_lower for k in LIQUID_KEYWORDS) or cat_lower in ('beverages', 'beverage'):
-            p_type = package_type or ('bottle' if 'can' not in name_lower else 'can')
+            p_type = package_type or ('can' if re.search(r'\b(can|cans|tin)\b', name_lower) else 'bottle')
             return {
                 'quantity': float(pack_count),
                 'unit': p_type,

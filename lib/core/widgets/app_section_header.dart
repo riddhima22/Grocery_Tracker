@@ -33,7 +33,9 @@ class AppSectionHeader extends StatelessWidget {
             onPressed: onActionPressed,
             child: Text(
               actionText!,
-              style: AppTextStyles.labelMedium(context).copyWith(color: AppColors.primary),
+              style: AppTextStyles.labelMedium(
+                context,
+              ).copyWith(color: AppColors.primary),
             ),
           ),
       ],

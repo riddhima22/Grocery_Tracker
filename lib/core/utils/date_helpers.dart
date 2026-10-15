@@ -46,11 +46,15 @@ class DateHelpers {
     if (rem.isNegative) return 'Expired';
     if (rem.inHours >= 1) {
       final mins = rem.inMinutes % 60;
-      return mins > 0 ? '${rem.inHours} hr $mins min left' : '${rem.inHours} hr left';
+      return mins > 0
+          ? '${rem.inHours} hr $mins min left'
+          : '${rem.inHours} hr left';
     }
     if (rem.inMinutes >= 1) {
       final secs = rem.inSeconds % 60;
-      return secs > 0 ? '${rem.inMinutes} min $secs sec left' : '${rem.inMinutes} min left';
+      return secs > 0
+          ? '${rem.inMinutes} min $secs sec left'
+          : '${rem.inMinutes} min left';
     }
     return '${rem.inSeconds.clamp(1, 59)} sec left';
   }
@@ -70,7 +74,10 @@ class DateHelpers {
   }
 
   /// Formats concise shelf life text for candidate cards.
-  static String formatCandidateShelfText(DateTime target, {bool isEstimated = false}) {
+  static String formatCandidateShelfText(
+    DateTime target, {
+    bool isEstimated = false,
+  }) {
     final diff = calendarDaysDifference(target);
     if (diff < 0) {
       return 'expired';
@@ -99,7 +106,10 @@ class DateHelpers {
   }
 
   /// Returns badge configuration (label and color) for an expiry date.
-  static ({String label, Color color}) formatExpiryBadge(DateTime target, {bool isEstimated = false}) {
+  static ({String label, Color color}) formatExpiryBadge(
+    DateTime target, {
+    bool isEstimated = false,
+  }) {
     final diff = calendarDaysDifference(target);
     if (diff < 0) {
       return (

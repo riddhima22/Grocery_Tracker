@@ -57,16 +57,24 @@ class AuthProvider extends ChangeNotifier {
 
       // Fallback when no cache exists: fetch with timeout
       try {
-        _user = await _authRepository.getProfile().timeout(const Duration(seconds: 4));
+        _user = await _authRepository.getProfile().timeout(
+          const Duration(seconds: 4),
+        );
         if (_user != null) {
           await _localStorage.saveCachedUser(_user!);
         }
       } catch (e) {
-        AppLogger.warning('Initial profile check failed, attempting token refresh: $e');
+        AppLogger.warning(
+          'Initial profile check failed, attempting token refresh: $e',
+        );
         try {
-          final newAccess = await TokenRefreshManager().refreshAccessToken().timeout(const Duration(seconds: 4));
+          final newAccess = await TokenRefreshManager()
+              .refreshAccessToken()
+              .timeout(const Duration(seconds: 4));
           if (newAccess != null) {
-            _user = await _authRepository.getProfile().timeout(const Duration(seconds: 4));
+            _user = await _authRepository.getProfile().timeout(
+              const Duration(seconds: 4),
+            );
             if (_user != null) {
               await _localStorage.saveCachedUser(_user!);
             }
@@ -99,13 +107,16 @@ class AuthProvider extends ChangeNotifier {
   }
 
   void _syncProfileInBackground() {
-    _authRepository.getProfile().then((profile) async {
-      _user = profile;
-      await _localStorage.saveCachedUser(profile);
-      notifyListeners();
-    }).catchError((e) {
-      AppLogger.debug('Background profile sync skipped/failed: $e');
-    });
+    _authRepository
+        .getProfile()
+        .then((profile) async {
+          _user = profile;
+          await _localStorage.saveCachedUser(profile);
+          notifyListeners();
+        })
+        .catchError((e) {
+          AppLogger.debug('Background profile sync skipped/failed: $e');
+        });
   }
 
   Future<bool> login(String email, String password) async {
@@ -129,11 +140,19 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> loginWithGoogle({required String token, String? email, String? name}) async {
+  Future<bool> loginWithGoogle({
+    required String token,
+    String? email,
+    String? name,
+  }) async {
     _setState(AuthState.loading);
     _errorMessage = null;
     try {
-      _user = await _authRepository.loginWithGoogle(token: token, email: email, name: name);
+      _user = await _authRepository.loginWithGoogle(
+        token: token,
+        email: email,
+        name: name,
+      );
       if (_user != null) {
         await _localStorage.saveCachedUser(_user!);
       }
@@ -146,11 +165,19 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> loginWithApple({required String token, String? email, String? name}) async {
+  Future<bool> loginWithApple({
+    required String token,
+    String? email,
+    String? name,
+  }) async {
     _setState(AuthState.loading);
     _errorMessage = null;
     try {
-      _user = await _authRepository.loginWithApple(token: token, email: email, name: name);
+      _user = await _authRepository.loginWithApple(
+        token: token,
+        email: email,
+        name: name,
+      );
       if (_user != null) {
         await _localStorage.saveCachedUser(_user!);
       }
@@ -208,7 +235,9 @@ class AuthProvider extends ChangeNotifier {
     try {
       await _authRepository.verifyEmail();
       if (_user != null) {
-        _user = _user!.copyWith(dietType: _user!.dietType); // trigger rebuild state
+        _user = _user!.copyWith(
+          dietType: _user!.dietType,
+        ); // trigger rebuild state
         // Re-check profile to update values
         _user = await _authRepository.getProfile();
         await _localStorage.saveCachedUser(_user!);
@@ -230,10 +259,16 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> resetPassword({required String token, required String newPassword}) async {
+  Future<bool> resetPassword({
+    required String token,
+    required String newPassword,
+  }) async {
     _setState(AuthState.loading);
     try {
-      await _authRepository.resetPassword(token: token, newPassword: newPassword);
+      await _authRepository.resetPassword(
+        token: token,
+        newPassword: newPassword,
+      );
       _setState(AuthState.idle);
       return true;
     } catch (e) {
@@ -316,13 +351,16 @@ class AuthProvider extends ChangeNotifier {
 
   void _registerFcmToken() {
     try {
-      FirebaseMessaging.instance.getToken().then((token) {
-        if (token != null && token.isNotEmpty) {
-          NotificationService().uploadFcmToken(token);
-        }
-      }).catchError((e) {
-        AppLogger.debug('FCM token registration skipped/failed: $e');
-      });
+      FirebaseMessaging.instance
+          .getToken()
+          .then((token) {
+            if (token != null && token.isNotEmpty) {
+              NotificationService().uploadFcmToken(token);
+            }
+          })
+          .catchError((e) {
+            AppLogger.debug('FCM token registration skipped/failed: $e');
+          });
     } catch (e) {
       AppLogger.debug('FirebaseMessaging unavailable: $e');
     }

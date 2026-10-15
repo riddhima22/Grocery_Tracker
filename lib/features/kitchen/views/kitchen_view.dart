@@ -71,14 +71,19 @@ class _KitchenViewState extends State<KitchenView> {
             child: Container(
               decoration: BoxDecoration(
                 color: AppColors.card,
-                borderRadius: BorderRadius.circular(AppRadius.card(context) * 0.8),
+                borderRadius: BorderRadius.circular(
+                  AppRadius.card(context) * 0.8,
+                ),
                 border: Border.all(color: AppColors.cardBorder),
               ),
               child: TextField(
                 controller: _searchController,
                 decoration: InputDecoration(
                   hintText: 'Search kitchen items... (e.g. "fruits")',
-                  prefixIcon: const Icon(Icons.psychology_outlined, color: AppColors.primary),
+                  prefixIcon: const Icon(
+                    Icons.psychology_outlined,
+                    color: AppColors.primary,
+                  ),
                   suffixIcon: _searchQuery.isNotEmpty
                       ? IconButton(
                           icon: const Icon(Icons.clear),
@@ -91,7 +96,10 @@ class _KitchenViewState extends State<KitchenView> {
                         )
                       : null,
                   border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                 ),
                 style: AppTextStyles.bodyMedium(context),
                 onChanged: (val) {
@@ -108,12 +116,17 @@ class _KitchenViewState extends State<KitchenView> {
             Expanded(
               child: Builder(
                 builder: (context) {
-                  final filtered = AISearchService.filter(kitchen.items, _searchQuery);
+                  final filtered = AISearchService.filter(
+                    kitchen.items,
+                    _searchQuery,
+                  );
                   if (filtered.isEmpty) {
                     return Center(
                       child: Text(
                         'No matching groceries found.',
-                        style: AppTextStyles.bodyMedium(context).copyWith(color: AppColors.textSecondary),
+                        style: AppTextStyles.bodyMedium(
+                          context,
+                        ).copyWith(color: AppColors.textSecondary),
                       ),
                     );
                   }
@@ -128,7 +141,8 @@ class _KitchenViewState extends State<KitchenView> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => KitchenItemDetailView(item: item),
+                              builder: (context) =>
+                                  KitchenItemDetailView(item: item),
                             ),
                           );
                         },
@@ -157,7 +171,7 @@ class _KitchenViewState extends State<KitchenView> {
                               _buildWallTiles(H),
                               _buildFloor(H),
                               _buildCountertop(H),
-                              
+
                               // FRIDGE Compartment
                               Positioned(
                                 left: W * KitchenSceneLayout.fridgeLeft,
@@ -168,7 +182,9 @@ class _KitchenViewState extends State<KitchenView> {
                                   onTap: () => _openZoneSheet('fridge'),
                                   child: _FridgeWidget(
                                     count: kitchen.fridgeItems.length,
-                                    iconKeys: kitchen.fridgeItems.map((i) => i.iconKey).toList(),
+                                    iconKeys: kitchen.fridgeItems
+                                        .map((i) => i.iconKey)
+                                        .toList(),
                                     height: H * KitchenSceneLayout.fridgeHeight,
                                   ),
                                 ),
@@ -194,7 +210,9 @@ class _KitchenViewState extends State<KitchenView> {
                                   onTap: () => _openZoneSheet('spice'),
                                   child: _SpicesCabinet(
                                     count: kitchen.spiceItems.length,
-                                    iconKeys: kitchen.spiceItems.map((i) => i.iconKey).toList(),
+                                    iconKeys: kitchen.spiceItems
+                                        .map((i) => i.iconKey)
+                                        .toList(),
                                   ),
                                 ),
                               ),
@@ -209,7 +227,9 @@ class _KitchenViewState extends State<KitchenView> {
                                   onTap: () => _openZoneSheet('pantry'),
                                   child: _PantryShelf(
                                     count: kitchen.pantryItems.length,
-                                    iconKeys: kitchen.pantryItems.map((i) => i.iconKey).toList(),
+                                    iconKeys: kitchen.pantryItems
+                                        .map((i) => i.iconKey)
+                                        .toList(),
                                   ),
                                 ),
                               ),
@@ -234,7 +254,9 @@ class _KitchenViewState extends State<KitchenView> {
                                   onTap: () => _openZoneSheet('cabinet'),
                                   child: _CabinetWidget(
                                     count: kitchen.cabinetItems.length,
-                                    iconKeys: kitchen.cabinetItems.map((i) => i.iconKey).toList(),
+                                    iconKeys: kitchen.cabinetItems
+                                        .map((i) => i.iconKey)
+                                        .toList(),
                                   ),
                                 ),
                               ),
@@ -259,7 +281,9 @@ class _KitchenViewState extends State<KitchenView> {
                                   onTap: () => _openZoneSheet('basket'),
                                   child: _BasketWidget(
                                     count: kitchen.basketItems.length,
-                                    iconKeys: kitchen.basketItems.map((i) => i.iconKey).toList(),
+                                    iconKeys: kitchen.basketItems
+                                        .map((i) => i.iconKey)
+                                        .toList(),
                                   ),
                                 ),
                               ),
@@ -279,7 +303,7 @@ class _KitchenViewState extends State<KitchenView> {
                       ),
                     ),
                   ),
-                  
+
                   // Redesigned Modern Kitchen Category Grid Section
                   SliverToBoxAdapter(
                     child: Padding(
@@ -314,126 +338,137 @@ class _KitchenViewState extends State<KitchenView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Storage Management', style: AppTextStyles.headingLarge(context)),
+                Text(
+                  'Storage Management',
+                  style: AppTextStyles.headingLarge(context),
+                ),
                 const SizedBox(height: 2),
                 Text(
                   '${kitchen.totalItems} items total • ${kitchen.expiringCount} expiring soon',
-                  style: AppTextStyles.caption(context).copyWith(color: AppColors.textSecondary),
+                  style: AppTextStyles.caption(
+                    context,
+                  ).copyWith(color: AppColors.textSecondary),
                 ),
               ],
             ),
           ),
-            Row(
-              children: [
-                GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const MealLogView()),
-                    );
-                  },
-                  child: Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: AppSpacing.sm(context),
-                      vertical: AppSpacing.xs(context),
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryDark,
-                      borderRadius: BorderRadius.circular(AppRadius.chip(context)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.restaurant_menu, size: AppIconSizes.sm(context), color: AppColors.white),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Log Meal',
-                          style: AppTextStyles.labelMedium(context).copyWith(
-                            color: AppColors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
+          Row(
+            children: [
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const MealLogView()),
+                  );
+                },
+                child: Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: AppSpacing.sm(context),
+                    vertical: AppSpacing.xs(context),
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryDark,
+                    borderRadius: BorderRadius.circular(
+                      AppRadius.chip(context),
                     ),
                   ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.restaurant_menu,
+                        size: AppIconSizes.sm(context),
+                        color: AppColors.white,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Log Meal',
+                        style: AppTextStyles.labelMedium(context).copyWith(
+                          color: AppColors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ],
-            )
-          ],
-        ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildWallBackground() => Positioned.fill(
-        child: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              stops: [0.0, 0.35, 0.351, 1.0],
-              colors: [
-                AppColors.wallTop,
-                Color(0xFFE0C898),
-                Color(0xFFC8A865),
-                AppColors.wallBottom,
-              ],
-            ),
-          ),
+    child: Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          stops: [0.0, 0.35, 0.351, 1.0],
+          colors: [
+            AppColors.wallTop,
+            Color(0xFFE0C898),
+            Color(0xFFC8A865),
+            AppColors.wallBottom,
+          ],
         ),
-      );
+      ),
+    ),
+  );
 
   Widget _buildWallTiles(double H) => Positioned(
-        top: 0,
-        left: 0,
-        right: 0,
-        child: SizedBox(
-          height: H * 0.35,
-          child: CustomPaint(painter: _TileGridPainter()),
-        ),
-      );
+    top: 0,
+    left: 0,
+    right: 0,
+    child: SizedBox(
+      height: H * 0.35,
+      child: CustomPaint(painter: _TileGridPainter()),
+    ),
+  );
 
   Widget _buildFloor(double H) => Positioned(
-        bottom: 0,
-        left: 0,
-        right: 0,
-        child: Container(
-          height: H * 0.32,
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [AppColors.floorTop, AppColors.floorBottom],
-            ),
-          ),
-          child: CustomPaint(painter: _TileGridPainter(isFloor: true)),
+    bottom: 0,
+    left: 0,
+    right: 0,
+    child: Container(
+      height: H * 0.32,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [AppColors.floorTop, AppColors.floorBottom],
         ),
-      );
+      ),
+      child: CustomPaint(painter: _TileGridPainter(isFloor: true)),
+    ),
+  );
 
   Widget _buildCountertop(double H) => Positioned(
-        bottom: H * 0.32 - 2.0,
-        left: 0,
-        right: 0,
-        child: Container(
-          height: H * 0.08,
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [AppColors.countertopTop, AppColors.countertopBottom],
-            ),
-            border: Border.symmetric(
-              horizontal: BorderSide(color: Color(0xFFF5F0E8), width: 2.0),
-            ),
-          ),
+    bottom: H * 0.32 - 2.0,
+    left: 0,
+    right: 0,
+    child: Container(
+      height: H * 0.08,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [AppColors.countertopTop, AppColors.countertopBottom],
         ),
-      );
+        border: Border.symmetric(
+          horizontal: BorderSide(color: Color(0xFFF5F0E8), width: 2.0),
+        ),
+      ),
+    ),
+  );
 }
 
 // Tile painter
 class _TileGridPainter extends CustomPainter {
   final bool isFloor;
   _TileGridPainter({this.isFloor = false});
-  
+
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
@@ -459,7 +494,11 @@ class _FridgeWidget extends StatelessWidget {
   final List<String> iconKeys;
   final double height;
 
-  const _FridgeWidget({required this.count, required this.iconKeys, required this.height});
+  const _FridgeWidget({
+    required this.count,
+    required this.iconKeys,
+    required this.height,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -473,7 +512,11 @@ class _FridgeWidget extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppRadius.card(context) * 0.6),
         border: Border.all(color: AppColors.fridgeBorder, width: 2.0),
         boxShadow: const [
-          BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(2, 4))
+          BoxShadow(
+            color: Colors.black26,
+            blurRadius: 10,
+            offset: Offset(2, 4),
+          ),
         ],
       ),
       child: Stack(
@@ -488,24 +531,29 @@ class _FridgeWidget extends StatelessWidget {
               color: AppColors.fridgeHandle,
             ),
           ),
-          
+
           // Icons strip
           Positioned(
             top: context.scaleHeight(16.0),
             left: context.scaleWidth(8.0),
             child: Row(
               mainAxisSize: MainAxisSize.min,
-              children: iconKeys.take(3).map((key) => Padding(
-                padding: const EdgeInsets.only(right: 2.0),
-                child: Icon(
-                  StorageZoneIconMapper.fromKey(key),
-                  size: AppIconSizes.sm(context) * 0.7,
-                  color: AppColors.white.withValues(alpha: 0.9),
-                ),
-              )).toList(),
+              children: iconKeys
+                  .take(3)
+                  .map(
+                    (key) => Padding(
+                      padding: const EdgeInsets.only(right: 2.0),
+                      child: Icon(
+                        StorageZoneIconMapper.fromKey(key),
+                        size: AppIconSizes.sm(context) * 0.7,
+                        color: AppColors.white.withValues(alpha: 0.9),
+                      ),
+                    ),
+                  )
+                  .toList(),
             ),
           ),
-          
+
           // Freezer Divider
           Positioned(
             top: height * 0.45,
@@ -513,7 +561,7 @@ class _FridgeWidget extends StatelessWidget {
             right: 0,
             child: Container(height: 2.0, color: AppColors.fridgeDivider),
           ),
-          
+
           // Freezer Handle
           Positioned(
             right: context.scaleWidth(6.0),
@@ -524,7 +572,7 @@ class _FridgeWidget extends StatelessWidget {
               color: AppColors.fridgeHandle,
             ),
           ),
-          
+
           Positioned(
             bottom: context.scaleHeight(8.0),
             left: 0,
@@ -539,7 +587,7 @@ class _FridgeWidget extends StatelessWidget {
                 color: AppColors.fridgeLabel,
               ),
             ),
-          )
+          ),
         ],
       ),
     );
@@ -561,21 +609,28 @@ class _SpicesCabinet extends StatelessWidget {
         ),
         borderRadius: BorderRadius.circular(AppRadius.chip(context) * 0.75),
         border: Border.all(color: AppColors.woodBorder, width: 2.0),
-        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(2, 4))],
+        boxShadow: const [
+          BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(2, 4)),
+        ],
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
-            children: iconKeys.take(3).map((key) => Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 1.0),
-              child: Icon(
-                StorageZoneIconMapper.fromKey(key),
-                size: AppIconSizes.sm(context) * 0.6,
-                color: AppColors.white.withValues(alpha: 0.9),
-              ),
-            )).toList(),
+            children: iconKeys
+                .take(3)
+                .map(
+                  (key) => Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 1.0),
+                    child: Icon(
+                      StorageZoneIconMapper.fromKey(key),
+                      size: AppIconSizes.sm(context) * 0.6,
+                      color: AppColors.white.withValues(alpha: 0.9),
+                    ),
+                  ),
+                )
+                .toList(),
           ),
           AppGap.xs(context),
           Text(
@@ -586,7 +641,7 @@ class _SpicesCabinet extends StatelessWidget {
               color: AppColors.white,
               fontWeight: FontWeight.bold,
             ),
-          )
+          ),
         ],
       ),
     );
@@ -605,22 +660,24 @@ class _PantryShelf extends StatelessWidget {
       alignment: Alignment.bottomCenter,
       children: [
         // Shelf wood board
-        Container(
-          height: 6.0,
-          color: AppColors.woodBottom,
-        ),
+        Container(height: 6.0, color: AppColors.woodBottom),
         Positioned(
           bottom: 6.0,
           child: Row(
             mainAxisSize: MainAxisSize.min,
-            children: iconKeys.take(3).map((key) => Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 2.0),
-              child: Icon(
-                StorageZoneIconMapper.fromKey(key),
-                size: AppIconSizes.sm(context) * 0.8,
-                color: AppColors.woodBorder,
-              ),
-            )).toList(),
+            children: iconKeys
+                .take(3)
+                .map(
+                  (key) => Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 2.0),
+                    child: Icon(
+                      StorageZoneIconMapper.fromKey(key),
+                      size: AppIconSizes.sm(context) * 0.8,
+                      color: AppColors.woodBorder,
+                    ),
+                  ),
+                )
+                .toList(),
           ),
         ),
       ],
@@ -638,16 +695,28 @@ class _CabinetWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        gradient: const LinearGradient(colors: [AppColors.woodTop, AppColors.woodBottom]),
+        gradient: const LinearGradient(
+          colors: [AppColors.woodTop, AppColors.woodBottom],
+        ),
         borderRadius: BorderRadius.circular(AppRadius.chip(context) * 0.75),
         border: Border.all(color: AppColors.woodBorder, width: 2.0),
-        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(-2, 4))],
+        boxShadow: const [
+          BoxShadow(
+            color: Colors.black26,
+            blurRadius: 8,
+            offset: Offset(-2, 4),
+          ),
+        ],
       ),
       child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.door_sliding_outlined, size: AppIconSizes.md(context), color: AppColors.white.withValues(alpha: 0.9)),
+            Icon(
+              Icons.door_sliding_outlined,
+              size: AppIconSizes.md(context),
+              color: AppColors.white.withValues(alpha: 0.9),
+            ),
             AppGap.xs(context),
             Text(
               'CABINET',
@@ -657,7 +726,7 @@ class _CabinetWidget extends StatelessWidget {
                 color: AppColors.white,
                 fontWeight: FontWeight.bold,
               ),
-            )
+            ),
           ],
         ),
       ),
@@ -675,20 +744,27 @@ class _BasketWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        gradient: LinearGradient(colors: [Color(0xFFC8A04A), Color(0xFFA07828)]),
+        gradient: LinearGradient(
+          colors: [Color(0xFFC8A04A), Color(0xFFA07828)],
+        ),
         borderRadius: BorderRadius.vertical(bottom: Radius.circular(8.0)),
       ),
       child: Center(
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: iconKeys.take(3).map((key) => Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 2.0),
-            child: Icon(
-              StorageZoneIconMapper.fromKey(key),
-              size: AppIconSizes.sm(context) * 0.7,
-              color: AppColors.white.withValues(alpha: 0.9),
-            ),
-          )).toList(),
+          children: iconKeys
+              .take(3)
+              .map(
+                (key) => Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 2.0),
+                  child: Icon(
+                    StorageZoneIconMapper.fromKey(key),
+                    size: AppIconSizes.sm(context) * 0.7,
+                    color: AppColors.white.withValues(alpha: 0.9),
+                  ),
+                ),
+              )
+              .toList(),
         ),
       ),
     );
@@ -725,7 +801,11 @@ class _ZonePill extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: AppIconSizes.sm(context) * 0.6, color: AppColors.zonePillText),
+            Icon(
+              icon,
+              size: AppIconSizes.sm(context) * 0.6,
+              color: AppColors.zonePillText,
+            ),
             const SizedBox(width: 4),
             Text(
               '$label ($count)',

@@ -9,15 +9,13 @@ class AppErrorBanner extends StatelessWidget {
   final String? errorMessage;
   final VoidCallback? onClose;
 
-  const AppErrorBanner({
-    super.key,
-    this.errorMessage,
-    this.onClose,
-  });
+  const AppErrorBanner({super.key, this.errorMessage, this.onClose});
 
   @override
   Widget build(BuildContext context) {
-    if (errorMessage == null || errorMessage!.isEmpty) return const SizedBox.shrink();
+    if (errorMessage == null || errorMessage!.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
     return Container(
       width: double.infinity,
@@ -32,23 +30,33 @@ class AppErrorBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(Icons.error_outline, size: AppIconSizes.md(context), color: AppColors.danger),
+          Icon(
+            Icons.error_outline,
+            size: AppIconSizes.md(context),
+            color: AppColors.danger,
+          ),
           AppGap.sm(context),
           Expanded(
             child: Text(
               errorMessage!,
-              style: AppTextStyles.bodyMedium(context).copyWith(color: AppColors.textPrimary),
+              style: AppTextStyles.bodyMedium(
+                context,
+              ).copyWith(color: AppColors.textPrimary),
             ),
           ),
           if (onClose != null) ...[
             AppGap.xs(context),
             IconButton(
-              icon: Icon(Icons.close, size: AppIconSizes.sm(context), color: AppColors.textSecondary),
+              icon: Icon(
+                Icons.close,
+                size: AppIconSizes.sm(context),
+                color: AppColors.textSecondary,
+              ),
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
               onPressed: onClose,
             ),
-          ]
+          ],
         ],
       ),
     );

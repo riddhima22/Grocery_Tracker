@@ -26,7 +26,8 @@ class ScanView extends StatefulWidget {
   State<ScanView> createState() => _ScanViewState();
 }
 
-class _ScanViewState extends State<ScanView> with SingleTickerProviderStateMixin {
+class _ScanViewState extends State<ScanView>
+    with SingleTickerProviderStateMixin {
   final ImagePickerService _pickerService = ImagePickerService();
   late AnimationController _laserController;
 
@@ -74,9 +75,7 @@ class _ScanViewState extends State<ScanView> with SingleTickerProviderStateMixin
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) scan.clearImages();
       },
-      child: AppScaffold(
-        body: _buildUIStateBody(scan),
-      ),
+      child: AppScaffold(body: _buildUIStateBody(scan)),
     );
   }
 
@@ -111,19 +110,26 @@ class _ScanViewState extends State<ScanView> with SingleTickerProviderStateMixin
               decoration: BoxDecoration(
                 color: AppColors.black,
                 borderRadius: BorderRadius.circular(AppRadius.card(context)),
-                border: Border.all(color: AppColors.primary.withValues(alpha: 0.5), width: 2.0),
+                border: Border.all(
+                  color: AppColors.primary.withValues(alpha: 0.5),
+                  width: 2.0,
+                ),
               ),
               child: Stack(
                 children: [
                   // Scan Grid Custom Paint overlay
                   Positioned.fill(
-                    child: CustomPaint(painter: _ScanFramePainter(context: context)),
+                    child: CustomPaint(
+                      painter: _ScanFramePainter(context: context),
+                    ),
                   ),
-                  
+
                   if (scan.selectedImages.isNotEmpty)
                     Positioned.fill(
                       child: ClipRRect(
-                        borderRadius: BorderRadius.circular(AppRadius.card(context) * 0.95),
+                        borderRadius: BorderRadius.circular(
+                          AppRadius.card(context) * 0.95,
+                        ),
                         child: Image.file(
                           File(scan.selectedImages.last.path),
                           fit: BoxFit.cover,
@@ -135,18 +141,22 @@ class _ScanViewState extends State<ScanView> with SingleTickerProviderStateMixin
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.camera_enhance_outlined, size: AppIconSizes.lg(context) * 1.5, color: AppColors.textSecondary),
+                          Icon(
+                            Icons.camera_enhance_outlined,
+                            size: AppIconSizes.lg(context) * 1.5,
+                            color: AppColors.textSecondary,
+                          ),
                           AppGap.xs(context),
                           Text(
                             'Tap here or use controls to scan package',
                             style: TextStyle(
-                              fontFamily: 'Outfit', 
-                              color: AppColors.textSecondary, 
+                              fontFamily: 'Outfit',
+                              color: AppColors.textSecondary,
                               fontSize: context.scaleFont(14.0),
                               fontWeight: FontWeight.w500,
                             ),
                             textAlign: TextAlign.center,
-                          )
+                          ),
                         ],
                       ),
                     ),
@@ -159,7 +169,9 @@ class _ScanViewState extends State<ScanView> with SingleTickerProviderStateMixin
                           return AnimatedBuilder(
                             animation: _laserController,
                             builder: (context, child) {
-                              final double top = _laserController.value * constraints.maxHeight;
+                              final double top =
+                                  _laserController.value *
+                                  constraints.maxHeight;
                               return Stack(
                                 children: [
                                   Positioned(
@@ -172,7 +184,9 @@ class _ScanViewState extends State<ScanView> with SingleTickerProviderStateMixin
                                         color: AppColors.primary,
                                         boxShadow: [
                                           BoxShadow(
-                                            color: AppColors.primary.withValues(alpha: 0.6),
+                                            color: AppColors.primary.withValues(
+                                              alpha: 0.6,
+                                            ),
                                             blurRadius: 8.0,
                                             spreadRadius: 2.0,
                                           ),
@@ -209,11 +223,15 @@ class _ScanViewState extends State<ScanView> with SingleTickerProviderStateMixin
                       width: context.scaleWidth(72.0),
                       height: context.scaleHeight(72.0),
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(AppRadius.chip(context)),
+                        borderRadius: BorderRadius.circular(
+                          AppRadius.chip(context),
+                        ),
                         border: Border.all(color: AppColors.cardBorder),
                       ),
                       child: ClipRRect(
-                        borderRadius: BorderRadius.circular(AppRadius.chip(context) * 0.75),
+                        borderRadius: BorderRadius.circular(
+                          AppRadius.chip(context) * 0.75,
+                        ),
                         child: Image.file(
                           File(scan.selectedImages[index].path),
                           fit: BoxFit.cover,
@@ -227,11 +245,18 @@ class _ScanViewState extends State<ScanView> with SingleTickerProviderStateMixin
                         onTap: () => scan.removeImage(index),
                         child: Container(
                           padding: const EdgeInsets.all(2.0),
-                          decoration: const BoxDecoration(color: AppColors.danger, shape: BoxShape.circle),
-                          child: Icon(Icons.close, size: AppIconSizes.sm(context) * 0.7, color: Colors.white),
+                          decoration: const BoxDecoration(
+                            color: AppColors.danger,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.close,
+                            size: AppIconSizes.sm(context) * 0.7,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
-                    )
+                    ),
                   ],
                 );
               },
@@ -252,11 +277,23 @@ class _ScanViewState extends State<ScanView> with SingleTickerProviderStateMixin
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      _buildControlBtn('Camera', Icons.camera_alt_rounded, _capturePhoto),
-                      _buildControlBtn('Gallery', Icons.photo_library_rounded, _pickGallery),
-                      _buildControlBtn('Barcode', Icons.qr_code_scanner_rounded, () {
-                        Navigator.pushNamed(context, AppRoutes.barcodeScan);
-                      }),
+                      _buildControlBtn(
+                        'Camera',
+                        Icons.camera_alt_rounded,
+                        _capturePhoto,
+                      ),
+                      _buildControlBtn(
+                        'Gallery',
+                        Icons.photo_library_rounded,
+                        _pickGallery,
+                      ),
+                      _buildControlBtn(
+                        'Barcode',
+                        Icons.qr_code_scanner_rounded,
+                        () {
+                          Navigator.pushNamed(context, AppRoutes.barcodeScan);
+                        },
+                      ),
                       _buildControlBtn('Manual', Icons.edit_note_rounded, () {
                         Navigator.pushNamed(context, AppRoutes.manualAdd);
                       }),
@@ -273,11 +310,11 @@ class _ScanViewState extends State<ScanView> with SingleTickerProviderStateMixin
                     onPressed: () => scan.clearImages(),
                     style: AppButtonStyle.outline,
                   ),
-                ]
+                ],
               ],
             ),
           ),
-        )
+        ),
       ],
     );
   }
@@ -294,7 +331,11 @@ class _ScanViewState extends State<ScanView> with SingleTickerProviderStateMixin
               shape: BoxShape.circle,
               border: Border.all(color: AppColors.cardBorder),
             ),
-            child: Icon(icon, size: AppIconSizes.lg(context), color: AppColors.primary),
+            child: Icon(
+              icon,
+              size: AppIconSizes.lg(context),
+              color: AppColors.primary,
+            ),
           ),
           AppGap.xs(context),
           Text(label, style: AppTextStyles.labelMedium(context)),
@@ -359,24 +400,34 @@ class _ScanViewState extends State<ScanView> with SingleTickerProviderStateMixin
             padding: EdgeInsets.all(AppSpacing.sm(context)),
             decoration: BoxDecoration(
               color: AppColors.danger.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(AppRadius.card(context) * 0.7),
-              border: Border.all(color: AppColors.danger.withValues(alpha: 0.3)),
+              borderRadius: BorderRadius.circular(
+                AppRadius.card(context) * 0.7,
+              ),
+              border: Border.all(
+                color: AppColors.danger.withValues(alpha: 0.3),
+              ),
             ),
             child: Row(
               children: [
-                const Icon(Icons.error_outline_rounded, color: AppColors.danger, size: 18),
+                const Icon(
+                  Icons.error_outline_rounded,
+                  color: AppColors.danger,
+                  size: 18,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     scan.errorMessage!,
-                    style: AppTextStyles.bodySmall(context).copyWith(color: AppColors.danger),
+                    style: AppTextStyles.bodySmall(
+                      context,
+                    ).copyWith(color: AppColors.danger),
                   ),
                 ),
               ],
             ),
           ),
         const Divider(),
-        
+
         Expanded(
           child: ListView.builder(
             padding: EdgeInsets.symmetric(horizontal: AppSpacing.sm(context)),
@@ -384,7 +435,7 @@ class _ScanViewState extends State<ScanView> with SingleTickerProviderStateMixin
             itemBuilder: (ctx, index) {
               final candidate = scan.candidates[index];
               final isSelected = scan.candidateSelection[candidate.id] ?? true;
-              
+
               return ScanCandidateCard(
                 candidate: candidate,
                 isSelected: isSelected,
@@ -412,7 +463,7 @@ class _ScanViewState extends State<ScanView> with SingleTickerProviderStateMixin
             },
           ),
         ),
-        
+
         Padding(
           padding: EdgeInsets.all(AppSpacing.md(context)),
           child: AppButton(
@@ -421,11 +472,13 @@ class _ScanViewState extends State<ScanView> with SingleTickerProviderStateMixin
               final success = await scan.confirmSelectedCandidates(context);
               if (success && mounted) {
                 // Fetch kitchen items with forceRefresh to update list & UI counts
-                context.read<KitchenProvider>().fetchKitchenItems(forceRefresh: true);
+                context.read<KitchenProvider>().fetchKitchenItems(
+                  forceRefresh: true,
+                );
               }
             },
           ),
-        )
+        ),
       ],
     );
   }
@@ -435,11 +488,15 @@ class _ScanViewState extends State<ScanView> with SingleTickerProviderStateMixin
     final brandController = TextEditingController(text: candidate.brand);
     final descController = TextEditingController(text: candidate.description);
     final qtyController = TextEditingController(
-      text: candidate.quantity % 1 == 0 ? candidate.quantity.toInt().toString() : candidate.quantity.toString(),
+      text: candidate.quantity % 1 == 0
+          ? candidate.quantity.toInt().toString()
+          : candidate.quantity.toString(),
     );
     final netValController = TextEditingController(
       text: candidate.netContentValue != null
-          ? (candidate.netContentValue! % 1 == 0 ? candidate.netContentValue!.toInt().toString() : candidate.netContentValue!.toString())
+          ? (candidate.netContentValue! % 1 == 0
+                ? candidate.netContentValue!.toInt().toString()
+                : candidate.netContentValue!.toString())
           : '',
     );
     final zoneController = TextEditingController(text: candidate.storageZone);
@@ -450,7 +507,16 @@ class _ScanViewState extends State<ScanView> with SingleTickerProviderStateMixin
     DateTime? selectedExpiry = candidate.expiryDate;
 
     const categories = [
-      'Vegetables', 'Fruits', 'Dairy', 'Bakery', 'Meat', 'Grains', 'Snacks', 'Beverages', 'Spices', 'Other'
+      'Vegetables',
+      'Fruits',
+      'Dairy',
+      'Bakery',
+      'Meat',
+      'Grains',
+      'Snacks',
+      'Beverages',
+      'Spices',
+      'Other',
     ];
     const units = UnitClassificationService.allUnits;
 
@@ -463,7 +529,10 @@ class _ScanViewState extends State<ScanView> with SingleTickerProviderStateMixin
             borderRadius: BorderRadius.circular(AppRadius.card(ctx)),
             side: const BorderSide(color: AppColors.cardBorder),
           ),
-          title: Text('Edit Candidate Details', style: AppTextStyles.headingMedium(ctx)),
+          title: Text(
+            'Edit Candidate Details',
+            style: AppTextStyles.headingMedium(ctx),
+          ),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -473,13 +542,13 @@ class _ScanViewState extends State<ScanView> with SingleTickerProviderStateMixin
                 AppGap.sm(ctx),
                 AppTextField(controller: brandController, label: 'Brand Name'),
                 AppGap.sm(ctx),
-                
+
                 // Category Selector
                 Text(
                   'Category',
-                  style: AppTextStyles.labelMedium(ctx).copyWith(
-                    color: AppColors.textSecondary,
-                  ),
+                  style: AppTextStyles.labelMedium(
+                    ctx,
+                  ).copyWith(color: AppColors.textSecondary),
                 ),
                 AppGap.xs(ctx),
                 Container(
@@ -492,19 +561,32 @@ class _ScanViewState extends State<ScanView> with SingleTickerProviderStateMixin
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
                       isExpanded: true,
-                      value: categories.contains(selectedCategory) ? selectedCategory : 'Other',
+                      value: categories.contains(selectedCategory)
+                          ? selectedCategory
+                          : 'Other',
                       dropdownColor: AppColors.surface,
-                      items: categories.map((cat) => DropdownMenuItem(value: cat, child: Text(cat, style: AppTextStyles.bodyMedium(ctx)))).toList(),
+                      items: categories
+                          .map(
+                            (cat) => DropdownMenuItem(
+                              value: cat,
+                              child: Text(
+                                cat,
+                                style: AppTextStyles.bodyMedium(ctx),
+                              ),
+                            ),
+                          )
+                          .toList(),
                       onChanged: (newCat) {
                         if (newCat != null) {
                           setDialogState(() {
                             selectedCategory = newCat;
                             // Smart auto-suggest unit if current was uncertain
                             if (candidate.isUncertain) {
-                              final suggested = UnitClassificationService.classifyProduct(
-                                productName: nameController.text,
-                                category: newCat,
-                              );
+                              final suggested =
+                                  UnitClassificationService.classifyProduct(
+                                    productName: nameController.text,
+                                    category: newCat,
+                                  );
                               selectedUnit = suggested.unit;
                             }
                           });
@@ -524,7 +606,9 @@ class _ScanViewState extends State<ScanView> with SingleTickerProviderStateMixin
                       child: AppTextField(
                         controller: qtyController,
                         label: 'Quantity',
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -535,9 +619,9 @@ class _ScanViewState extends State<ScanView> with SingleTickerProviderStateMixin
                         children: [
                           Text(
                             'Unit',
-                            style: AppTextStyles.labelMedium(ctx).copyWith(
-                              color: AppColors.textSecondary,
-                            ),
+                            style: AppTextStyles.labelMedium(
+                              ctx,
+                            ).copyWith(color: AppColors.textSecondary),
                           ),
                           AppGap.xs(ctx),
                           Container(
@@ -551,16 +635,37 @@ class _ScanViewState extends State<ScanView> with SingleTickerProviderStateMixin
                             child: DropdownButtonHideUnderline(
                               child: DropdownButton<String>(
                                 isExpanded: true,
-                                value: units.contains(selectedUnit) ? selectedUnit : units.first,
+                                value: units.contains(selectedUnit)
+                                    ? selectedUnit
+                                    : units.first,
                                 dropdownColor: AppColors.surface,
-                                items: units.map((u) => DropdownMenuItem(value: u, child: Text(u, style: AppTextStyles.bodyMedium(ctx)))).toList(),
+                                items: units
+                                    .map(
+                                      (u) => DropdownMenuItem(
+                                        value: u,
+                                        child: Text(
+                                          u,
+                                          style: AppTextStyles.bodyMedium(ctx),
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
                                 onChanged: (newUnit) {
                                   if (newUnit != null) {
-                                    final currentVal = double.tryParse(qtyController.text);
+                                    final currentVal = double.tryParse(
+                                      qtyController.text,
+                                    );
                                     if (currentVal != null) {
-                                      final converted = UnitClassificationService.convertQuantity(currentVal, selectedUnit, newUnit);
+                                      final converted =
+                                          UnitClassificationService.convertQuantity(
+                                            currentVal,
+                                            selectedUnit,
+                                            newUnit,
+                                          );
                                       if (converted != null) {
-                                        qtyController.text = converted % 1 == 0 ? converted.toInt().toString() : converted.toString();
+                                        qtyController.text = converted % 1 == 0
+                                            ? converted.toInt().toString()
+                                            : converted.toString();
                                       }
                                     }
                                     setDialogState(() {
@@ -579,7 +684,8 @@ class _ScanViewState extends State<ScanView> with SingleTickerProviderStateMixin
                 AppGap.sm(ctx),
 
                 // Package Net Content (e.g. 50 g or 1 L)
-                if (UnitClassificationService.unitCategories[selectedUnit] == UnitClassificationService.categoryPackage) ...[
+                if (UnitClassificationService.unitCategories[selectedUnit] ==
+                    UnitClassificationService.categoryPackage) ...[
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -589,7 +695,9 @@ class _ScanViewState extends State<ScanView> with SingleTickerProviderStateMixin
                           controller: netValController,
                           label: 'Net Size/Weight',
                           hint: 'e.g. 50 or 500',
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -600,14 +708,16 @@ class _ScanViewState extends State<ScanView> with SingleTickerProviderStateMixin
                           children: [
                             Text(
                               'Size Unit',
-                              style: AppTextStyles.labelMedium(ctx).copyWith(
-                                color: AppColors.textSecondary,
-                              ),
+                              style: AppTextStyles.labelMedium(
+                                ctx,
+                              ).copyWith(color: AppColors.textSecondary),
                             ),
                             AppGap.xs(ctx),
                             Container(
                               height: 48,
-                              padding: const EdgeInsets.symmetric(horizontal: 10),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                              ),
                               decoration: BoxDecoration(
                                 color: AppColors.card,
                                 borderRadius: BorderRadius.circular(8),
@@ -616,16 +726,42 @@ class _ScanViewState extends State<ScanView> with SingleTickerProviderStateMixin
                               child: DropdownButtonHideUnderline(
                                 child: DropdownButton<String>(
                                   isExpanded: true,
-                                  value: ['g', 'kg', 'ml', 'L', ''].contains(selectedNetUnit) ? selectedNetUnit : '',
+                                  value:
+                                      [
+                                        'g',
+                                        'kg',
+                                        'ml',
+                                        'L',
+                                        '',
+                                      ].contains(selectedNetUnit)
+                                      ? selectedNetUnit
+                                      : '',
                                   dropdownColor: AppColors.surface,
                                   items: const [
-                                    DropdownMenuItem(value: '', child: Text('None')),
-                                    DropdownMenuItem(value: 'g', child: Text('g')),
-                                    DropdownMenuItem(value: 'kg', child: Text('kg')),
-                                    DropdownMenuItem(value: 'ml', child: Text('ml')),
-                                    DropdownMenuItem(value: 'L', child: Text('L')),
+                                    DropdownMenuItem(
+                                      value: '',
+                                      child: Text('None'),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: 'g',
+                                      child: Text('g'),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: 'kg',
+                                      child: Text('kg'),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: 'ml',
+                                      child: Text('ml'),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: 'L',
+                                      child: Text('L'),
+                                    ),
                                   ],
-                                  onChanged: (u) => setDialogState(() => selectedNetUnit = u ?? ''),
+                                  onChanged: (u) => setDialogState(
+                                    () => selectedNetUnit = u ?? '',
+                                  ),
                                 ),
                               ),
                             ),
@@ -637,9 +773,16 @@ class _ScanViewState extends State<ScanView> with SingleTickerProviderStateMixin
                   AppGap.sm(ctx),
                 ],
 
-                AppTextField(controller: descController, label: 'Description', maxLines: 2),
+                AppTextField(
+                  controller: descController,
+                  label: 'Description',
+                  maxLines: 2,
+                ),
                 AppGap.sm(ctx),
-                AppTextField(controller: zoneController, label: 'Storage Zone (fridge, pantry, basket etc.)'),
+                AppTextField(
+                  controller: zoneController,
+                  label: 'Storage Zone (fridge, pantry, basket etc.)',
+                ),
                 AppGap.sm(ctx),
                 Text('Expiry Date', style: AppTextStyles.labelMedium(ctx)),
                 const SizedBox(height: 6),
@@ -647,9 +790,15 @@ class _ScanViewState extends State<ScanView> with SingleTickerProviderStateMixin
                   onTap: () async {
                     final picked = await showDatePicker(
                       context: context,
-                      initialDate: selectedExpiry ?? DateTime.now().add(const Duration(days: 7)),
-                      firstDate: DateTime.now().subtract(const Duration(days: 365)),
-                      lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
+                      initialDate:
+                          selectedExpiry ??
+                          DateTime.now().add(const Duration(days: 7)),
+                      firstDate: DateTime.now().subtract(
+                        const Duration(days: 365),
+                      ),
+                      lastDate: DateTime.now().add(
+                        const Duration(days: 365 * 5),
+                      ),
                     );
                     if (picked != null) {
                       setDialogState(() {
@@ -659,7 +808,10 @@ class _ScanViewState extends State<ScanView> with SingleTickerProviderStateMixin
                   },
                   borderRadius: BorderRadius.circular(8),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.card,
                       borderRadius: BorderRadius.circular(8),
@@ -669,14 +821,23 @@ class _ScanViewState extends State<ScanView> with SingleTickerProviderStateMixin
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          selectedExpiry != null 
-                              ? selectedExpiry!.toIso8601String().substring(0, 10) 
+                          selectedExpiry != null
+                              ? selectedExpiry!.toIso8601String().substring(
+                                  0,
+                                  10,
+                                )
                               : 'Select Expiry Date',
                           style: AppTextStyles.bodyMedium(ctx).copyWith(
-                            color: selectedExpiry != null ? AppColors.textPrimary : AppColors.textSecondary,
+                            color: selectedExpiry != null
+                                ? AppColors.textPrimary
+                                : AppColors.textSecondary,
                           ),
                         ),
-                        const Icon(Icons.calendar_month, color: AppColors.primary, size: 20),
+                        const Icon(
+                          Icons.calendar_month,
+                          color: AppColors.primary,
+                          size: 20,
+                        ),
                       ],
                     ),
                   ),
@@ -687,14 +848,25 @@ class _ScanViewState extends State<ScanView> with SingleTickerProviderStateMixin
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: Text('Cancel', style: AppTextStyles.labelMedium(ctx).copyWith(color: AppColors.textSecondary)),
+              child: Text(
+                'Cancel',
+                style: AppTextStyles.labelMedium(
+                  ctx,
+                ).copyWith(color: AppColors.textSecondary),
+              ),
             ),
             TextButton(
               onPressed: () {
-                final qtyParsed = double.tryParse(qtyController.text) ?? candidate.quantity;
+                final qtyParsed =
+                    double.tryParse(qtyController.text) ?? candidate.quantity;
                 final netValParsed = double.tryParse(netValController.text);
-                final unitCat = UnitClassificationService.unitCategories[selectedUnit] ?? 'count';
-                final pType = unitCat == UnitClassificationService.categoryPackage ? selectedUnit : '';
+                final unitCat =
+                    UnitClassificationService.unitCategories[selectedUnit] ??
+                    'count';
+                final pType =
+                    unitCat == UnitClassificationService.categoryPackage
+                    ? selectedUnit
+                    : '';
 
                 final Map<String, dynamic> updateData = {
                   'name': nameController.text.trim(),
@@ -712,13 +884,23 @@ class _ScanViewState extends State<ScanView> with SingleTickerProviderStateMixin
                   'storage_zone': zoneController.text.toLowerCase().trim(),
                 };
                 if (selectedExpiry != null) {
-                  updateData['expiry_date'] = selectedExpiry!.toIso8601String().substring(0, 10);
+                  updateData['expiry_date'] = selectedExpiry!
+                      .toIso8601String()
+                      .substring(0, 10);
                 }
-                context.read<ScanProvider>().updateCandidate(candidate.id, updateData);
+                context.read<ScanProvider>().updateCandidate(
+                  candidate.id,
+                  updateData,
+                );
                 Navigator.pop(ctx);
               },
-              child: Text('Save', style: AppTextStyles.labelMedium(ctx).copyWith(color: AppColors.primary)),
-            )
+              child: Text(
+                'Save',
+                style: AppTextStyles.labelMedium(
+                  ctx,
+                ).copyWith(color: AppColors.primary),
+              ),
+            ),
           ],
         ),
       ),
@@ -737,8 +919,15 @@ class _ScanViewState extends State<ScanView> with SingleTickerProviderStateMixin
             Container(
               width: iconBoxSize,
               height: iconBoxSize,
-              decoration: BoxDecoration(color: AppColors.success.withValues(alpha: 0.12), shape: BoxShape.circle),
-              child: Icon(Icons.check_circle_rounded, size: AppIconSizes.lg(context) * 1.5, color: AppColors.success),
+              decoration: BoxDecoration(
+                color: AppColors.success.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.check_circle_rounded,
+                size: AppIconSizes.lg(context) * 1.5,
+                color: AppColors.success,
+              ),
             ),
             AppGap.md(context),
             Text('Items Added!', style: AppTextStyles.displayMedium(context)),
@@ -753,7 +942,9 @@ class _ScanViewState extends State<ScanView> with SingleTickerProviderStateMixin
               text: 'Go to Kitchen',
               onPressed: () {
                 scan.clearImages();
-                context.read<KitchenProvider>().fetchKitchenItems(forceRefresh: true);
+                context.read<KitchenProvider>().fetchKitchenItems(
+                  forceRefresh: true,
+                );
                 HomeShell.switchTab(1);
               },
             ),
@@ -770,20 +961,22 @@ class _ScanViewState extends State<ScanView> with SingleTickerProviderStateMixin
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.error_outline_rounded, size: AppIconSizes.lg(context) * 2.0, color: AppColors.danger),
+            Icon(
+              Icons.error_outline_rounded,
+              size: AppIconSizes.lg(context) * 2.0,
+              color: AppColors.danger,
+            ),
             AppGap.md(context),
             Text('Scan Failed', style: AppTextStyles.headingLarge(context)),
             AppGap.xs(context),
             Text(
-              scan.errorMessage ?? 'An unexpected error occurred during image processing.',
+              scan.errorMessage ??
+                  'An unexpected error occurred during image processing.',
               style: AppTextStyles.bodyMedium(context),
               textAlign: TextAlign.center,
             ),
             AppGap.md(context),
-            AppButton(
-              text: 'Try Again',
-              onPressed: () => scan.clearImages(),
-            ),
+            AppButton(text: 'Try Again', onPressed: () => scan.clearImages()),
           ],
         ),
       ),
@@ -804,7 +997,7 @@ class _ScanFramePainter extends CustomPainter {
       ..style = PaintingStyle.stroke;
 
     final double len = context.scaleWidth(24.0);
-    
+
     // Top Left Corner
     canvas.drawPath(
       Path()

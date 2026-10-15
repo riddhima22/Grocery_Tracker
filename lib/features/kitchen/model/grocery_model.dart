@@ -105,22 +105,28 @@ class GroceryModel {
 
   /// Semantic date helper: returns printed expiryDate if detected,
   /// otherwise returns estimated consumption or predicted shelf-life date.
-  DateTime? get effectiveExpiryDate => expiryDate ?? estimatedConsumptionDate ?? predictedExpiry;
+  DateTime? get effectiveExpiryDate =>
+      expiryDate ?? estimatedConsumptionDate ?? predictedExpiry;
 
   /// Formatted quantity representation (e.g. "1 packet (50 g)", "1 bottle (1 L)", "500 g")
   String get displayQuantityText {
-    final qtyStr = quantity % 1 == 0 ? quantity.toInt().toString() : quantity.toString();
+    final qtyStr = quantity % 1 == 0
+        ? quantity.toInt().toString()
+        : quantity.toString();
     final pType = packageType.isNotEmpty ? packageType : unit;
     if (netContentValue != null && netContentUnit.isNotEmpty) {
-      final netStr = netContentValue! % 1 == 0 ? netContentValue!.toInt().toString() : netContentValue!.toString();
+      final netStr = netContentValue! % 1 == 0
+          ? netContentValue!.toInt().toString()
+          : netContentValue!.toString();
       return '$qtyStr $pType ($netStr $netContentUnit)';
     }
     return '$qtyStr $unit';
   }
 
   factory GroceryModel.fromJson(Map<String, dynamic> json) {
-    final DateTime? parsedExpiry =
-        json['expiry_date'] != null ? DateTime.tryParse(json['expiry_date']) : null;
+    final DateTime? parsedExpiry = json['expiry_date'] != null
+        ? DateTime.tryParse(json['expiry_date'])
+        : null;
     final DateTime? parsedEstimated = json['estimated_consumption_date'] != null
         ? DateTime.tryParse(json['estimated_consumption_date'])
         : null;
@@ -141,12 +147,17 @@ class GroceryModel {
     String resolvedUnit = rawUnit?.toString() ?? '';
     String resolvedCategory = json['unit_category']?.toString() ?? '';
     String resolvedPackageType = json['package_type']?.toString() ?? '';
-    double? resolvedNetVal = double.tryParse(json['net_content_value']?.toString() ?? '');
+    double? resolvedNetVal = double.tryParse(
+      json['net_content_value']?.toString() ?? '',
+    );
     String resolvedNetUnit = json['net_content_unit']?.toString() ?? '';
-    int? resolvedPackCount = int.tryParse(json['package_count']?.toString() ?? '');
+    int? resolvedPackCount = int.tryParse(
+      json['package_count']?.toString() ?? '',
+    );
     String resolvedUnitConf = json['unit_confidence']?.toString() ?? 'High';
 
-    if (resolvedUnit.isEmpty || (resolvedUnit == 'pcs' && resolvedCategory.isEmpty)) {
+    if (resolvedUnit.isEmpty ||
+        (resolvedUnit == 'pcs' && resolvedCategory.isEmpty)) {
       final classified = UnitClassificationService.classifyProduct(
         productName: name,
         category: category,
@@ -186,7 +197,9 @@ class GroceryModel {
       estimatedConsumptionDate: parsedEstimated,
       isExpiryEstimated: isEstimated,
       dateType: json['date_type'] ?? (isEstimated ? 'estimated' : 'expiry'),
-      dateSource: json['date_source'] ?? (isEstimated ? 'calculated_shelf_life' : 'ocr_verified'),
+      dateSource:
+          json['date_source'] ??
+          (isEstimated ? 'calculated_shelf_life' : 'ocr_verified'),
       dateConfidence: json['date_confidence'] ?? 'Low',
       scanSessionId: json['scan_session']?.toString(),
       purchaseDate: json['purchase_date'] != null
@@ -198,7 +211,8 @@ class GroceryModel {
       aiDetected: json['ai_detected'] ?? false,
       aiConfidence: json['ai_confidence'],
       ripeness: json['ripeness'] ?? 'not_applicable',
-      temperature: double.tryParse(json['temperature']?.toString() ?? '20.0') ?? 20.0,
+      temperature:
+          double.tryParse(json['temperature']?.toString() ?? '20.0') ?? 20.0,
       humidity: double.tryParse(json['humidity']?.toString() ?? '50.0') ?? 50.0,
       isOpened: json['is_opened'] ?? false,
       freshnessScore: json['freshness_score'] ?? 100,
@@ -208,10 +222,12 @@ class GroceryModel {
       recommendedConsumptionDate: json['recommended_consumption_date'] != null
           ? DateTime.tryParse(json['recommended_consumption_date'])
           : null,
-      confidenceScore: double.tryParse(json['confidence_score']?.toString() ?? '1.0') ?? 1.0,
+      confidenceScore:
+          double.tryParse(json['confidence_score']?.toString() ?? '1.0') ?? 1.0,
       storageRecommendationWhy: json['storage_recommendation_why'] ?? '',
       storageRecommendationHow: json['storage_recommendation_how'] ?? '',
-      storageRecommendationShelfLife: json['storage_recommendation_shelf_life'] ?? '',
+      storageRecommendationShelfLife:
+          json['storage_recommendation_shelf_life'] ?? '',
       aiExplanation: json['ai_explanation'] ?? '',
     );
   }
@@ -234,7 +250,9 @@ class GroceryModel {
     'unit_confidence': unitConfidence,
     'storage_zone': storageZone,
     'expiry_date': expiryDate?.toIso8601String().substring(0, 10),
-    'estimated_consumption_date': estimatedConsumptionDate?.toIso8601String().substring(0, 10),
+    'estimated_consumption_date': estimatedConsumptionDate
+        ?.toIso8601String()
+        .substring(0, 10),
     'is_expiry_estimated': isExpiryEstimated,
     'date_type': dateType,
     'date_source': dateSource,
@@ -248,8 +266,9 @@ class GroceryModel {
     'is_opened': isOpened,
     'freshness_score': freshnessScore,
     'predicted_expiry': predictedExpiry?.toIso8601String().substring(0, 10),
-    'recommended_consumption_date':
-        recommendedConsumptionDate?.toIso8601String().substring(0, 10),
+    'recommended_consumption_date': recommendedConsumptionDate
+        ?.toIso8601String()
+        .substring(0, 10),
     'confidence_score': confidenceScore,
     'storage_recommendation_why': storageRecommendationWhy,
     'storage_recommendation_how': storageRecommendationHow,
@@ -297,7 +316,8 @@ class GroceryModel {
       unitConfidence: unitConfidence ?? this.unitConfidence,
       storageZone: storageZone ?? this.storageZone,
       expiryDate: expiryDate ?? this.expiryDate,
-      estimatedConsumptionDate: estimatedConsumptionDate ?? this.estimatedConsumptionDate,
+      estimatedConsumptionDate:
+          estimatedConsumptionDate ?? this.estimatedConsumptionDate,
       isExpiryEstimated: isExpiryEstimated ?? this.isExpiryEstimated,
       dateType: dateType,
       dateSource: dateSource,

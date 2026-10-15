@@ -24,8 +24,11 @@ class MealIngredientCandidateModel {
       id: json['id'] ?? '',
       pantryItemId: json['pantry_item'],
       name: json['name'] ?? '',
-      estimatedQuantity: double.tryParse(json['estimated_quantity']?.toString() ?? '1.0') ?? 1.0,
-      deductQuantity: double.tryParse(json['deduct_quantity']?.toString() ?? '1.0') ?? 1.0,
+      estimatedQuantity:
+          double.tryParse(json['estimated_quantity']?.toString() ?? '1.0') ??
+          1.0,
+      deductQuantity:
+          double.tryParse(json['deduct_quantity']?.toString() ?? '1.0') ?? 1.0,
       unit: json['unit'] ?? 'pcs',
       confidence: json['confidence'] ?? 'Medium',
       confirmed: json['confirmed'] ?? true,

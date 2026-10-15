@@ -22,7 +22,9 @@ class NotificationRouter {
 
     final navState = AppNavigation.navigatorKey.currentState;
     if (navState == null) {
-      AppLogger.info('Navigator not ready yet. Storing notification payload as pending.');
+      AppLogger.info(
+        'Navigator not ready yet. Storing notification payload as pending.',
+      );
       _pendingNotificationData = rawData;
       return;
     }
@@ -43,8 +45,10 @@ class NotificationRouter {
 
   static void _executeRouting(Map<String, dynamic> data) {
     try {
-      final type = data['type']?.toString() ?? NotificationConstants.typeGeneral;
-      final groceryId = data['grocery_id']?.toString() ?? data['id']?.toString();
+      final type =
+          data['type']?.toString() ?? NotificationConstants.typeGeneral;
+      final groceryId =
+          data['grocery_id']?.toString() ?? data['id']?.toString();
       final listId = data['list_id']?.toString();
 
       switch (type) {
@@ -80,7 +84,9 @@ class NotificationRouter {
     final navState = AppNavigation.navigatorKey.currentState;
     if (navState != null) {
       // If we are nested in subpages, pop back to home shell first
-      navState.popUntil((route) => route.isFirst || route.settings.name == AppRoutes.home);
+      navState.popUntil(
+        (route) => route.isFirst || route.settings.name == AppRoutes.home,
+      );
       HomeShell.switchTab(tabIndex);
     }
   }
@@ -90,13 +96,18 @@ class NotificationRouter {
     if (navState == null) return;
 
     // Pop back to home shell base first
-    navState.popUntil((route) => route.isFirst || route.settings.name == AppRoutes.home);
+    navState.popUntil(
+      (route) => route.isFirst || route.settings.name == AppRoutes.home,
+    );
 
     // 1. Check if item is already loaded in KitchenProvider in memory
     GroceryModel? targetItem;
     try {
       final context = AppNavigation.context;
-      final kitchenProvider = Provider.of<KitchenProvider>(context, listen: false);
+      final kitchenProvider = Provider.of<KitchenProvider>(
+        context,
+        listen: false,
+      );
       targetItem = kitchenProvider.items.cast<GroceryModel?>().firstWhere(
         (item) => item?.id == groceryId,
         orElse: () => null,
@@ -109,7 +120,9 @@ class NotificationRouter {
         final repo = GroceryRepository();
         targetItem = await repo.getGrocery(groceryId);
       } catch (e) {
-        AppLogger.warning('Could not fetch grocery detail for id $groceryId, opening Kitchen tab: $e');
+        AppLogger.warning(
+          'Could not fetch grocery detail for id $groceryId, opening Kitchen tab: $e',
+        );
         HomeShell.switchTab(1); // Switch to kitchen tab
         return;
       }

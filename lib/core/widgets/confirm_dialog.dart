@@ -26,7 +26,8 @@ class ConfirmDialog extends StatelessWidget {
   static Future<bool> show({
     required BuildContext context,
     String title = 'Delete Confirmation',
-    String content = 'Are you sure you want to delete this item? This action cannot be undone.',
+    String content =
+        'Are you sure you want to delete this item? This action cannot be undone.',
     String confirmLabel = 'Delete',
     String cancelLabel = 'Cancel',
     bool isDestructive = true,
@@ -56,14 +57,18 @@ class ConfirmDialog extends StatelessWidget {
       title: Text(title, style: AppTextStyles.headingMedium(context)),
       content: Text(
         content,
-        style: AppTextStyles.bodyMedium(context).copyWith(color: AppColors.textPrimary),
+        style: AppTextStyles.bodyMedium(
+          context,
+        ).copyWith(color: AppColors.textPrimary),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context, false),
           child: Text(
             cancelLabel,
-            style: AppTextStyles.labelMedium(context).copyWith(color: AppColors.textSecondary),
+            style: AppTextStyles.labelMedium(
+              context,
+            ).copyWith(color: AppColors.textSecondary),
           ),
         ),
         TextButton(

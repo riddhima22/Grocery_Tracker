@@ -28,7 +28,9 @@ class AppScaffold extends StatelessWidget {
       appBar: appBar,
       body: Container(
         decoration: BoxDecoration(
-          gradient: useSplashBg ? AppColors.splashGradient : AppColors.bgGradient,
+          gradient: useSplashBg
+              ? AppColors.splashGradient
+              : AppColors.bgGradient,
         ),
         child: AppLoadingOverlay(
           isLoading: isLoading,

@@ -76,10 +76,14 @@ class ScanCandidateModel {
 
   /// Display string with package details (e.g. "Chips — 1 packet (50 g)")
   String get displayQuantityText {
-    final qtyStr = quantity % 1 == 0 ? quantity.toInt().toString() : quantity.toString();
+    final qtyStr = quantity % 1 == 0
+        ? quantity.toInt().toString()
+        : quantity.toString();
     final pType = packageType.isNotEmpty ? packageType : unit;
     if (netContentValue != null && netContentUnit.isNotEmpty) {
-      final netStr = netContentValue! % 1 == 0 ? netContentValue!.toInt().toString() : netContentValue!.toString();
+      final netStr = netContentValue! % 1 == 0
+          ? netContentValue!.toInt().toString()
+          : netContentValue!.toString();
       return '$qtyStr $pType ($netStr $netContentUnit)';
     }
     return '$qtyStr $unit';
@@ -87,14 +91,17 @@ class ScanCandidateModel {
 
   factory ScanCandidateModel.fromJson(Map<String, dynamic> json) {
     DateTime? parsedExpiry;
-    if (json['expiry_date'] != null && json['expiry_date'].toString().isNotEmpty) {
+    if (json['expiry_date'] != null &&
+        json['expiry_date'].toString().isNotEmpty) {
       parsedExpiry = DateTime.tryParse(json['expiry_date'].toString());
     }
 
     DateTime? parsedEstimated;
     if (json['estimated_consumption_date'] != null &&
         json['estimated_consumption_date'].toString().isNotEmpty) {
-      parsedEstimated = DateTime.tryParse(json['estimated_consumption_date'].toString());
+      parsedEstimated = DateTime.tryParse(
+        json['estimated_consumption_date'].toString(),
+      );
     }
 
     final bool isEstimated;
@@ -114,13 +121,20 @@ class ScanCandidateModel {
     String resolvedUnit = rawUnit?.toString() ?? '';
     String resolvedCategory = json['unit_category']?.toString() ?? '';
     String resolvedPackageType = json['package_type']?.toString() ?? '';
-    double? resolvedNetVal = double.tryParse(json['net_content_value']?.toString() ?? '');
+    double? resolvedNetVal = double.tryParse(
+      json['net_content_value']?.toString() ?? '',
+    );
     String resolvedNetUnit = json['net_content_unit']?.toString() ?? '';
-    int? resolvedPackCount = int.tryParse(json['package_count']?.toString() ?? '');
+    int? resolvedPackCount = int.tryParse(
+      json['package_count']?.toString() ?? '',
+    );
     String resolvedUnitConf = json['unit_confidence']?.toString() ?? 'High';
-    bool resolvedUncertain = json['is_uncertain'] == true || resolvedUnitConf.toLowerCase() == 'uncertain';
+    bool resolvedUncertain =
+        json['is_uncertain'] == true ||
+        resolvedUnitConf.toLowerCase() == 'uncertain';
 
-    if (resolvedUnit.isEmpty || (resolvedUnit == 'pcs' && resolvedCategory.isEmpty)) {
+    if (resolvedUnit.isEmpty ||
+        (resolvedUnit == 'pcs' && resolvedCategory.isEmpty)) {
       final classified = UnitClassificationService.classifyProduct(
         productName: name,
         category: category,
@@ -164,7 +178,9 @@ class ScanCandidateModel {
       estimatedConsumptionDate: parsedEstimated,
       isExpiryEstimated: isEstimated,
       dateType: json['date_type'] ?? (isEstimated ? 'estimated' : 'expiry'),
-      dateSource: json['date_source'] ?? (isEstimated ? 'calculated_shelf_life' : 'ocr_verified'),
+      dateSource:
+          json['date_source'] ??
+          (isEstimated ? 'calculated_shelf_life' : 'ocr_verified'),
       dateConfidence: json['date_confidence'] ?? 'Low',
       rawDateText: json['raw_date_text'] ?? '',
       storageReason: json['storage_reason'] ?? '',
@@ -193,7 +209,9 @@ class ScanCandidateModel {
     'is_uncertain': isUncertain,
     'storage_zone': storageZone,
     'expiry_date': expiryDate?.toIso8601String().substring(0, 10),
-    'estimated_consumption_date': estimatedConsumptionDate?.toIso8601String().substring(0, 10),
+    'estimated_consumption_date': estimatedConsumptionDate
+        ?.toIso8601String()
+        .substring(0, 10),
     'is_expiry_estimated': isExpiryEstimated,
     'date_type': dateType,
     'date_source': dateSource,
@@ -254,7 +272,8 @@ class ScanCandidateModel {
       isUncertain: isUncertain ?? this.isUncertain,
       storageZone: storageZone ?? this.storageZone,
       expiryDate: expiryDate ?? this.expiryDate,
-      estimatedConsumptionDate: estimatedConsumptionDate ?? this.estimatedConsumptionDate,
+      estimatedConsumptionDate:
+          estimatedConsumptionDate ?? this.estimatedConsumptionDate,
       isExpiryEstimated: isExpiryEstimated ?? this.isExpiryEstimated,
       dateType: dateType ?? this.dateType,
       dateSource: dateSource ?? this.dateSource,

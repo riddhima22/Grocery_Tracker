@@ -26,13 +26,19 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
       centerTitle: true,
       title: Text(
         title,
-        style: AppTextStyles.headingMedium(context).copyWith(fontWeight: FontWeight.bold),
+        style: AppTextStyles.headingMedium(
+          context,
+        ).copyWith(fontWeight: FontWeight.bold),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
       leading: showBackButton
           ? IconButton(
-              icon: Icon(Icons.arrow_back_ios_new_rounded, size: AppIconSizes.sm(context), color: AppColors.textPrimary),
+              icon: Icon(
+                Icons.arrow_back_ios_new_rounded,
+                size: AppIconSizes.sm(context),
+                color: AppColors.textPrimary,
+              ),
               onPressed: onBackPressed ?? () => Navigator.maybePop(context),
             )
           : null,

@@ -21,21 +21,14 @@ class ScanRepository {
       AppLogger.info(
         'Preparing image for upload: ${image.name} (${(bytes.length / 1024).toStringAsFixed(1)} KB)',
       );
-      multipartFiles.add(
-        MultipartFile.fromBytes(
-          bytes,
-          filename: image.name,
-        ),
-      );
+      multipartFiles.add(MultipartFile.fromBytes(bytes, filename: image.name));
     }
 
     AppLogger.info(
       'Starting upload of ${images.length} image(s) (${(totalBytes / 1024).toStringAsFixed(1)} KB total) to ${ApiEndpoints.scanSessions}...',
     );
 
-    final formData = FormData.fromMap({
-      'images': multipartFiles,
-    });
+    final formData = FormData.fromMap({'images': multipartFiles});
 
     final response = await _apiClient.post(
       ApiEndpoints.scanSessions,
@@ -59,12 +52,18 @@ class ScanRepository {
   }
 
   Future<List<ScanCandidateModel>> getCandidates(String sessionId) async {
-    final response = await _apiClient.get(ApiEndpoints.scanCandidates(sessionId));
+    final response = await _apiClient.get(
+      ApiEndpoints.scanCandidates(sessionId),
+    );
     final list = response.data['data'] as List?;
-    return list?.map((c) => ScanCandidateModel.fromJson(c)).toList() ?? const [];
+    return list?.map((c) => ScanCandidateModel.fromJson(c)).toList() ??
+        const [];
   }
 
-  Future<ScanCandidateModel> updateCandidate(String candidateId, Map<String, dynamic> data) async {
+  Future<ScanCandidateModel> updateCandidate(
+    String candidateId,
+    Map<String, dynamic> data,
+  ) async {
     final response = await _apiClient.patch(
       '${ApiEndpoints.scans}candidates/$candidateId/',
       data: data,
@@ -76,13 +75,14 @@ class ScanRepository {
     await _apiClient.delete('${ApiEndpoints.scans}candidates/$candidateId/');
   }
 
-  Future<List<GroceryModel>> confirmScan(String sessionId, List<String> candidateIds, String idempotencyKey) async {
+  Future<List<GroceryModel>> confirmScan(
+    String sessionId,
+    List<String> candidateIds,
+    String idempotencyKey,
+  ) async {
     final response = await _apiClient.post(
       ApiEndpoints.confirmScan(sessionId),
-      data: {
-        'candidate_ids': candidateIds,
-        'idempotency_key': idempotencyKey,
-      },
+      data: {'candidate_ids': candidateIds, 'idempotency_key': idempotencyKey},
     );
     final list = response.data['data'] as List?;
     return list?.map((i) => GroceryModel.fromJson(i)).toList() ?? const [];

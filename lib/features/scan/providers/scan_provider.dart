@@ -11,7 +11,15 @@ import '../../../core/utils/app_logger.dart';
 import '../../../core/services/unit_classification_service.dart';
 import '../../kitchen/providers/kitchen_provider.dart';
 
-enum ScanUIState { idle, selecting, uploading, analyzing, review, success, error }
+enum ScanUIState {
+  idle,
+  selecting,
+  uploading,
+  analyzing,
+  review,
+  success,
+  error,
+}
 
 class ScanProvider extends ChangeNotifier {
   final ScanRepository _scanRepository = ScanRepository();
@@ -21,11 +29,11 @@ class ScanProvider extends ChangeNotifier {
   String? _errorMessage;
   String _scanStageMessage = 'Uploading image...';
   double _scanProgress = 0.2;
-  
+
   ScanSessionModel? _currentSession;
   List<ScanCandidateModel> _candidates = [];
   List<GroceryModel> _confirmedGroceries = [];
-  
+
   // Selection map for confirming review candidates
   final Map<String, bool> _candidateSelection = {};
   Timer? _pollingTimer;
@@ -77,7 +85,7 @@ class ScanProvider extends ChangeNotifier {
 
   Future<void> startAnalysis() async {
     if (_selectedImages.isEmpty) return;
-    
+
     _stopPolling();
     _uiState = ScanUIState.uploading;
     _errorMessage = null;
@@ -87,7 +95,9 @@ class ScanProvider extends ChangeNotifier {
 
     try {
       // 1. Upload files to backend and create session
-      _currentSession = await _scanRepository.createScanSession(_selectedImages);
+      _currentSession = await _scanRepository.createScanSession(
+        _selectedImages,
+      );
       _uiState = ScanUIState.analyzing;
       _scanStageMessage = 'Analyzing image...';
       _scanProgress = 0.50;
@@ -105,16 +115,16 @@ class ScanProvider extends ChangeNotifier {
 
   void _startPolling() {
     _stopPolling();
-    
+
     int attempts = 0;
     const maxAttempts = 45; // Max 90 seconds (2s interval)
-    
+
     _pollingTimer = Timer.periodic(const Duration(seconds: 2), (timer) async {
       if (_currentSession == null) {
         timer.cancel();
         return;
       }
-      
+
       attempts++;
 
       // Update progressive UI messages based on elapsed time
@@ -130,40 +140,50 @@ class ScanProvider extends ChangeNotifier {
 
       if (attempts > maxAttempts) {
         timer.cancel();
-        _errorMessage = "Analysis is taking longer than expected. Please try again.";
+        _errorMessage =
+            "Analysis is taking longer than expected. Please try again.";
         _uiState = ScanUIState.error;
         notifyListeners();
         return;
       }
 
       try {
-        final session = await _scanRepository.getScanSession(_currentSession!.id);
+        final session = await _scanRepository.getScanSession(
+          _currentSession!.id,
+        );
         _currentSession = session;
-        
-        if (session.status == 'completed' || session.status == 'partial_success' || session.status == 'partial') {
+
+        if (session.status == 'completed' ||
+            session.status == 'partial_success' ||
+            session.status == 'partial') {
           timer.cancel();
           _scanProgress = 1.0;
-          
+
           // Load detected candidates
           _candidates = await _scanRepository.getCandidates(session.id);
-          AppLogger.info('Scan completed for session ${session.id}: found ${_candidates.length} item(s)');
-          
+          AppLogger.info(
+            'Scan completed for session ${session.id}: found ${_candidates.length} item(s)',
+          );
+
           // Default all candidates to selected
           for (var c in _candidates) {
             _candidateSelection[c.id] = c.selected;
           }
-          
+
           _uiState = ScanUIState.review;
           notifyListeners();
         } else if (session.status == 'failed') {
           timer.cancel();
-          final firstError = session.images.firstWhere(
-            (img) => img.errorMessage.isNotEmpty,
-            orElse: () => const ScanImageModel(id: '', status: '', errorMessage: ''),
-          ).errorMessage;
-          
-          _errorMessage = firstError.isNotEmpty 
-              ? firstError 
+          final firstError = session.images
+              .firstWhere(
+                (img) => img.errorMessage.isNotEmpty,
+                orElse: () =>
+                    const ScanImageModel(id: '', status: '', errorMessage: ''),
+              )
+              .errorMessage;
+
+          _errorMessage = firstError.isNotEmpty
+              ? firstError
               : "Analysis could not identify grocery items. Please try a clearer picture.";
           _uiState = ScanUIState.error;
           notifyListeners();
@@ -203,7 +223,8 @@ class ScanProvider extends ChangeNotifier {
 
       double? newQty = old.quantity;
       if (data.containsKey('quantity')) {
-        newQty = double.tryParse(data['quantity']?.toString() ?? '') ?? old.quantity;
+        newQty =
+            double.tryParse(data['quantity']?.toString() ?? '') ?? old.quantity;
       }
 
       _candidates[index] = old.copyWith(
@@ -216,7 +237,9 @@ class ScanProvider extends ChangeNotifier {
         unit: data['unit']?.toString(),
         unitCategory: data['unit_category']?.toString(),
         packageType: data['package_type']?.toString(),
-        netContentValue: double.tryParse(data['net_content_value']?.toString() ?? ''),
+        netContentValue: double.tryParse(
+          data['net_content_value']?.toString() ?? '',
+        ),
         netContentUnit: data['net_content_unit']?.toString(),
         unitConfidence: data['unit_confidence']?.toString(),
         isUncertain: data['is_uncertain'] == true,
@@ -246,8 +269,15 @@ class ScanProvider extends ChangeNotifier {
     final index = _candidates.indexWhere((c) => c.id == id);
     if (index == -1) return;
     final old = _candidates[index];
-    final convertedQty = UnitClassificationService.convertQuantity(old.quantity, old.unit, newUnit) ?? old.quantity;
-    final cat = UnitClassificationService.unitCategories[newUnit] ?? old.unitCategory;
+    final convertedQty =
+        UnitClassificationService.convertQuantity(
+          old.quantity,
+          old.unit,
+          newUnit,
+        ) ??
+        old.quantity;
+    final cat =
+        UnitClassificationService.unitCategories[newUnit] ?? old.unitCategory;
     updateCandidate(id, {
       'unit': newUnit,
       'quantity': convertedQty,

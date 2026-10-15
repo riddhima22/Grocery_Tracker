@@ -23,7 +23,8 @@ class ExpiryBadge extends StatelessWidget {
     final double paddingV = context.scaleHeight(4.0);
 
     final effectiveDate = expiryDate ?? estimatedDate;
-    final bool estimated = isEstimated || (expiryDate == null && estimatedDate != null);
+    final bool estimated =
+        isEstimated || (expiryDate == null && estimatedDate != null);
 
     if (effectiveDate == null) {
       return Container(
@@ -34,15 +35,17 @@ class ExpiryBadge extends StatelessWidget {
         ),
         child: Text(
           'No Expiry',
-          style: AppTextStyles.caption(context).copyWith(
-            color: AppColors.info,
-            fontWeight: FontWeight.bold,
-          ),
+          style: AppTextStyles.caption(
+            context,
+          ).copyWith(color: AppColors.info, fontWeight: FontWeight.bold),
         ),
       );
     }
 
-    final badgeInfo = DateHelpers.formatExpiryBadge(effectiveDate, isEstimated: estimated);
+    final badgeInfo = DateHelpers.formatExpiryBadge(
+      effectiveDate,
+      isEstimated: estimated,
+    );
     final badgeColor = badgeInfo.color;
     final label = badgeInfo.label;
 
@@ -51,14 +54,16 @@ class ExpiryBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: badgeColor.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(AppRadius.chip(context)),
-        border: Border.all(color: badgeColor.withValues(alpha: 0.3), width: 1.0),
+        border: Border.all(
+          color: badgeColor.withValues(alpha: 0.3),
+          width: 1.0,
+        ),
       ),
       child: Text(
         label,
-        style: AppTextStyles.caption(context).copyWith(
-          color: badgeColor,
-          fontWeight: FontWeight.bold,
-        ),
+        style: AppTextStyles.caption(
+          context,
+        ).copyWith(color: badgeColor, fontWeight: FontWeight.bold),
       ),
     );
   }

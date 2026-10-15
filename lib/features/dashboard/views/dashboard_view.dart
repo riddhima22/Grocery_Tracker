@@ -26,7 +26,8 @@ class DashboardView extends StatefulWidget {
   State<DashboardView> createState() => _DashboardViewState();
 }
 
-class _DashboardViewState extends State<DashboardView> with TickerProviderStateMixin {
+class _DashboardViewState extends State<DashboardView>
+    with TickerProviderStateMixin {
   late AnimationController _pulseController;
   late AnimationController _chartController;
   final TextEditingController _searchController = TextEditingController();
@@ -52,7 +53,7 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
     );
 
     _chartController.forward();
-    
+
     // 1. Immediately hydrate cached insights (0ms)
     _loadCachedInsights();
 
@@ -61,12 +62,12 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
       final kitchen = context.read<KitchenProvider>();
       // Trigger cache-first fetch for kitchen items
       kitchen.fetchKitchenItems();
-      
+
       // If we don't have insights yet, generate instant client-side insights
       if (_insights.isEmpty) {
         _applyInstantClientInsights(kitchen);
       }
-      
+
       // Fetch fresh remote insights in background
       _loadAIInsights();
     });
@@ -78,7 +79,8 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
       if (cached != null && mounted) {
         setState(() {
           _insights = List<String>.from(cached['insights'] ?? []);
-          _wasteRisk = double.tryParse(cached['waste_risk']?.toString() ?? '0.0') ?? 0.0;
+          _wasteRisk =
+              double.tryParse(cached['waste_risk']?.toString() ?? '0.0') ?? 0.0;
           _freshnessScore = cached['freshness_score'] ?? 100;
         });
       }
@@ -95,32 +97,42 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
     if (expiring.isNotEmpty) {
       final names = expiring.take(3).map((e) => e.name).join(', ');
       if (expiring.length > 3) {
-        generated.add('You have ${expiring.length} items expiring soon, including $names, and others.');
+        generated.add(
+          'You have ${expiring.length} items expiring soon, including $names, and others.',
+        );
       } else {
         generated.add('You have items expiring soon: $names.');
       }
     }
 
     if (expired.isNotEmpty) {
-      generated.add('Warning: ${expired.length} items have expired. Please clear them to keep your kitchen fresh.');
+      generated.add(
+        'Warning: ${expired.length} items have expired. Please clear them to keep your kitchen fresh.',
+      );
     }
 
     final categories = items.map((e) => e.category.toLowerCase()).toSet();
     if (categories.contains('fruits') || categories.contains('fruit')) {
-      generated.add('Keeping bananas separate from other fruits prevents ethylene gas from ripening them too quickly.');
+      generated.add(
+        'Keeping bananas separate from other fruits prevents ethylene gas from ripening them too quickly.',
+      );
     }
     if (categories.contains('vegetables') || categories.contains('vegetable')) {
-      generated.add('Store leafy greens with a dry paper towel inside a sealed bag to absorb excess moisture.');
+      generated.add(
+        'Store leafy greens with a dry paper towel inside a sealed bag to absorb excess moisture.',
+      );
     }
     if (categories.contains('dairy')) {
-      generated.add('Avoid storing milk in the refrigerator door; shelf temperatures are much more stable.');
+      generated.add(
+        'Avoid storing milk in the refrigerator door; shelf temperatures are much more stable.',
+      );
     }
 
     if (generated.isEmpty) {
       generated.addAll([
         'Your kitchen is in healthy shape! Keep logging items to track freshness.',
         'Storage temperature control is the easiest way to prevent grocery wastage.',
-        'Planning meals around expiring items saves money and reduces waste.'
+        'Planning meals around expiring items saves money and reduces waste.',
       ]);
     }
 
@@ -156,7 +168,9 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
         if (newInsights.isNotEmpty) {
           setState(() {
             _insights = newInsights;
-            _wasteRisk = double.tryParse(data['waste_risk']?.toString() ?? '0.0') ?? _wasteRisk;
+            _wasteRisk =
+                double.tryParse(data['waste_risk']?.toString() ?? '0.0') ??
+                _wasteRisk;
             _freshnessScore = data['freshness_score'] ?? _freshnessScore;
           });
           // Cache in background
@@ -188,167 +202,186 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
       body: kitchen.isLoading && kitchen.items.isEmpty
           ? _buildShimmerLoading()
           : kitchen.errorMessage != null && kitchen.items.isEmpty
-               ? AppRetryState(
-                   errorMessage: kitchen.errorMessage!,
-                   onRetry: () {
-                     kitchen.fetchKitchenItems(forceRefresh: true);
-                     _loadAIInsights(force: true);
-                   },
-                 )
-               : RefreshIndicator(
-                   color: AppColors.primary,
-                   onRefresh: () async {
-                     await Future.wait([
-                       kitchen.fetchKitchenItems(forceRefresh: true),
-                       _loadAIInsights(force: true),
-                     ]);
-                   },
-                   child: CustomScrollView(
-                     slivers: [
-                       // Header Section
-                       SliverPadding(
-                         padding: EdgeInsets.all(AppSpacing.md(context)),
-                         sliver: SliverList(
-                           delegate: SliverChildListDelegate([
-                             Row(
-                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                               children: [
-                                 Expanded(
-                                   child: Column(
-                                     crossAxisAlignment: CrossAxisAlignment.start,
-                                     children: [
-                                       Text(
-                                         '$greeting, $name',
-                                         style: AppTextStyles.headingLarge(context).copyWith(
-                                           fontSize: context.scaleFont(22.0),
-                                         ),
-                                         maxLines: 2,
-                                         overflow: TextOverflow.ellipsis,
-                                       ),
-                                       const SizedBox(height: 4),
-                                       Text(
-                                         'Here\'s your kitchen status overview',
-                                         style: AppTextStyles.bodyMedium(context),
-                                       ),
-                                     ],
-                                   ),
-                                 ),
-                                 CircleAvatar(
-                                   radius: context.scaleWidth(20.0),
-                                   backgroundColor: AppColors.primary.withValues(alpha: 0.2),
-                                   backgroundImage: auth.user?.avatarUrl != null && auth.user!.avatarUrl!.isNotEmpty
-                                       ? NetworkImage(auth.user!.avatarUrl!)
-                                       : null,
-                                   child: auth.user?.avatarUrl == null || auth.user!.avatarUrl!.isEmpty
-                                       ? Text(
-                                           name.isNotEmpty ? name[0].toUpperCase() : 'C',
-                                           style: AppTextStyles.labelMedium(context).copyWith(color: AppColors.primary),
-                                         )
-                                       : null,
-                                 ),
-                               ],
-                             ),
-                             AppGap.md(context),
+          ? AppRetryState(
+              errorMessage: kitchen.errorMessage!,
+              onRetry: () {
+                kitchen.fetchKitchenItems(forceRefresh: true);
+                _loadAIInsights(force: true);
+              },
+            )
+          : RefreshIndicator(
+              color: AppColors.primary,
+              onRefresh: () async {
+                await Future.wait([
+                  kitchen.fetchKitchenItems(forceRefresh: true),
+                  _loadAIInsights(force: true),
+                ]);
+              },
+              child: CustomScrollView(
+                slivers: [
+                  // Header Section
+                  SliverPadding(
+                    padding: EdgeInsets.all(AppSpacing.md(context)),
+                    sliver: SliverList(
+                      delegate: SliverChildListDelegate([
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '$greeting, $name',
+                                    style: AppTextStyles.headingLarge(context)
+                                        .copyWith(
+                                          fontSize: context.scaleFont(22.0),
+                                        ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Here\'s your kitchen status overview',
+                                    style: AppTextStyles.bodyMedium(context),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            CircleAvatar(
+                              radius: context.scaleWidth(20.0),
+                              backgroundColor: AppColors.primary.withValues(
+                                alpha: 0.2,
+                              ),
+                              backgroundImage:
+                                  auth.user?.avatarUrl != null &&
+                                      auth.user!.avatarUrl!.isNotEmpty
+                                  ? NetworkImage(auth.user!.avatarUrl!)
+                                  : null,
+                              child:
+                                  auth.user?.avatarUrl == null ||
+                                      auth.user!.avatarUrl!.isEmpty
+                                  ? Text(
+                                      name.isNotEmpty
+                                          ? name[0].toUpperCase()
+                                          : 'C',
+                                      style: AppTextStyles.labelMedium(
+                                        context,
+                                      ).copyWith(color: AppColors.primary),
+                                    )
+                                  : null,
+                            ),
+                          ],
+                        ),
+                        AppGap.md(context),
 
-                             // AI Search Bar
-                             _buildAISearchBox(),
-                             AppGap.md(context),
+                        // AI Search Bar
+                        _buildAISearchBox(),
+                        AppGap.md(context),
 
-                             // Log Meal Quick Action
-                             _buildLogMealAction(),
-                             AppGap.md(context),
+                        // Log Meal Quick Action
+                        _buildLogMealAction(),
+                        AppGap.md(context),
 
-                             // Expired Warning Banner (Dynamic)
-                             if (kitchen.expiredCount > 0) ...[
-                               _buildExpiredAlertBanner(kitchen.expiredCount),
-                               AppGap.sm(context),
-                             ],
+                        // Expired Warning Banner (Dynamic)
+                        if (kitchen.expiredCount > 0) ...[
+                          _buildExpiredAlertBanner(kitchen.expiredCount),
+                          AppGap.sm(context),
+                        ],
 
-                             // Expiry Warning Banner (Dynamic)
-                             if (kitchen.expiringCount > 0) ...[
-                               _buildExpiryAlertBanner(kitchen.expiringCount),
-                               AppGap.sm(context),
-                             ],
+                        // Expiry Warning Banner (Dynamic)
+                        if (kitchen.expiringCount > 0) ...[
+                          _buildExpiryAlertBanner(kitchen.expiringCount),
+                          AppGap.sm(context),
+                        ],
 
-                              // AI Dashboard Analytics & Smart Insights Suite
-                              AnimatedBuilder(
-                                animation: _chartController,
-                                builder: (context, _) {
-                                  return DashboardAnalyticsSection(
-                                    kitchen: kitchen,
-                                    insights: _insights,
-                                    wasteRisk: _wasteRisk,
-                                    freshnessScore: _freshnessScore,
-                                    animation: _chartController,
+                        // AI Dashboard Analytics & Smart Insights Suite
+                        AnimatedBuilder(
+                          animation: _chartController,
+                          builder: (context, _) {
+                            return DashboardAnalyticsSection(
+                              kitchen: kitchen,
+                              insights: _insights,
+                              wasteRisk: _wasteRisk,
+                              freshnessScore: _freshnessScore,
+                              animation: _chartController,
+                            );
+                          },
+                        ),
+                        AppGap.md(context),
+
+                        // Upcoming Expiry (Filtered by AI search query)
+                        AppSectionHeader(
+                          title: _searchQuery.isEmpty
+                              ? (kitchen.expiredCount > 0
+                                    ? 'Expired & Upcoming Expiry'
+                                    : 'Upcoming Expiry')
+                              : 'Search Results',
+                          actionText: 'View All',
+                          onActionPressed: () {
+                            // Navigate to kitchen tab
+                          },
+                        ),
+                        AppGap.xs(context),
+                      ]),
+                    ),
+                  ),
+
+                  // List of upcoming expiring items
+                  filteredExpiring.isEmpty
+                      ? SliverPadding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: AppSpacing.md(context),
+                          ),
+                          sliver: SliverToBoxAdapter(
+                            child: Container(
+                              padding: const EdgeInsets.all(24.0),
+                              decoration: BoxDecoration(
+                                color: AppColors.card,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: AppColors.cardBorder),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  _searchQuery.isEmpty
+                                      ? 'No expired or expiring items. Everything is fresh!'
+                                      : 'No matching grocery items found.',
+                                  style: AppTextStyles.bodyMedium(
+                                    context,
+                                  ).copyWith(color: AppColors.textSecondary),
+                                ),
+                              ),
+                            ),
+                          ),
+                        )
+                      : SliverPadding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: AppSpacing.md(context),
+                          ),
+                          sliver: SliverList(
+                            delegate: SliverChildBuilderDelegate((ctx, index) {
+                              final item = filteredExpiring[index];
+                              return GroceryItemCard(
+                                item: item,
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          KitchenItemDetailView(item: item),
+                                    ),
                                   );
                                 },
-                              ),
-                              AppGap.md(context),
-
-                             // Upcoming Expiry (Filtered by AI search query)
-                             AppSectionHeader(
-                               title: _searchQuery.isEmpty 
-                                   ? (kitchen.expiredCount > 0 ? 'Expired & Upcoming Expiry' : 'Upcoming Expiry')
-                                   : 'Search Results',
-                               actionText: 'View All',
-                               onActionPressed: () {
-                                 // Navigate to kitchen tab
-                               },
-                             ),
-                             AppGap.xs(context),
-                           ]),
-                         ),
-                       ),
-
-                       // List of upcoming expiring items
-                       filteredExpiring.isEmpty
-                           ? SliverPadding(
-                               padding: EdgeInsets.symmetric(horizontal: AppSpacing.md(context)),
-                               sliver: SliverToBoxAdapter(
-                                 child: Container(
-                                   padding: const EdgeInsets.all(24.0),
-                                   decoration: BoxDecoration(
-                                     color: AppColors.card,
-                                     borderRadius: BorderRadius.circular(12),
-                                     border: Border.all(color: AppColors.cardBorder),
-                                   ),
-                                   child: Center(
-                                     child: Text(
-                                       _searchQuery.isEmpty 
-                                           ? 'No expired or expiring items. Everything is fresh!'
-                                           : 'No matching grocery items found.',
-                                       style: AppTextStyles.bodyMedium(context).copyWith(color: AppColors.textSecondary),
-                                     ),
-                                   ),
-                                 ),
-                               ),
-                             )
-                           : SliverPadding(
-                               padding: EdgeInsets.symmetric(horizontal: AppSpacing.md(context)),
-                               sliver: SliverList(
-                                 delegate: SliverChildBuilderDelegate(
-                                   (ctx, index) {
-                                     final item = filteredExpiring[index];
-                                     return GroceryItemCard(
-                                       item: item,
-                                       onTap: () {
-                                         Navigator.push(
-                                           context,
-                                           MaterialPageRoute(
-                                             builder: (context) => KitchenItemDetailView(item: item),
-                                           ),
-                                         );
-                                       },
-                                     );
-                                   },
-                                   childCount: filteredExpiring.length,
-                                 ),
-                               ),
-                             ),
-                       SliverToBoxAdapter(child: SizedBox(height: context.scaleHeight(64.0))),
-                     ],
-                   ),
-                 ),
+                              );
+                            }, childCount: filteredExpiring.length),
+                          ),
+                        ),
+                  SliverToBoxAdapter(
+                    child: SizedBox(height: context.scaleHeight(64.0)),
+                  ),
+                ],
+              ),
+            ),
     );
   }
 
@@ -363,14 +396,17 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
             color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 8.0,
             offset: const Offset(0, 4),
-          )
-        ]
+          ),
+        ],
       ),
       child: TextField(
         controller: _searchController,
         decoration: InputDecoration(
           hintText: 'AI Search (e.g. "Show fruits expiring soon")',
-          prefixIcon: const Icon(Icons.psychology_outlined, color: AppColors.primary),
+          prefixIcon: const Icon(
+            Icons.psychology_outlined,
+            color: AppColors.primary,
+          ),
           suffixIcon: _searchQuery.isNotEmpty
               ? IconButton(
                   icon: const Icon(Icons.clear),
@@ -383,7 +419,10 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
                 )
               : null,
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 14,
+          ),
         ),
         style: AppTextStyles.bodyLarge(context),
         onChanged: (val) {
@@ -439,9 +478,9 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
                   ),
                   Text(
                     'Snap a photo to deduct ingredients',
-                    style: AppTextStyles.caption(context).copyWith(
-                      color: Colors.white.withValues(alpha: 0.8),
-                    ),
+                    style: AppTextStyles.caption(
+                      context,
+                    ).copyWith(color: Colors.white.withValues(alpha: 0.8)),
                   ),
                 ],
               ),
@@ -459,7 +498,10 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
       decoration: BoxDecoration(
         color: AppColors.danger.withValues(alpha: 0.16),
         borderRadius: BorderRadius.circular(AppRadius.card(context)),
-        border: Border.all(color: AppColors.danger.withValues(alpha: 0.5), width: 1.5),
+        border: Border.all(
+          color: AppColors.danger.withValues(alpha: 0.5),
+          width: 1.5,
+        ),
       ),
       child: Row(
         children: [
@@ -469,7 +511,11 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
               color: AppColors.danger.withValues(alpha: 0.2),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.warning_rounded, color: AppColors.danger, size: 20),
+            child: const Icon(
+              Icons.warning_rounded,
+              color: AppColors.danger,
+              size: 20,
+            ),
           ),
           AppGap.sm(context),
           Expanded(
@@ -486,11 +532,13 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
                 const SizedBox(height: 2),
                 Text(
                   '$expiredCount ${expiredCount == 1 ? "item has" : "items have"} expired. Please remove or dispose of them.',
-                  style: AppTextStyles.bodySmall(context).copyWith(color: AppColors.textPrimary),
+                  style: AppTextStyles.bodySmall(
+                    context,
+                  ).copyWith(color: AppColors.textPrimary),
                 ),
               ],
             ),
-          )
+          ),
         ],
       ),
     );
@@ -514,12 +562,14 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
                 height: 14.0,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: AppColors.danger.withValues(alpha: 0.3 + (0.7 * _pulseController.value)),
+                  color: AppColors.danger.withValues(
+                    alpha: 0.3 + (0.7 * _pulseController.value),
+                  ),
                   boxShadow: [
                     BoxShadow(
                       color: AppColors.danger,
                       blurRadius: 4.0 + (4.0 * _pulseController.value),
-                    )
+                    ),
                   ],
                 ),
               );
@@ -532,21 +582,25 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
               children: [
                 Text(
                   'Expiry Alert',
-                  style: AppTextStyles.labelMedium(context).copyWith(color: AppColors.danger, fontWeight: FontWeight.bold),
+                  style: AppTextStyles.labelMedium(context).copyWith(
+                    color: AppColors.danger,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   '$expiringCount items in your pantry will expire soon. Use them before they spoil.',
-                  style: AppTextStyles.bodySmall(context).copyWith(color: AppColors.textPrimary),
+                  style: AppTextStyles.bodySmall(
+                    context,
+                  ).copyWith(color: AppColors.textPrimary),
                 ),
               ],
             ),
-          )
+          ),
         ],
       ),
     );
   }
-
 
   Widget _buildShimmerLoading() {
     return Shimmer.fromColors(

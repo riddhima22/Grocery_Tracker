@@ -2,13 +2,7 @@ import 'package:flutter/material.dart';
 import '../../config/app_breakpoints.dart';
 import '../../config/app_dimensions.dart';
 
-enum DeviceType {
-  compactPhone,
-  phone,
-  largePhone,
-  tablet,
-  largeTablet,
-}
+enum DeviceType { compactPhone, phone, largePhone, tablet, largeTablet }
 
 extension ResponsiveContext on BuildContext {
   Size get screenSize => MediaQuery.sizeOf(this);
@@ -47,7 +41,8 @@ extension ResponsiveContext on BuildContext {
   double scaleWidth(double designValue) {
     final double effectiveWidth = availableWidth <= AppBreakpoints.phoneMax
         ? availableWidth.clamp(320.0, AppBreakpoints.phoneMax)
-        : AppDimensions.baseWidth; // Use 1:1 on tablets (content is constrained)
+        : AppDimensions
+              .baseWidth; // Use 1:1 on tablets (content is constrained)
     final scale = effectiveWidth / AppDimensions.baseWidth;
     return designValue * scale;
   }

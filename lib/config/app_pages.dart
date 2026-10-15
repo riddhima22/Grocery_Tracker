@@ -27,7 +27,7 @@ class AppPages {
     AppRoutes.home: (context) => const HomeShell(),
     AppRoutes.scan: (context) => const ScanView(),
     AppRoutes.barcodeScan: (context) => const BarcodeScannerView(),
-    
+
     // Dynamic/Parameterized route builders
     AppRoutes.manualAdd: (context) {
       final args = ModalRoute.of(context)?.settings.arguments;
@@ -47,11 +47,15 @@ class AppPages {
       if (args is GroceryModel) {
         return KitchenItemDetailView(item: args);
       }
-      throw ArgumentError('Expected GroceryModel for itemDetail route, got: $args');
+      throw ArgumentError(
+        'Expected GroceryModel for itemDetail route, got: $args',
+      );
     },
     AppRoutes.recipes: (context) {
       final args = ModalRoute.of(context)?.settings.arguments;
-      final expiringOnly = (args is Map<String, dynamic>) ? (args['expiring_only'] == true) : false;
+      final expiringOnly = (args is Map<String, dynamic>)
+          ? (args['expiring_only'] == true)
+          : false;
       return RecipesView(initialExpiringOnly: expiringOnly);
     },
   };

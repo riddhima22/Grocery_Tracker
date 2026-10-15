@@ -29,8 +29,14 @@ class GroceryRepository {
     return GroceryModel.fromJson(response.data['data']);
   }
 
-  Future<GroceryModel> updateGrocery(String id, Map<String, dynamic> data) async {
-    final response = await _apiClient.patch(ApiEndpoints.groceryDetail(id), data: data);
+  Future<GroceryModel> updateGrocery(
+    String id,
+    Map<String, dynamic> data,
+  ) async {
+    final response = await _apiClient.patch(
+      ApiEndpoints.groceryDetail(id),
+      data: data,
+    );
     return GroceryModel.fromJson(response.data['data']);
   }
 

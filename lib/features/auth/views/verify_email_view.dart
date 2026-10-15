@@ -98,7 +98,10 @@ class _VerifyEmailViewState extends State<VerifyEmailView> {
                 decoration: BoxDecoration(
                   color: AppColors.primary.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.3), width: 1.5),
+                  border: Border.all(
+                    color: AppColors.primary.withValues(alpha: 0.3),
+                    width: 1.5,
+                  ),
                 ),
                 child: Center(
                   child: Icon(
@@ -109,10 +112,7 @@ class _VerifyEmailViewState extends State<VerifyEmailView> {
                 ),
               ),
               AppGap.md(context),
-              Text(
-                'Verify Email',
-                style: AppTextStyles.displayMedium(context),
-              ),
+              Text('Verify Email', style: AppTextStyles.displayMedium(context)),
               AppGap.xs(context),
               Text(
                 'We have sent a verification code link to:',
@@ -122,34 +122,42 @@ class _VerifyEmailViewState extends State<VerifyEmailView> {
               const SizedBox(height: 4.0),
               Text(
                 email,
-                style: AppTextStyles.labelLarge(context).copyWith(color: AppColors.primary),
+                style: AppTextStyles.labelLarge(
+                  context,
+                ).copyWith(color: AppColors.primary),
                 textAlign: TextAlign.center,
               ),
               AppGap.md(context),
               Text(
                 'Please verify your email address to unlock FreshTrack features.',
-                style: AppTextStyles.bodyMedium(context).copyWith(color: AppColors.textSecondary),
+                style: AppTextStyles.bodyMedium(
+                  context,
+                ).copyWith(color: AppColors.textSecondary),
                 textAlign: TextAlign.center,
               ),
               const Spacer(),
-              
+
               AppButton(
                 text: 'I have verified my email',
                 onPressed: _checkStatus,
               ),
               AppGap.xs(context),
-              
+
               TextButton(
                 onPressed: _countdown > 0 ? null : _resend,
                 child: Text(
-                  _countdown > 0 ? 'Resend verification in ${_countdown}s' : 'Resend Verification Email',
+                  _countdown > 0
+                      ? 'Resend verification in ${_countdown}s'
+                      : 'Resend Verification Email',
                   style: AppTextStyles.labelMedium(context).copyWith(
-                    color: _countdown > 0 ? AppColors.textHint : AppColors.primary,
+                    color: _countdown > 0
+                        ? AppColors.textHint
+                        : AppColors.primary,
                   ),
                 ),
               ),
               const SizedBox(height: 8.0),
-              
+
               TextButton(
                 onPressed: () {
                   auth.logout();
@@ -157,9 +165,11 @@ class _VerifyEmailViewState extends State<VerifyEmailView> {
                 },
                 child: Text(
                   'Use a different email address',
-                  style: AppTextStyles.caption(context).copyWith(color: AppColors.danger),
+                  style: AppTextStyles.caption(
+                    context,
+                  ).copyWith(color: AppColors.danger),
                 ),
-              )
+              ),
             ],
           ),
         ),

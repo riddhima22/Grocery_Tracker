@@ -36,7 +36,10 @@ class _RecipesViewState extends State<RecipesView> {
     });
   }
 
-  void _showZeroWasteGeneratorSheet(BuildContext context, {bool defaultExpiringOnly = false}) {
+  void _showZeroWasteGeneratorSheet(
+    BuildContext context, {
+    bool defaultExpiringOnly = false,
+  }) {
     final authUser = context.read<AuthProvider>().user;
     final initialAllergies = Set<String>.from(authUser?.allergies ?? []);
 
@@ -75,12 +78,16 @@ class _RecipesViewState extends State<RecipesView> {
           IconButton(
             icon: const Icon(Icons.auto_awesome, color: AppColors.primary),
             tooltip: 'Zero-Waste Chef',
-            onPressed: () => _showZeroWasteGeneratorSheet(context, defaultExpiringOnly: true),
+            onPressed: () => _showZeroWasteGeneratorSheet(
+              context,
+              defaultExpiringOnly: true,
+            ),
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showZeroWasteGeneratorSheet(context, defaultExpiringOnly: true),
+        onPressed: () =>
+            _showZeroWasteGeneratorSheet(context, defaultExpiringOnly: true),
         backgroundColor: AppColors.primary,
         icon: const Icon(Icons.auto_awesome, color: Colors.white),
         label: Text(
@@ -157,7 +164,10 @@ class _RecipesViewState extends State<RecipesView> {
             ),
           ),
           TextButton(
-            onPressed: () => _showZeroWasteGeneratorSheet(context, defaultExpiringOnly: true),
+            onPressed: () => _showZeroWasteGeneratorSheet(
+              context,
+              defaultExpiringOnly: true,
+            ),
             style: TextButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               visualDensity: VisualDensity.compact,
@@ -197,12 +207,22 @@ class _RecipesViewState extends State<RecipesView> {
           return GestureDetector(
             onTap: () => provider.setFilter(f['key']!),
             child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 8.0),
-              padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 4.0),
+              margin: const EdgeInsets.symmetric(
+                horizontal: 6.0,
+                vertical: 8.0,
+              ),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 14.0,
+                vertical: 4.0,
+              ),
               decoration: BoxDecoration(
                 color: isSelected ? AppColors.primary : AppColors.card,
-                borderRadius: BorderRadius.circular(AppRadius.chip(context) * 2.0),
-                border: Border.all(color: isSelected ? AppColors.primary : AppColors.cardBorder),
+                borderRadius: BorderRadius.circular(
+                  AppRadius.chip(context) * 2.0,
+                ),
+                border: Border.all(
+                  color: isSelected ? AppColors.primary : AppColors.cardBorder,
+                ),
               ),
               child: Center(
                 child: Text(
@@ -222,7 +242,8 @@ class _RecipesViewState extends State<RecipesView> {
 
   Widget _buildRecipeCard(dynamic r) {
     // Check if recipe needs no extra grocery purchases (strict zero-waste)
-    final bool isZeroWaste = r.otherIngredients.isEmpty ||
+    final bool isZeroWaste =
+        r.otherIngredients.isEmpty ||
         r.otherIngredients.every((i) {
           final name = i.toString().toLowerCase();
           return name.contains('salt') ||
@@ -254,7 +275,9 @@ class _RecipesViewState extends State<RecipesView> {
                 height: context.scaleWidth(56.0),
                 decoration: BoxDecoration(
                   color: AppColors.primary.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(AppRadius.card(context) * 0.75),
+                  borderRadius: BorderRadius.circular(
+                    AppRadius.card(context) * 0.75,
+                  ),
                 ),
                 child: Center(
                   child: Icon(
@@ -271,7 +294,9 @@ class _RecipesViewState extends State<RecipesView> {
                   children: [
                     Text(
                       r.name,
-                      style: AppTextStyles.headingMedium(context).copyWith(fontSize: context.scaleFont(16.0)),
+                      style: AppTextStyles.headingMedium(
+                        context,
+                      ).copyWith(fontSize: context.scaleFont(16.0)),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -282,14 +307,21 @@ class _RecipesViewState extends State<RecipesView> {
                       children: [
                         Text(
                           '${r.prepTimeMins} mins',
-                          style: AppTextStyles.caption(context).copyWith(color: AppColors.textSecondary),
+                          style: AppTextStyles.caption(
+                            context,
+                          ).copyWith(color: AppColors.textSecondary),
                         ),
                         Text(
                           '${r.caloriesPerServing} kcal',
-                          style: AppTextStyles.caption(context).copyWith(color: AppColors.textSecondary),
+                          style: AppTextStyles.caption(
+                            context,
+                          ).copyWith(color: AppColors.textSecondary),
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 5.0, vertical: 2.0),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 5.0,
+                            vertical: 2.0,
+                          ),
                           decoration: BoxDecoration(
                             color: r.dietType.toLowerCase() == 'veg'
                                 ? AppColors.success.withValues(alpha: 0.1)
@@ -301,14 +333,19 @@ class _RecipesViewState extends State<RecipesView> {
                             style: TextStyle(
                               fontFamily: 'Outfit',
                               fontSize: context.scaleFont(8.0),
-                              color: r.dietType.toLowerCase() == 'veg' ? AppColors.success : AppColors.danger,
+                              color: r.dietType.toLowerCase() == 'veg'
+                                  ? AppColors.success
+                                  : AppColors.danger,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                         ),
                         if (isZeroWaste)
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 5.0, vertical: 2.0),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 5.0,
+                              vertical: 2.0,
+                            ),
                             decoration: BoxDecoration(
                               color: AppColors.primary.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(4.0),
@@ -316,7 +353,11 @@ class _RecipesViewState extends State<RecipesView> {
                             child: const Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.eco_rounded, size: 9, color: AppColors.primary),
+                                Icon(
+                                  Icons.eco_rounded,
+                                  size: 9,
+                                  color: AppColors.primary,
+                                ),
                                 SizedBox(width: 2),
                                 Text(
                                   'ZERO-WASTE',
@@ -335,7 +376,11 @@ class _RecipesViewState extends State<RecipesView> {
                   ],
                 ),
               ),
-              Icon(Icons.arrow_forward_ios_rounded, size: AppIconSizes.sm(context) * 0.8, color: AppColors.textHint),
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: AppIconSizes.sm(context) * 0.8,
+                color: AppColors.textHint,
+              ),
             ],
           ),
         ),
@@ -357,10 +402,7 @@ class _RecipesViewState extends State<RecipesView> {
             color: AppColors.textSecondary,
           ),
           AppGap.md(context),
-          Text(
-            'No Recipes Yet',
-            style: AppTextStyles.headingMedium(context),
-          ),
+          Text('No Recipes Yet', style: AppTextStyles.headingMedium(context)),
           AppGap.xs(context),
           Text(
             hasKitchenItems
@@ -375,7 +417,10 @@ class _RecipesViewState extends State<RecipesView> {
               width: context.scaleWidth(240.0),
               child: AppButton(
                 text: 'Zero-Waste Chef',
-                onPressed: () => _showZeroWasteGeneratorSheet(context, defaultExpiringOnly: true),
+                onPressed: () => _showZeroWasteGeneratorSheet(
+                  context,
+                  defaultExpiringOnly: true,
+                ),
               ),
             ),
         ],
@@ -396,7 +441,8 @@ class _ZeroWasteGeneratorModal extends StatefulWidget {
   });
 
   @override
-  State<_ZeroWasteGeneratorModal> createState() => _ZeroWasteGeneratorModalState();
+  State<_ZeroWasteGeneratorModal> createState() =>
+      _ZeroWasteGeneratorModalState();
 }
 
 class _ZeroWasteGeneratorModalState extends State<_ZeroWasteGeneratorModal> {
@@ -465,7 +511,10 @@ class _ZeroWasteGeneratorModalState extends State<_ZeroWasteGeneratorModal> {
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(provider.errorMessage ?? 'Failed to generate recipes. Please try again.'),
+          content: Text(
+            provider.errorMessage ??
+                'Failed to generate recipes. Please try again.',
+          ),
           backgroundColor: AppColors.danger,
         ),
       );
@@ -512,7 +561,11 @@ class _ZeroWasteGeneratorModalState extends State<_ZeroWasteGeneratorModal> {
                     color: AppColors.primary.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.soup_kitchen_rounded, color: AppColors.primary, size: 24),
+                  child: const Icon(
+                    Icons.soup_kitchen_rounded,
+                    color: AppColors.primary,
+                    size: 24,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -521,11 +574,15 @@ class _ZeroWasteGeneratorModalState extends State<_ZeroWasteGeneratorModal> {
                     children: [
                       Text(
                         'Zero-Waste Chef Studio',
-                        style: AppTextStyles.headingSmall(context).copyWith(fontWeight: FontWeight.bold),
+                        style: AppTextStyles.headingSmall(
+                          context,
+                        ).copyWith(fontWeight: FontWeight.bold),
                       ),
                       Text(
                         'Cook with what you have. No extra materials needed!',
-                        style: AppTextStyles.caption(context).copyWith(color: AppColors.textSecondary),
+                        style: AppTextStyles.caption(
+                          context,
+                        ).copyWith(color: AppColors.textSecondary),
                       ),
                     ],
                   ),
@@ -536,12 +593,19 @@ class _ZeroWasteGeneratorModalState extends State<_ZeroWasteGeneratorModal> {
             const Divider(),
 
             // 1. Zero-Waste Constraints Toggles
-            Text('Kitchen Sourcing Rules', style: AppTextStyles.labelLarge(context).copyWith(fontWeight: FontWeight.bold)),
+            Text(
+              'Kitchen Sourcing Rules',
+              style: AppTextStyles.labelLarge(
+                context,
+              ).copyWith(fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 6),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('Prioritize Expiring Groceries'),
-              subtitle: const Text('Rescues items expiring soonest first to eliminate waste.'),
+              subtitle: const Text(
+                'Rescues items expiring soonest first to eliminate waste.',
+              ),
               value: _expiringOnly,
               activeThumbColor: AppColors.primary,
               onChanged: (val) => setState(() => _expiringOnly = val),
@@ -549,7 +613,9 @@ class _ZeroWasteGeneratorModalState extends State<_ZeroWasteGeneratorModal> {
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('Strict Kitchen Only (No extra shopping)'),
-              subtitle: const Text('Uses strictly what is in your kitchen (only salt/water/oil assumed).'),
+              subtitle: const Text(
+                'Uses strictly what is in your kitchen (only salt/water/oil assumed).',
+              ),
               value: _strictPantryOnly,
               activeThumbColor: AppColors.primary,
               onChanged: (val) => setState(() => _strictPantryOnly = val),
@@ -557,7 +623,12 @@ class _ZeroWasteGeneratorModalState extends State<_ZeroWasteGeneratorModal> {
             const SizedBox(height: 12),
 
             // 2. Fitness Goal Choice
-            Text('Fitness & Nutrition Goal', style: AppTextStyles.labelLarge(context).copyWith(fontWeight: FontWeight.bold)),
+            Text(
+              'Fitness & Nutrition Goal',
+              style: AppTextStyles.labelLarge(
+                context,
+              ).copyWith(fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
@@ -570,7 +641,9 @@ class _ZeroWasteGeneratorModalState extends State<_ZeroWasteGeneratorModal> {
                   selectedColor: AppColors.primary,
                   labelStyle: TextStyle(
                     color: isSelected ? Colors.white : AppColors.textPrimary,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    fontWeight: isSelected
+                        ? FontWeight.bold
+                        : FontWeight.normal,
                     fontSize: 12,
                   ),
                   onSelected: (selected) {
@@ -582,13 +655,19 @@ class _ZeroWasteGeneratorModalState extends State<_ZeroWasteGeneratorModal> {
             const SizedBox(height: 16),
 
             // 3. Allergy Protection Choice
-            Text('Strict Allergy Filter (Never include)', style: AppTextStyles.labelLarge(context).copyWith(fontWeight: FontWeight.bold)),
+            Text(
+              'Strict Allergy Filter (Never include)',
+              style: AppTextStyles.labelLarge(
+                context,
+              ).copyWith(fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: _allergyOptions.map((allergy) {
-                final isSelected = _selectedAllergies.contains(allergy.toLowerCase()) ||
+                final isSelected =
+                    _selectedAllergies.contains(allergy.toLowerCase()) ||
                     _selectedAllergies.contains(allergy);
                 return FilterChip(
                   label: Text(allergy),
@@ -596,8 +675,12 @@ class _ZeroWasteGeneratorModalState extends State<_ZeroWasteGeneratorModal> {
                   selectedColor: AppColors.danger.withValues(alpha: 0.15),
                   checkmarkColor: AppColors.danger,
                   labelStyle: TextStyle(
-                    color: isSelected ? AppColors.danger : AppColors.textPrimary,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    color: isSelected
+                        ? AppColors.danger
+                        : AppColors.textPrimary,
+                    fontWeight: isSelected
+                        ? FontWeight.bold
+                        : FontWeight.normal,
                     fontSize: 12,
                   ),
                   onSelected: (selected) {
@@ -616,7 +699,12 @@ class _ZeroWasteGeneratorModalState extends State<_ZeroWasteGeneratorModal> {
             const SizedBox(height: 16),
 
             // 4. Diet Choice
-            Text('Diet Preference', style: AppTextStyles.labelLarge(context).copyWith(fontWeight: FontWeight.bold)),
+            Text(
+              'Diet Preference',
+              style: AppTextStyles.labelLarge(
+                context,
+              ).copyWith(fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 8),
             Row(
               children: [
@@ -651,7 +739,9 @@ class _ZeroWasteGeneratorModalState extends State<_ZeroWasteGeneratorModal> {
           decoration: BoxDecoration(
             color: isSelected ? AppColors.primary : AppColors.card,
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: isSelected ? AppColors.primary : AppColors.cardBorder),
+            border: Border.all(
+              color: isSelected ? AppColors.primary : AppColors.cardBorder,
+            ),
           ),
           child: Center(
             child: Text(

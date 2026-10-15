@@ -33,11 +33,15 @@ class GroceryItemCard extends StatelessWidget {
           child: Row(
             children: [
               Container(
-                width: AppSpacing.xxl(context), // use xxl (48) or similar token size
+                width: AppSpacing.xxl(
+                  context,
+                ), // use xxl (48) or similar token size
                 height: AppSpacing.xxl(context),
                 decoration: BoxDecoration(
                   color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(AppRadius.card(context) * 0.75),
+                  borderRadius: BorderRadius.circular(
+                    AppRadius.card(context) * 0.75,
+                  ),
                   border: Border.all(color: AppColors.cardBorder),
                 ),
                 child: Center(
@@ -55,7 +59,9 @@ class GroceryItemCard extends StatelessWidget {
                   children: [
                     Text(
                       item.name,
-                      style: AppTextStyles.labelMedium(context).copyWith(fontSize: 15),
+                      style: AppTextStyles.labelMedium(
+                        context,
+                      ).copyWith(fontSize: 15),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -63,7 +69,9 @@ class GroceryItemCard extends StatelessWidget {
                       const SizedBox(height: 2), // small relative spacer
                       Text(
                         item.brand,
-                        style: AppTextStyles.bodySmall(context).copyWith(color: AppColors.textSecondary),
+                        style: AppTextStyles.bodySmall(
+                          context,
+                        ).copyWith(color: AppColors.textSecondary),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -73,7 +81,9 @@ class GroceryItemCard extends StatelessWidget {
                       Text(
                         item.description,
                         style: AppTextStyles.caption(context).copyWith(
-                          color: AppColors.textSecondary.withValues(alpha: 0.85),
+                          color: AppColors.textSecondary.withValues(
+                            alpha: 0.85,
+                          ),
                           fontSize: 11,
                         ),
                         maxLines: 1,
@@ -83,7 +93,9 @@ class GroceryItemCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       '${item.quantity} ${item.unit} • ${item.storageZone.toUpperCase()}',
-                      style: AppTextStyles.bodySmall(context).copyWith(color: AppColors.textSecondary),
+                      style: AppTextStyles.bodySmall(
+                        context,
+                      ).copyWith(color: AppColors.textSecondary),
                     ),
                   ],
                 ),
@@ -94,10 +106,10 @@ class GroceryItemCard extends StatelessWidget {
               else
                 ExpiryBadge(
                   expiryDate: item.expiryDate,
-                  estimatedDate: item.estimatedConsumptionDate ?? item.predictedExpiry,
+                  estimatedDate:
+                      item.estimatedConsumptionDate ?? item.predictedExpiry,
                   isEstimated: item.isExpiryEstimated,
                 ),
-
             ],
           ),
         ),

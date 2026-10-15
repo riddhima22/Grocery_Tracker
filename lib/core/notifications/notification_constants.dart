@@ -2,7 +2,8 @@ class NotificationConstants {
   // Android Channel Configuration
   static const String channelId = 'grocery_notifications';
   static const String channelName = 'Grocery Notifications';
-  static const String channelDescription = 'Notifications for grocery expiry, reminders, and updates';
+  static const String channelDescription =
+      'Notifications for grocery expiry, reminders, and updates';
 
   // Notification Types
   static const String typeExpiryReminder = 'expiry_reminder';

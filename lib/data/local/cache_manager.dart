@@ -11,7 +11,8 @@ class CacheManager {
   static const String _keyGroceries = 'cached_groceries_list_v1';
   static const String _keyGroceriesTimestamp = 'cached_groceries_timestamp_v1';
   static const String _keyAIInsights = 'cached_ai_insights_v1';
-  static const String _keyAIInsightsTimestamp = 'cached_ai_insights_timestamp_v1';
+  static const String _keyAIInsightsTimestamp =
+      'cached_ai_insights_timestamp_v1';
 
   /// Save grocery list to local cache
   Future<void> saveGroceries(List<GroceryModel> items) async {
@@ -19,7 +20,10 @@ class CacheManager {
       final prefs = await SharedPreferences.getInstance();
       final jsonList = items.map((item) => item.toJson()).toList();
       await prefs.setString(_keyGroceries, jsonEncode(jsonList));
-      await prefs.setInt(_keyGroceriesTimestamp, DateTime.now().millisecondsSinceEpoch);
+      await prefs.setInt(
+        _keyGroceriesTimestamp,
+        DateTime.now().millisecondsSinceEpoch,
+      );
     } catch (e) {
       AppLogger.error('Failed to save groceries to cache', e);
     }
@@ -33,7 +37,9 @@ class CacheManager {
       if (raw != null && raw.isNotEmpty) {
         final decoded = jsonDecode(raw) as List;
         return decoded
-            .map((item) => GroceryModel.fromJson(Map<String, dynamic>.from(item)))
+            .map(
+              (item) => GroceryModel.fromJson(Map<String, dynamic>.from(item)),
+            )
             .toList();
       }
     } catch (e) {
@@ -43,12 +49,16 @@ class CacheManager {
   }
 
   /// Check if the cached groceries are older than [duration]
-  Future<bool> isGroceriesCacheStale({Duration maxAge = const Duration(minutes: 5)}) async {
+  Future<bool> isGroceriesCacheStale({
+    Duration maxAge = const Duration(minutes: 5),
+  }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final timestamp = prefs.getInt(_keyGroceriesTimestamp);
       if (timestamp == null) return true;
-      final cacheAge = DateTime.now().difference(DateTime.fromMillisecondsSinceEpoch(timestamp));
+      final cacheAge = DateTime.now().difference(
+        DateTime.fromMillisecondsSinceEpoch(timestamp),
+      );
       return cacheAge > maxAge;
     } catch (_) {
       return true;
@@ -60,7 +70,10 @@ class CacheManager {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_keyAIInsights, jsonEncode(data));
-      await prefs.setInt(_keyAIInsightsTimestamp, DateTime.now().millisecondsSinceEpoch);
+      await prefs.setInt(
+        _keyAIInsightsTimestamp,
+        DateTime.now().millisecondsSinceEpoch,
+      );
     } catch (e) {
       AppLogger.error('Failed to save AI insights to cache', e);
     }

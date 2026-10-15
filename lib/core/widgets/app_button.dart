@@ -28,7 +28,9 @@ class AppButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool disabled = onPressed == null || isLoading;
-    final double buttonH = context.scaleHeight(AppDimensions.buttonHeight).clamp(46.0, 56.0);
+    final double buttonH = context
+        .scaleHeight(AppDimensions.buttonHeight)
+        .clamp(46.0, 56.0);
     final double radius = AppRadius.card(context);
     final EdgeInsets buttonPadding = EdgeInsets.symmetric(
       horizontal: AppSpacing.sm(context),
@@ -154,9 +156,7 @@ class AppButton extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,
-                  style: AppTextStyles.labelMedium(
-                    context,
-                  ).copyWith(
+                  style: AppTextStyles.labelMedium(context).copyWith(
                     color: textColor,
                     fontSize: context.scaleFont(15.0),
                     fontWeight: FontWeight.w600,

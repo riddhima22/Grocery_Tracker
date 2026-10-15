@@ -31,7 +31,11 @@ class QuantityStepper extends StatelessWidget {
     if (step != null) return step!;
     final u = UnitClassificationService.normalizeUnit(unit);
     if (u == 'g' || u == 'ml') return 50.0;
-    if (u == 'pcs' || UnitClassificationService.unitCategories[u] == UnitClassificationService.categoryPackage) return 1.0;
+    if (u == 'pcs' ||
+        UnitClassificationService.unitCategories[u] ==
+            UnitClassificationService.categoryPackage) {
+      return 1.0;
+    }
     return 0.5;
   }
 
@@ -39,7 +43,11 @@ class QuantityStepper extends StatelessWidget {
     if (min != null) return min!;
     final u = UnitClassificationService.normalizeUnit(unit);
     if (u == 'g' || u == 'ml') return 10.0;
-    if (u == 'pcs' || UnitClassificationService.unitCategories[u] == UnitClassificationService.categoryPackage) return 1.0;
+    if (u == 'pcs' ||
+        UnitClassificationService.unitCategories[u] ==
+            UnitClassificationService.categoryPackage) {
+      return 1.0;
+    }
     return 0.1;
   }
 
@@ -50,7 +58,9 @@ class QuantityStepper extends StatelessWidget {
     final currentStep = _resolvedStep;
     final currentMin = _resolvedMin;
 
-    final qtyDisplay = quantity % 1 == 0 ? quantity.toInt().toString() : quantity.toString();
+    final qtyDisplay = quantity % 1 == 0
+        ? quantity.toInt().toString()
+        : quantity.toString();
 
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -68,9 +78,11 @@ class QuantityStepper extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.all(6.0),
               child: Icon(
-                Icons.remove_circle_outline, 
+                Icons.remove_circle_outline,
                 size: AppIconSizes.md(context),
-                color: quantity <= currentMin ? AppColors.textHint : AppColors.primary,
+                color: quantity <= currentMin
+                    ? AppColors.textHint
+                    : AppColors.primary,
               ),
             ),
           ),
@@ -80,10 +92,15 @@ class QuantityStepper extends StatelessWidget {
           borderRadius: BorderRadius.circular(AppRadius.chip(context) * 0.75),
           onTap: () => _showQuantityAndUnitDialog(context),
           child: Container(
-            padding: EdgeInsets.symmetric(horizontal: paddingH, vertical: paddingV),
+            padding: EdgeInsets.symmetric(
+              horizontal: paddingH,
+              vertical: paddingV,
+            ),
             decoration: BoxDecoration(
               color: AppColors.card,
-              borderRadius: BorderRadius.circular(AppRadius.chip(context) * 0.75),
+              borderRadius: BorderRadius.circular(
+                AppRadius.chip(context) * 0.75,
+              ),
               border: Border.all(color: AppColors.cardBorder),
             ),
             child: Row(
@@ -91,11 +108,17 @@ class QuantityStepper extends StatelessWidget {
               children: [
                 Text(
                   '$qtyDisplay $unit',
-                  style: AppTextStyles.labelMedium(context).copyWith(color: AppColors.textPrimary),
+                  style: AppTextStyles.labelMedium(
+                    context,
+                  ).copyWith(color: AppColors.textPrimary),
                 ),
                 if (onUnitChanged != null) ...[
                   const SizedBox(width: 4),
-                  const Icon(Icons.arrow_drop_down, size: 16, color: AppColors.textSecondary),
+                  const Icon(
+                    Icons.arrow_drop_down,
+                    size: 16,
+                    color: AppColors.textSecondary,
+                  ),
                 ],
               ],
             ),
@@ -115,7 +138,7 @@ class QuantityStepper extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.all(6.0),
               child: Icon(
-                Icons.add_circle_outline, 
+                Icons.add_circle_outline,
                 size: AppIconSizes.md(context),
                 color: quantity >= max ? AppColors.textHint : AppColors.primary,
               ),
@@ -128,7 +151,9 @@ class QuantityStepper extends StatelessWidget {
 
   void _showQuantityAndUnitDialog(BuildContext context) {
     final controller = TextEditingController(
-      text: quantity % 1 == 0 ? quantity.toInt().toString() : quantity.toString(),
+      text: quantity % 1 == 0
+          ? quantity.toInt().toString()
+          : quantity.toString(),
     );
     String selectedUnit = unit;
     final compatibleUnits = UnitClassificationService.getCompatibleUnits(unit);
@@ -142,17 +167,27 @@ class QuantityStepper extends StatelessWidget {
             borderRadius: BorderRadius.circular(AppRadius.card(ctx)),
             side: const BorderSide(color: AppColors.cardBorder),
           ),
-          title: Text('Edit Quantity & Unit', style: AppTextStyles.headingMedium(ctx)),
+          title: Text(
+            'Edit Quantity & Unit',
+            style: AppTextStyles.headingMedium(ctx),
+          ),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Quantity Value', style: AppTextStyles.caption(ctx).copyWith(color: AppColors.textSecondary)),
+                Text(
+                  'Quantity Value',
+                  style: AppTextStyles.caption(
+                    ctx,
+                  ).copyWith(color: AppColors.textSecondary),
+                ),
                 const SizedBox(height: 6),
                 TextField(
                   controller: controller,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   autofocus: true,
                   decoration: const InputDecoration(
                     hintText: 'e.g. 500 or 1.5',
@@ -161,13 +196,19 @@ class QuantityStepper extends StatelessWidget {
                 ),
                 if (onUnitChanged != null) ...[
                   const SizedBox(height: 16),
-                  Text('Unit of Measurement', style: AppTextStyles.caption(ctx).copyWith(color: AppColors.textSecondary)),
+                  Text(
+                    'Unit of Measurement',
+                    style: AppTextStyles.caption(
+                      ctx,
+                    ).copyWith(color: AppColors.textSecondary),
+                  ),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
                     children: compatibleUnits.map((u) {
-                      final isSel = u.toLowerCase() == selectedUnit.toLowerCase();
+                      final isSel =
+                          u.toLowerCase() == selectedUnit.toLowerCase();
                       return ChoiceChip(
                         label: Text(u),
                         selected: isSel,
@@ -175,16 +216,25 @@ class QuantityStepper extends StatelessWidget {
                         backgroundColor: AppColors.card,
                         labelStyle: TextStyle(
                           color: isSel ? Colors.white : AppColors.textPrimary,
-                          fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                          fontWeight: isSel
+                              ? FontWeight.bold
+                              : FontWeight.normal,
                         ),
                         onSelected: (val) {
                           if (val && u != selectedUnit) {
                             // Smart conversion of the input number if compatible
                             final currentNum = double.tryParse(controller.text);
                             if (currentNum != null) {
-                              final converted = UnitClassificationService.convertQuantity(currentNum, selectedUnit, u);
+                              final converted =
+                                  UnitClassificationService.convertQuantity(
+                                    currentNum,
+                                    selectedUnit,
+                                    u,
+                                  );
                               if (converted != null) {
-                                controller.text = converted % 1 == 0 ? converted.toInt().toString() : converted.toString();
+                                controller.text = converted % 1 == 0
+                                    ? converted.toInt().toString()
+                                    : converted.toString();
                               }
                             }
                             setModalState(() {
@@ -202,7 +252,12 @@ class QuantityStepper extends StatelessWidget {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: Text('Cancel', style: AppTextStyles.labelMedium(ctx).copyWith(color: AppColors.textSecondary)),
+              child: Text(
+                'Cancel',
+                style: AppTextStyles.labelMedium(
+                  ctx,
+                ).copyWith(color: AppColors.textSecondary),
+              ),
             ),
             TextButton(
               onPressed: () {
@@ -215,7 +270,12 @@ class QuantityStepper extends StatelessWidget {
                 }
                 Navigator.pop(ctx);
               },
-              child: Text('Confirm', style: AppTextStyles.labelMedium(ctx).copyWith(color: AppColors.primary)),
+              child: Text(
+                'Confirm',
+                style: AppTextStyles.labelMedium(
+                  ctx,
+                ).copyWith(color: AppColors.primary),
+              ),
             ),
           ],
         ),

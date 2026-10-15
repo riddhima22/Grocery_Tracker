@@ -47,10 +47,7 @@ class AppEmptyState extends StatelessWidget {
               style: AppTextStyles.bodyMedium(context),
               textAlign: TextAlign.center,
             ),
-            if (action != null) ...[
-              AppGap.lg(context),
-              action!,
-            ],
+            if (action != null) ...[AppGap.lg(context), action!],
           ],
         ),
       ),

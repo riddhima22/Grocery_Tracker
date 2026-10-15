@@ -31,8 +31,12 @@ class StorageZonePanel extends StatelessWidget {
         height: context.screenSize.height * 0.65,
         decoration: BoxDecoration(
           color: AppColors.surface,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.panel(context))),
-          border: const Border(top: BorderSide(color: AppColors.cardBorder, width: 1.5)),
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(AppRadius.panel(context)),
+          ),
+          border: const Border(
+            top: BorderSide(color: AppColors.cardBorder, width: 1.5),
+          ),
         ),
         child: Column(
           children: [
@@ -47,7 +51,7 @@ class StorageZonePanel extends StatelessWidget {
               ),
             ),
             AppGap.md(context),
-            
+
             // Header details
             Padding(
               padding: EdgeInsets.symmetric(horizontal: AppSpacing.md(context)),
@@ -59,25 +63,33 @@ class StorageZonePanel extends StatelessWidget {
                     children: [
                       Text(
                         '${zone.toUpperCase()} ZONE',
-                        style: AppTextStyles.headingMedium(context).copyWith(fontWeight: FontWeight.bold),
+                        style: AppTextStyles.headingMedium(
+                          context,
+                        ).copyWith(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         '${items.length} items total',
-                        style: AppTextStyles.caption(context).copyWith(color: AppColors.textSecondary),
+                        style: AppTextStyles.caption(
+                          context,
+                        ).copyWith(color: AppColors.textSecondary),
                       ),
                     ],
                   ),
                   IconButton(
-                    icon: Icon(Icons.close_rounded, size: AppIconSizes.md(context), color: AppColors.textSecondary),
+                    icon: Icon(
+                      Icons.close_rounded,
+                      size: AppIconSizes.md(context),
+                      color: AppColors.textSecondary,
+                    ),
                     onPressed: () => Navigator.pop(context),
-                  )
+                  ),
                 ],
               ),
             ),
             AppGap.sm(context),
             const Divider(),
-            
+
             // Scrollable grocery list
             Expanded(
               child: items.isEmpty
@@ -98,7 +110,8 @@ class StorageZonePanel extends StatelessWidget {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => KitchenItemDetailView(item: item),
+                                builder: (context) =>
+                                    KitchenItemDetailView(item: item),
                               ),
                             );
                           },
@@ -141,7 +154,11 @@ class StorageZonePanel extends StatelessWidget {
               text: 'Add Item to $zone',
               onPressed: () {
                 Navigator.pop(context);
-                Navigator.pushNamed(context, AppRoutes.manualAdd, arguments: zone);
+                Navigator.pushNamed(
+                  context,
+                  AppRoutes.manualAdd,
+                  arguments: zone,
+                );
               },
               style: AppButtonStyle.outline,
             ),

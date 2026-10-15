@@ -25,16 +25,23 @@ class _ProfileViewState extends State<ProfileView> {
   final _formKey = GlobalKey<FormState>();
   final _displayNameController = TextEditingController();
   final _newAllergyController = TextEditingController();
-  
+
   String _dietType = 'any';
   List<String> _allergies = [];
   bool _notify3Days = true;
   bool _notify1Day = true;
   bool _notifyDailyRecipe = true;
-  
+
   bool _initialized = false;
 
-  final List<String> _commonAllergens = ['Dairy', 'Nuts', 'Gluten', 'Soy', 'Seafood', 'Egg'];
+  final List<String> _commonAllergens = [
+    'Dairy',
+    'Nuts',
+    'Gluten',
+    'Soy',
+    'Seafood',
+    'Egg',
+  ];
 
   Future<void> _pickAvatar() async {
     final ImagePicker picker = ImagePicker();
@@ -48,9 +55,7 @@ class _ProfileViewState extends State<ProfileView> {
     if (image != null) {
       if (!mounted) return;
       final auth = context.read<AuthProvider>();
-      await auth.updatePreferences(
-        avatarPath: image.path,
-      );
+      await auth.updatePreferences(avatarPath: image.path);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -112,7 +117,11 @@ class _ProfileViewState extends State<ProfileView> {
         onConfirm: () async {
           await context.read<AuthProvider>().logout();
           if (mounted) {
-            Navigator.pushNamedAndRemoveUntil(context, AppRoutes.login, (route) => false);
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              AppRoutes.login,
+              (route) => false,
+            );
           }
         },
       ),
@@ -123,7 +132,8 @@ class _ProfileViewState extends State<ProfileView> {
     final confirmed = await ConfirmDialog.show(
       context: context,
       title: 'Delete Account',
-      content: 'WARNING: Deleting your account is completely irreversible. All your inventory, stats, and recipes will be deleted forever.',
+      content:
+          'WARNING: Deleting your account is completely irreversible. All your inventory, stats, and recipes will be deleted forever.',
       confirmLabel: 'Permanently Delete',
       cancelLabel: 'Cancel',
       isDestructive: true,
@@ -133,7 +143,11 @@ class _ProfileViewState extends State<ProfileView> {
 
     final success = await context.read<AuthProvider>().deleteAccount();
     if (success && mounted) {
-      Navigator.pushNamedAndRemoveUntil(context, AppRoutes.login, (route) => false);
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        AppRoutes.login,
+        (route) => false,
+      );
     }
   }
 
@@ -160,8 +174,12 @@ class _ProfileViewState extends State<ProfileView> {
       isLoading: auth.isLoading,
       appBar: AppBar(
         title: Text(
-          'Profile Preferences', 
-          style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold, fontSize: context.scaleFont(20.0)),
+          'Profile Preferences',
+          style: TextStyle(
+            fontFamily: 'Outfit',
+            fontWeight: FontWeight.bold,
+            fontSize: context.scaleFont(20.0),
+          ),
         ),
         backgroundColor: Colors.transparent,
       ),
@@ -181,11 +199,17 @@ class _ProfileViewState extends State<ProfileView> {
                       children: [
                         CircleAvatar(
                           radius: context.scaleWidth(50.0),
-                          backgroundColor: AppColors.primary.withValues(alpha: 0.12),
-                          backgroundImage: auth.user?.avatarUrl != null && auth.user!.avatarUrl!.isNotEmpty
+                          backgroundColor: AppColors.primary.withValues(
+                            alpha: 0.12,
+                          ),
+                          backgroundImage:
+                              auth.user?.avatarUrl != null &&
+                                  auth.user!.avatarUrl!.isNotEmpty
                               ? NetworkImage(auth.user!.avatarUrl!)
                               : null,
-                          child: auth.user?.avatarUrl == null || auth.user!.avatarUrl!.isEmpty
+                          child:
+                              auth.user?.avatarUrl == null ||
+                                  auth.user!.avatarUrl!.isEmpty
                               ? Text(
                                   auth.user?.displayName.isNotEmpty == true
                                       ? auth.user!.displayName[0].toUpperCase()
@@ -209,7 +233,10 @@ class _ProfileViewState extends State<ProfileView> {
                               decoration: BoxDecoration(
                                 color: AppColors.primary,
                                 shape: BoxShape.circle,
-                                border: Border.all(color: Colors.white, width: 2),
+                                border: Border.all(
+                                  color: Colors.white,
+                                  width: 2,
+                                ),
                               ),
                               child: const Icon(
                                 Icons.camera_alt,
@@ -229,29 +256,43 @@ class _ProfileViewState extends State<ProfileView> {
                   AppGap.md(context),
                   const Divider(),
                   AppGap.sm(context),
-                  
+
                   // Profile Fields
                   AppTextField(
                     controller: _displayNameController,
                     label: 'Display Name',
                     hint: 'Your display name',
-                    validator: (val) => val == null || val.trim().isEmpty ? 'Name is required' : null,
+                    validator: (val) => val == null || val.trim().isEmpty
+                        ? 'Name is required'
+                        : null,
                   ),
                   AppGap.sm(context),
 
                   // Diet Preferences dropdown
-                  Text('Dietary Type', style: AppTextStyles.labelMedium(context)),
+                  Text(
+                    'Dietary Type',
+                    style: AppTextStyles.labelMedium(context),
+                  ),
                   const SizedBox(height: 6),
                   DropdownButtonFormField<String>(
                     initialValue: _dietType,
                     decoration: const InputDecoration(
-                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                     ),
                     dropdownColor: AppColors.surface,
                     items: const [
-                      DropdownMenuItem(value: 'any', child: Text('Any (No dietary restriction)')),
+                      DropdownMenuItem(
+                        value: 'any',
+                        child: Text('Any (No dietary restriction)'),
+                      ),
                       DropdownMenuItem(value: 'veg', child: Text('Vegetarian')),
-                      DropdownMenuItem(value: 'non-veg', child: Text('Non-Vegetarian')),
+                      DropdownMenuItem(
+                        value: 'non-veg',
+                        child: Text('Non-Vegetarian'),
+                      ),
                     ],
                     onChanged: (val) {
                       if (val != null) setState(() => _dietType = val);
@@ -260,18 +301,28 @@ class _ProfileViewState extends State<ProfileView> {
                   AppGap.sm(context),
 
                   // Allergies checklist
-                  Text('Allergies & Sensitivities', style: AppTextStyles.labelMedium(context)),
+                  Text(
+                    'Allergies & Sensitivities',
+                    style: AppTextStyles.labelMedium(context),
+                  ),
                   AppGap.xs(context),
                   Wrap(
                     spacing: 8.0,
                     runSpacing: 8.0,
                     children: [
                       ..._commonAllergens.map((allergy) {
-                        final hasAllergy = _allergies.contains(allergy.toLowerCase());
+                        final hasAllergy = _allergies.contains(
+                          allergy.toLowerCase(),
+                        );
                         return FilterChip(
-                          label: Text(allergy, style: AppTextStyles.bodyMedium(context)),
+                          label: Text(
+                            allergy,
+                            style: AppTextStyles.bodyMedium(context),
+                          ),
                           selected: hasAllergy,
-                          selectedColor: AppColors.primary.withValues(alpha: 0.12),
+                          selectedColor: AppColors.primary.withValues(
+                            alpha: 0.12,
+                          ),
                           checkmarkColor: AppColors.primary,
                           onSelected: (selected) {
                             setState(() {
@@ -284,22 +335,34 @@ class _ProfileViewState extends State<ProfileView> {
                           },
                         );
                       }),
-                      ..._allergies.where((a) => !_commonAllergens.map((c) => c.toLowerCase()).contains(a)).map((allergy) {
-                        final displayName = allergy.isNotEmpty
-                            ? allergy.substring(0, 1).toUpperCase() + allergy.substring(1)
-                            : '';
-                        return InputChip(
-                          label: Text(displayName, style: AppTextStyles.bodyMedium(context)),
-                          selected: true,
-                          selectedColor: AppColors.primary.withValues(alpha: 0.12),
-                          checkmarkColor: AppColors.primary,
-                          onDeleted: () {
-                            setState(() {
-                              _allergies.remove(allergy);
-                            });
-                          },
-                        );
-                      }),
+                      ..._allergies
+                          .where(
+                            (a) => !_commonAllergens
+                                .map((c) => c.toLowerCase())
+                                .contains(a),
+                          )
+                          .map((allergy) {
+                            final displayName = allergy.isNotEmpty
+                                ? allergy.substring(0, 1).toUpperCase() +
+                                      allergy.substring(1)
+                                : '';
+                            return InputChip(
+                              label: Text(
+                                displayName,
+                                style: AppTextStyles.bodyMedium(context),
+                              ),
+                              selected: true,
+                              selectedColor: AppColors.primary.withValues(
+                                alpha: 0.12,
+                              ),
+                              checkmarkColor: AppColors.primary,
+                              onDeleted: () {
+                                setState(() {
+                                  _allergies.remove(allergy);
+                                });
+                              },
+                            );
+                          }),
                     ],
                   ),
                   AppGap.xs(context),
@@ -310,7 +373,10 @@ class _ProfileViewState extends State<ProfileView> {
                           controller: _newAllergyController,
                           decoration: const InputDecoration(
                             hintText: 'Add custom allergy (e.g. Garlic)',
-                            contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 10,
+                            ),
                           ),
                           style: AppTextStyles.bodyMedium(context),
                           onSubmitted: (_) => _addAllergy(),
@@ -318,9 +384,13 @@ class _ProfileViewState extends State<ProfileView> {
                       ),
                       const SizedBox(width: 8.0),
                       IconButton(
-                        icon: Icon(Icons.add_circle_outline, color: AppColors.primary, size: AppIconSizes.md(context)),
+                        icon: Icon(
+                          Icons.add_circle_outline,
+                          color: AppColors.primary,
+                          size: AppIconSizes.md(context),
+                        ),
                         onPressed: _addAllergy,
-                      )
+                      ),
                     ],
                   ),
                   AppGap.md(context),
@@ -328,7 +398,10 @@ class _ProfileViewState extends State<ProfileView> {
                   AppGap.sm(context),
 
                   // Notifications Toggle list
-                  Text('Notification Alerts', style: AppTextStyles.headingMedium(context)),
+                  Text(
+                    'Notification Alerts',
+                    style: AppTextStyles.headingMedium(context),
+                  ),
                   AppGap.xs(context),
                   _buildNotificationSwitch(
                     '3 Days Prior Alert',
@@ -351,10 +424,7 @@ class _ProfileViewState extends State<ProfileView> {
                   AppGap.md(context),
 
                   // Actions Buttons
-                  AppButton(
-                    text: 'Save Profile Preferences',
-                    onPressed: _save,
-                  ),
+                  AppButton(text: 'Save Profile Preferences', onPressed: _save),
                   AppGap.sm(context),
                   AppButton(
                     text: 'Log Out',
@@ -362,14 +432,17 @@ class _ProfileViewState extends State<ProfileView> {
                     style: AppButtonStyle.outline,
                   ),
                   AppGap.md(context),
-                  
+
                   // Double destructive deletion link
                   Center(
                     child: TextButton(
                       onPressed: _deleteAccount,
                       child: Text(
                         'Delete My FreshTrack Account permanently',
-                        style: AppTextStyles.caption(context).copyWith(color: AppColors.danger, fontWeight: FontWeight.bold),
+                        style: AppTextStyles.caption(context).copyWith(
+                          color: AppColors.danger,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),
@@ -424,7 +497,9 @@ class _ProfileViewState extends State<ProfileView> {
             fit: BoxFit.scaleDown,
             child: Text(
               label,
-              style: AppTextStyles.caption(context).copyWith(color: AppColors.textSecondary),
+              style: AppTextStyles.caption(
+                context,
+              ).copyWith(color: AppColors.textSecondary),
             ),
           ),
         ],
@@ -432,7 +507,12 @@ class _ProfileViewState extends State<ProfileView> {
     );
   }
 
-  Widget _buildNotificationSwitch(String title, String desc, bool value, ValueChanged<bool> onChanged) {
+  Widget _buildNotificationSwitch(
+    String title,
+    String desc,
+    bool value,
+    ValueChanged<bool> onChanged,
+  ) {
     return SwitchListTile(
       title: Text(title, style: AppTextStyles.labelMedium(context)),
       subtitle: Text(desc, style: AppTextStyles.caption(context)),

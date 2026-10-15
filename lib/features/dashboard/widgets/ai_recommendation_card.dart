@@ -7,10 +7,7 @@ import '../../../config/app_text_styles.dart';
 class AiRecommendationCard extends StatefulWidget {
   final List<String> recommendations;
 
-  const AiRecommendationCard({
-    super.key,
-    required this.recommendations,
-  });
+  const AiRecommendationCard({super.key, required this.recommendations});
 
   @override
   State<AiRecommendationCard> createState() => _AiRecommendationCardState();

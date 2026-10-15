@@ -31,9 +31,15 @@ class UnitClassificationResult {
   /// "Cooking oil — 1 bottle (1 L)"
   /// "Eggs — 6 pcs"
   String get displayQuantityText {
-    final qtyStr = quantity % 1 == 0 ? quantity.toInt().toString() : quantity.toString();
-    if (packageType.isNotEmpty && netContentValue != null && netContentUnit.isNotEmpty) {
-      final netValStr = netContentValue! % 1 == 0 ? netContentValue!.toInt().toString() : netContentValue!.toString();
+    final qtyStr = quantity % 1 == 0
+        ? quantity.toInt().toString()
+        : quantity.toString();
+    if (packageType.isNotEmpty &&
+        netContentValue != null &&
+        netContentUnit.isNotEmpty) {
+      final netValStr = netContentValue! % 1 == 0
+          ? netContentValue!.toInt().toString()
+          : netContentValue!.toString();
       return '$qtyStr $unit ($netValStr $netContentUnit)';
     }
     return '$qtyStr $unit';
@@ -82,7 +88,19 @@ class UnitClassificationService {
   static const String categoryPackage = 'package';
 
   static const List<String> allUnits = [
-    'kg', 'g', 'L', 'ml', 'pcs', 'dozen', 'packet', 'pack', 'bottle', 'box', 'jar', 'pouch', 'can'
+    'kg',
+    'g',
+    'L',
+    'ml',
+    'pcs',
+    'dozen',
+    'packet',
+    'pack',
+    'bottle',
+    'box',
+    'jar',
+    'pouch',
+    'can',
   ];
 
   static const Map<String, String> unitCategories = {
@@ -122,22 +140,39 @@ class UnitClassificationService {
   /// Normalizes unit strings (e.g. 'l' -> 'L', 'grams' -> 'g')
   static String normalizeUnit(String unit) {
     final lower = unit.trim().toLowerCase();
-    if (lower == 'l' || lower == 'liter' || lower == 'litre' || lower == 'liters' || lower == 'litres') {
+    if (lower == 'l' ||
+        lower == 'liter' ||
+        lower == 'litre' ||
+        lower == 'liters' ||
+        lower == 'litres') {
       return 'L';
     }
     if (lower == 'ml' || lower == 'milliliter' || lower == 'millilitre') {
       return 'ml';
     }
-    if (lower == 'kg' || lower == 'kilogram' || lower == 'kilograms' || lower == 'kgs') {
+    if (lower == 'kg' ||
+        lower == 'kilogram' ||
+        lower == 'kilograms' ||
+        lower == 'kgs') {
       return 'kg';
     }
-    if (lower == 'g' || lower == 'gram' || lower == 'grams' || lower == 'gm' || lower == 'gms') {
+    if (lower == 'g' ||
+        lower == 'gram' ||
+        lower == 'grams' ||
+        lower == 'gm' ||
+        lower == 'gms') {
       return 'g';
     }
-    if (lower == 'pc' || lower == 'pcs' || lower == 'piece' || lower == 'pieces') {
+    if (lower == 'pc' ||
+        lower == 'pcs' ||
+        lower == 'piece' ||
+        lower == 'pieces') {
       return 'pcs';
     }
-    if (lower == 'pack' || lower == 'packet' || lower == 'packets' || lower == 'pkt') {
+    if (lower == 'pack' ||
+        lower == 'packet' ||
+        lower == 'packets' ||
+        lower == 'pkt') {
       return 'packet';
     }
     if (lower == 'bottle' || lower == 'bottles' || lower == 'btl') {
@@ -175,25 +210,42 @@ class UnitClassificationService {
 
   /// Converts quantity between compatible units.
   /// Returns null if units are incompatible.
-  static double? convertQuantity(double quantity, String fromUnit, String toUnit) {
+  static double? convertQuantity(
+    double quantity,
+    String fromUnit,
+    String toUnit,
+  ) {
     final f = normalizeUnit(fromUnit);
     final t = normalizeUnit(toUnit);
     if (f == t) return quantity;
 
     // Weight conversions: kg <-> g
-    if (f == 'kg' && t == 'g') return double.parse((quantity * 1000).toStringAsFixed(3));
-    if (f == 'g' && t == 'kg') return double.parse((quantity / 1000).toStringAsFixed(3));
+    if (f == 'kg' && t == 'g') {
+      return double.parse((quantity * 1000).toStringAsFixed(3));
+    }
+    if (f == 'g' && t == 'kg') {
+      return double.parse((quantity / 1000).toStringAsFixed(3));
+    }
 
     // Volume conversions: L <-> ml
-    if (f == 'L' && t == 'ml') return double.parse((quantity * 1000).toStringAsFixed(3));
-    if (f == 'ml' && t == 'L') return double.parse((quantity / 1000).toStringAsFixed(3));
+    if (f == 'L' && t == 'ml') {
+      return double.parse((quantity * 1000).toStringAsFixed(3));
+    }
+    if (f == 'ml' && t == 'L') {
+      return double.parse((quantity / 1000).toStringAsFixed(3));
+    }
 
     // Count conversions: dozen <-> pcs
-    if (f == 'dozen' && t == 'pcs') return double.parse((quantity * 12).toStringAsFixed(3));
-    if (f == 'pcs' && t == 'dozen') return double.parse((quantity / 12).toStringAsFixed(3));
+    if (f == 'dozen' && t == 'pcs') {
+      return double.parse((quantity * 12).toStringAsFixed(3));
+    }
+    if (f == 'pcs' && t == 'dozen') {
+      return double.parse((quantity / 12).toStringAsFixed(3));
+    }
 
     // Packages conversion preserves count if converting between package types
-    if (unitCategories[f] == categoryPackage && unitCategories[t] == categoryPackage) {
+    if (unitCategories[f] == categoryPackage &&
+        unitCategories[t] == categoryPackage) {
       return quantity;
     }
 
@@ -208,10 +260,18 @@ class UnitClassificationService {
     double? netContentValue,
     String? netContentUnit,
   }) {
-    final qtyStr = quantity % 1 == 0 ? quantity.toInt().toString() : quantity.toString();
-    final pType = (packageType != null && packageType.isNotEmpty) ? packageType : unit;
-    if (netContentValue != null && netContentUnit != null && netContentUnit.isNotEmpty) {
-      final netStr = netContentValue % 1 == 0 ? netContentValue.toInt().toString() : netContentValue.toString();
+    final qtyStr = quantity % 1 == 0
+        ? quantity.toInt().toString()
+        : quantity.toString();
+    final pType = (packageType != null && packageType.isNotEmpty)
+        ? packageType
+        : unit;
+    if (netContentValue != null &&
+        netContentUnit != null &&
+        netContentUnit.isNotEmpty) {
+      final netStr = netContentValue % 1 == 0
+          ? netContentValue.toInt().toString()
+          : netContentValue.toString();
       return '$qtyStr $pType ($netStr $netContentUnit)';
     }
     return '$qtyStr $unit';
@@ -258,8 +318,12 @@ class UnitClassificationService {
     final nameLower = nameClean.toLowerCase();
     final catLower = category.trim().toLowerCase();
 
-    final packageType = _detectPackageType(nameClean) ?? _detectPackageType(explicitQuantityStr ?? '');
-    final parsedMeta = _parseQuantityString(explicitQuantityStr) ?? _parseQuantityString(nameClean);
+    final packageType =
+        _detectPackageType(nameClean) ??
+        _detectPackageType(explicitQuantityStr ?? '');
+    final parsedMeta =
+        _parseQuantityString(explicitQuantityStr) ??
+        _parseQuantityString(nameClean);
 
     // Priority 1 & 2: Explicit metadata and package size
     if (parsedMeta != null) {
@@ -284,7 +348,11 @@ class UnitClassificationService {
 
       // Liquids and oils
       if (_isLiquid(nameLower, catLower)) {
-        final pType = packageType ?? (nameLower.contains('can') ? 'can' : 'bottle');
+        final pType =
+            packageType ??
+            (RegExp(r'\b(can|cans|tin)\b').hasMatch(nameLower)
+                ? 'can'
+                : 'bottle');
         return UnitClassificationResult(
           quantity: packCount.toDouble(),
           unit: pType,
@@ -329,7 +397,9 @@ class UnitClassificationService {
     // Eggs (can be placed under Dairy, Breakfast, Produce, or Other)
     if (nameLower.contains('egg')) {
       double eggCount = 6.0;
-      final numMatch = RegExp(r'\b(\d+)\s*(eggs|egg|pcs|pc)\b').firstMatch(nameLower);
+      final numMatch = RegExp(
+        r'\b(\d+)\s*(eggs|egg|pcs|pc)\b',
+      ).firstMatch(nameLower);
       if (numMatch != null) {
         eggCount = double.tryParse(numMatch.group(1)!) ?? 6.0;
       }
@@ -343,7 +413,10 @@ class UnitClassificationService {
     }
 
     // A. Fruits and Vegetables
-    if (catLower == 'vegetables' || catLower == 'fruits' || catLower == 'produce' || _isProduce(nameLower)) {
+    if (catLower == 'vegetables' ||
+        catLower == 'fruits' ||
+        catLower == 'produce' ||
+        _isProduce(nameLower)) {
       // Countable produce (coconut, watermelon, pumpkin, pineapple, lemon, cabbage, etc.)
       if (_isCountableProduce(nameLower)) {
         return const UnitClassificationResult(
@@ -379,7 +452,9 @@ class UnitClassificationService {
           unitConfidence: 'High',
         );
       }
-      if (nameLower.contains('onion') || nameLower.contains('tomato') || nameLower.contains('carrot')) {
+      if (nameLower.contains('onion') ||
+          nameLower.contains('tomato') ||
+          nameLower.contains('carrot')) {
         return const UnitClassificationResult(
           quantity: 500.0,
           unit: 'g',
@@ -402,7 +477,9 @@ class UnitClassificationService {
     }
 
     // B. Pulses, Grains, Flour & Loose Spices
-    if (catLower == 'grains' || catLower == 'spices' || _isGrainOrSpice(nameLower)) {
+    if (catLower == 'grains' ||
+        catLower == 'spices' ||
+        _isGrainOrSpice(nameLower)) {
       if (nameLower.contains('dal') || nameLower.contains('lentil')) {
         return UnitClassificationResult(
           quantity: 250.0,
@@ -414,7 +491,10 @@ class UnitClassificationService {
           unitConfidence: 'High',
         );
       }
-      if (nameLower.contains('rice') || nameLower.contains('wheat') || nameLower.contains('flour') || nameLower.contains('atta')) {
+      if (nameLower.contains('rice') ||
+          nameLower.contains('wheat') ||
+          nameLower.contains('flour') ||
+          nameLower.contains('atta')) {
         return UnitClassificationResult(
           quantity: 1.0,
           unit: 'kg',
@@ -425,7 +505,11 @@ class UnitClassificationService {
           unitConfidence: 'High',
         );
       }
-      if (catLower == 'spices' || nameLower.contains('powder') || nameLower.contains('masala') || nameLower.contains('cumin') || nameLower.contains('turmeric')) {
+      if (catLower == 'spices' ||
+          nameLower.contains('powder') ||
+          nameLower.contains('masala') ||
+          nameLower.contains('cumin') ||
+          nameLower.contains('turmeric')) {
         return UnitClassificationResult(
           quantity: 100.0,
           unit: 'g',
@@ -451,12 +535,18 @@ class UnitClassificationService {
     if (catLower == 'snacks' || _isSnack(nameLower, catLower)) {
       final pType = packageType ?? 'packet';
       double qty = 1.0;
-      final qtyMatch = RegExp(r'\b(\d+)\s*(packet|packets|pack|packs|bars|bar|box|boxes)\b').firstMatch(nameLower);
+      final qtyMatch = RegExp(
+        r'\b(\d+)\s*(packet|packets|pack|packs|bars|bar|box|boxes)\b',
+      ).firstMatch(nameLower);
       if (qtyMatch != null) {
         qty = double.tryParse(qtyMatch.group(1)!) ?? 1.0;
       }
-      final weightMatch = RegExp(r'(\d+)\s*(g|gm|gms|kg)\b').firstMatch(nameLower);
-      final netVal = weightMatch != null ? double.tryParse(weightMatch.group(1)!) : null;
+      final weightMatch = RegExp(
+        r'(\d+)\s*(g|gm|gms|kg)\b',
+      ).firstMatch(nameLower);
+      final netVal = weightMatch != null
+          ? double.tryParse(weightMatch.group(1)!)
+          : null;
       final netU = weightMatch != null ? 'g' : '';
 
       return UnitClassificationResult(
@@ -472,11 +562,15 @@ class UnitClassificationService {
     }
 
     // D. Oils, Milk & Liquids
-    if (catLower == 'beverages' || catLower == 'beverage' || _isLiquid(nameLower, catLower)) {
+    if (catLower == 'beverages' ||
+        catLower == 'beverage' ||
+        _isLiquid(nameLower, catLower)) {
       final pType = packageType ?? 'bottle';
       double volVal = 1.0;
       String volUnit = 'L';
-      final volMatch = RegExp(r'(\d+)\s*(l|litre|liter|ml)\b').firstMatch(nameLower);
+      final volMatch = RegExp(
+        r'(\d+)\s*(l|litre|liter|ml)\b',
+      ).firstMatch(nameLower);
       if (volMatch != null) {
         volVal = double.tryParse(volMatch.group(1)!) ?? 1.0;
         volUnit = volMatch.group(2)!.toLowerCase().startsWith('l') ? 'L' : 'ml';
@@ -494,8 +588,13 @@ class UnitClassificationService {
     }
 
     // E. Other Configurable Categories (Bakery, Dairy, etc.)
-    if (catLower == 'bakery' || nameLower.contains('bread') || nameLower.contains('bun') || nameLower.contains('cake')) {
-      final pType = nameLower.contains('bread') ? 'loaf' : (packageType ?? 'packet');
+    if (catLower == 'bakery' ||
+        nameLower.contains('bread') ||
+        nameLower.contains('bun') ||
+        nameLower.contains('cake')) {
+      final pType = nameLower.contains('bread')
+          ? 'loaf'
+          : (packageType ?? 'packet');
       return UnitClassificationResult(
         quantity: 1.0,
         unit: pType,
@@ -556,10 +655,12 @@ class UnitClassificationService {
   }
 
   /// Parses raw net weight/volume strings (e.g. '500 g', '1.5 L')
-  static Map<String, dynamic>? parseNetContentString(String? text) => _parseQuantityString(text);
+  static Map<String, dynamic>? parseNetContentString(String? text) =>
+      _parseQuantityString(text);
 
   /// Parses raw net weight/volume strings
-  static Map<String, dynamic>? parseQuantityString(String? text) => _parseQuantityString(text);
+  static Map<String, dynamic>? parseQuantityString(String? text) =>
+      _parseQuantityString(text);
 
   // --- Helpers ---
 
@@ -567,7 +668,11 @@ class UnitClassificationService {
     if (text.isEmpty) return null;
     final lower = text.toLowerCase();
     if (RegExp(r'\b(bottle|bottles|btl)\b').hasMatch(lower)) return 'bottle';
-    if (RegExp(r'\b(packet|packets|pack|packs|pkt|bag|pouch)\b').hasMatch(lower)) return 'packet';
+    if (RegExp(
+      r'\b(packet|packets|pack|packs|pkt|bag|pouch)\b',
+    ).hasMatch(lower)) {
+      return 'packet';
+    }
     if (RegExp(r'\b(box|boxes|carton)\b').hasMatch(lower)) return 'box';
     if (RegExp(r'\b(jar|jars|pot)\b').hasMatch(lower)) return 'jar';
     if (RegExp(r'\b(can|cans|tin)\b').hasMatch(lower)) return 'can';
@@ -579,7 +684,10 @@ class UnitClassificationService {
     final raw = text.trim();
 
     // Multi-pack: "6 x 330 ml"
-    final multi = RegExp(r'(\d+)\s*[xX*]\s*([0-9.]+)\s*(kg|g|gm|gms|l|litre|liter|ml)\b', caseSensitive: false).firstMatch(raw);
+    final multi = RegExp(
+      r'(\d+)\s*[xX*]\s*([0-9.]+)\s*(kg|g|gm|gms|l|litre|liter|ml)\b',
+      caseSensitive: false,
+    ).firstMatch(raw);
     if (multi != null) {
       final count = int.tryParse(multi.group(1)!) ?? 1;
       final val = double.tryParse(multi.group(2)!) ?? 1.0;
@@ -592,14 +700,14 @@ class UnitClassificationService {
     }
 
     // Single quantity: "50 g", "1.5 L", "500ml"
-    final single = RegExp(r'([0-9.]+)\s*(kg|kilogram|g|gram|gm|gms|l|litre|liter|ml|pcs|piece)\b', caseSensitive: false).firstMatch(raw);
+    final single = RegExp(
+      r'([0-9.]+)\s*(kg|kilogram|g|gram|gm|gms|l|litre|liter|ml|pcs|piece)\b',
+      caseSensitive: false,
+    ).firstMatch(raw);
     if (single != null) {
       final val = double.tryParse(single.group(1)!) ?? 1.0;
       final u = normalizeUnit(single.group(2)!);
-      return {
-        'netContentValue': val,
-        'netContentUnit': u,
-      };
+      return {'netContentValue': val, 'netContentUnit': u};
     }
 
     return null;
@@ -607,49 +715,126 @@ class UnitClassificationService {
 
   static bool _isProduce(String name) {
     return [
-      'potato', 'onion', 'tomato', 'carrot', 'spinach', 'apple', 'banana',
-      'cabbage', 'ginger', 'garlic', 'chilli', 'cucumber', 'lemon',
-      'orange', 'mango', 'grape', 'beetroot', 'cauliflower', 'broccoli'
+      'potato',
+      'onion',
+      'tomato',
+      'carrot',
+      'spinach',
+      'apple',
+      'banana',
+      'cabbage',
+      'ginger',
+      'garlic',
+      'chilli',
+      'cucumber',
+      'lemon',
+      'orange',
+      'mango',
+      'grape',
+      'beetroot',
+      'cauliflower',
+      'broccoli',
     ].any((k) => name.contains(k));
   }
 
   static bool _isCountableProduce(String name) {
     return [
-      'coconut', 'watermelon', 'pineapple', 'pumpkin', 'cabbage',
-      'cauliflower', 'lemon', 'lime', 'avocado', 'melon', 'papaya',
-      'lettuce', 'cucumber'
+      'coconut',
+      'watermelon',
+      'pineapple',
+      'pumpkin',
+      'cabbage',
+      'cauliflower',
+      'lemon',
+      'lime',
+      'avocado',
+      'melon',
+      'papaya',
+      'lettuce',
+      'cucumber',
     ].any((k) => name.contains(k));
   }
 
   static bool _isSmallWeightProduce(String name) {
     return [
-      'spinach', 'coriander', 'cilantro', 'mint', 'chilli', 'chili',
-      'ginger', 'garlic', 'berry', 'berries', 'strawberry', 'curry leaves'
+      'spinach',
+      'coriander',
+      'cilantro',
+      'mint',
+      'chilli',
+      'chili',
+      'ginger',
+      'garlic',
+      'berry',
+      'berries',
+      'strawberry',
+      'curry leaves',
     ].any((k) => name.contains(k));
   }
 
   static bool _isGrainOrSpice(String name) {
     return [
-      'dal', 'lentil', 'rice', 'wheat', 'flour', 'atta', 'chickpea', 'rajma',
-      'cumin', 'turmeric', 'coriander powder', 'chilli powder', 'salt', 'pepper', 'masala'
+      'dal',
+      'lentil',
+      'rice',
+      'wheat',
+      'flour',
+      'atta',
+      'chickpea',
+      'rajma',
+      'cumin',
+      'turmeric',
+      'coriander powder',
+      'chilli powder',
+      'salt',
+      'pepper',
+      'masala',
     ].any((k) => name.contains(k));
   }
 
   static bool _isSnack(String name, String cat) {
     if (cat == 'snacks') return true;
     return [
-      'chip', 'chips', 'biscuit', 'biscuits', 'cookie', 'cookies',
-      'chocolate', 'chocolates', 'noodle', 'noodles', 'maggi', 'cracker',
-      'popcorn', 'wafer', 'wafers', 'candy', 'snack'
+      'chip',
+      'chips',
+      'biscuit',
+      'biscuits',
+      'cookie',
+      'cookies',
+      'chocolate',
+      'chocolates',
+      'noodle',
+      'noodles',
+      'maggi',
+      'cracker',
+      'popcorn',
+      'wafer',
+      'wafers',
+      'candy',
+      'snack',
     ].any((k) => name.contains(k));
   }
 
   static bool _isLiquid(String name, String cat) {
     if (cat == 'beverages' || cat == 'beverage') return true;
     return [
-      'oil', 'cooking oil', 'olive oil', 'sunflower oil', 'mustard oil',
-      'milk', 'juice', 'water', 'vinegar', 'syrup', 'soda', 'coke', 'pepsi',
-      'sprite', 'drink', 'beverage', 'sauce'
+      'oil',
+      'cooking oil',
+      'olive oil',
+      'sunflower oil',
+      'mustard oil',
+      'milk',
+      'juice',
+      'water',
+      'vinegar',
+      'syrup',
+      'soda',
+      'coke',
+      'pepsi',
+      'sprite',
+      'drink',
+      'beverage',
+      'sauce',
     ].any((k) => name.contains(k));
   }
 }

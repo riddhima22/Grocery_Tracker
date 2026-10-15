@@ -32,7 +32,9 @@ class SyncOperation {
       id: json['id'] ?? '',
       endpoint: json['endpoint'] ?? '',
       method: json['method'] ?? 'POST',
-      data: json['data'] != null ? Map<String, dynamic>.from(json['data']) : null,
+      data: json['data'] != null
+          ? Map<String, dynamic>.from(json['data'])
+          : null,
       timestamp: json['timestamp'] ?? DateTime.now().millisecondsSinceEpoch,
     );
   }
@@ -50,9 +52,13 @@ class OfflineSyncService {
   bool _isSyncing = false;
 
   void initialize() {
-    _connectivity.onConnectivityChanged.listen((List<ConnectivityResult> results) {
+    _connectivity.onConnectivityChanged.listen((
+      List<ConnectivityResult> results,
+    ) {
       if (results.isNotEmpty && results.first != ConnectivityResult.none) {
-        AppLogger.info('Connection restored! Starting background synchronization...');
+        AppLogger.info(
+          'Connection restored! Starting background synchronization...',
+        );
         syncPendingOperations();
       }
     });
@@ -96,7 +102,7 @@ class OfflineSyncService {
     try {
       final prefs = await SharedPreferences.getInstance();
       final rawQueue = prefs.getStringList(_keyQueue) ?? [];
-      
+
       final operation = SyncOperation(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         endpoint: endpoint,
@@ -126,13 +132,15 @@ class OfflineSyncService {
         return;
       }
 
-      AppLogger.info('Synchronizing ${rawQueue.length} pending offline operations...');
+      AppLogger.info(
+        'Synchronizing ${rawQueue.length} pending offline operations...',
+      );
       List<String> failedQueue = [];
 
       for (var rawOp in rawQueue) {
         final op = SyncOperation.fromJson(jsonDecode(rawOp));
         bool success = false;
-        
+
         try {
           if (op.method == 'POST') {
             await _apiClient.post(op.endpoint, data: op.data);
@@ -145,7 +153,10 @@ class OfflineSyncService {
             success = true;
           }
         } catch (e) {
-          AppLogger.error('Failed to synchronize pending operation ${op.method} ${op.endpoint}, enqueuing again', e);
+          AppLogger.error(
+            'Failed to synchronize pending operation ${op.method} ${op.endpoint}, enqueuing again',
+            e,
+          );
           success = false;
         }
 
@@ -155,7 +166,9 @@ class OfflineSyncService {
       }
 
       await prefs.setStringList(_keyQueue, failedQueue);
-      AppLogger.info('Synchronization complete. Remaining in queue: ${failedQueue.length}');
+      AppLogger.info(
+        'Synchronization complete. Remaining in queue: ${failedQueue.length}',
+      );
     } catch (e) {
       AppLogger.error('Sync queue loop error', e);
     } finally {

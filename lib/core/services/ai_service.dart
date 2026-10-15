@@ -14,7 +14,9 @@ class AIServiceImpl implements IAIService {
   final ApiClient _apiClient = ApiClient();
 
   @override
-  Future<Map<String, dynamic>> predictShelfLife(Map<String, dynamic> data) async {
+  Future<Map<String, dynamic>> predictShelfLife(
+    Map<String, dynamic> data,
+  ) async {
     try {
       final response = await _apiClient.post(
         ApiEndpoints.predictShelfLife,
@@ -24,9 +26,12 @@ class AIServiceImpl implements IAIService {
         return response.data['data'] as Map<String, dynamic>;
       }
     } catch (e) {
-      AppLogger.error('Failed to call remote predictShelfLife, using local fallback estimation', e);
+      AppLogger.error(
+        'Failed to call remote predictShelfLife, using local fallback estimation',
+        e,
+      );
     }
-    
+
     // Fallback to local prediction logic if backend is offline or errors
     return _localPredictionFallback(data);
   }
@@ -45,7 +50,7 @@ class AIServiceImpl implements IAIService {
       'insights': [
         'Could not fetch live insights. Try checking your internet connection.',
         'Store fresh vegetables in high humidity to prevent wilting.',
-        'Label food containers with consumption dates to track freshness.'
+        'Label food containers with consumption dates to track freshness.',
       ],
       'waste_risk': 0.0,
       'freshness_score': 100,
@@ -53,17 +58,39 @@ class AIServiceImpl implements IAIService {
   }
 
   Map<String, dynamic> _localPredictionFallback(Map<String, dynamic> data) {
-    final String category = (data['category'] ?? 'default').toString().toLowerCase();
+    final String category = (data['category'] ?? 'default')
+        .toString()
+        .toLowerCase();
     final String name = (data['name'] ?? '').toString().toLowerCase();
-    final bool isBeverage = category == 'beverages' || category == 'beverage' ||
-        ['carbonated', 'soda', 'coke', 'pepsi', 'sprite', 'fanta', 'drink', 'beverage'].any((k) => name.contains(k));
-    final String zone = isBeverage ? 'fridge' : (data['storage_zone'] ?? 'pantry').toString().toLowerCase();
-    final double temp = double.tryParse(data['temperature']?.toString() ?? '20.0') ?? 20.0;
-    final double humidity = double.tryParse(data['humidity']?.toString() ?? '50.0') ?? 50.0;
-    final String ripeness = (data['ripeness'] ?? 'not_applicable').toString().toLowerCase();
+    final bool isBeverage =
+        category == 'beverages' ||
+        category == 'beverage' ||
+        [
+          'carbonated',
+          'soda',
+          'coke',
+          'pepsi',
+          'sprite',
+          'fanta',
+          'drink',
+          'beverage',
+        ].any((k) => name.contains(k));
+    final String zone = isBeverage
+        ? 'fridge'
+        : (data['storage_zone'] ?? 'pantry').toString().toLowerCase();
+    final double temp =
+        double.tryParse(data['temperature']?.toString() ?? '20.0') ?? 20.0;
+    final double humidity =
+        double.tryParse(data['humidity']?.toString() ?? '50.0') ?? 50.0;
+    final String ripeness = (data['ripeness'] ?? 'not_applicable')
+        .toString()
+        .toLowerCase();
     final bool opened = data['is_opened'] == true;
-    final int freshness = int.tryParse(data['freshness_score']?.toString() ?? '100') ?? 100;
-    final DateTime purchaseDate = DateTime.tryParse(data['purchase_date']?.toString() ?? '') ?? DateTime.now();
+    final int freshness =
+        int.tryParse(data['freshness_score']?.toString() ?? '100') ?? 100;
+    final DateTime purchaseDate =
+        DateTime.tryParse(data['purchase_date']?.toString() ?? '') ??
+        DateTime.now();
 
     int baseDays = 14;
     switch (category) {
@@ -124,13 +151,16 @@ class AIServiceImpl implements IAIService {
 
     final int remainingDays = estDays.clamp(0.5, 365.0).round();
     final predictedExpiry = purchaseDate.add(Duration(days: remainingDays));
-    final recommendedConsumption = purchaseDate.add(Duration(days: (remainingDays * 0.8).round()));
+    final recommendedConsumption = purchaseDate.add(
+      Duration(days: (remainingDays * 0.8).round()),
+    );
 
     String why = 'Clean, dry storage slows enzymatic spoilage.';
     String how = 'Place in sealed containers or zip bags.';
     if (isBeverage || category == 'beverages') {
       why = 'Chilling preserves carbonation fizz and refreshing flavor.';
-      how = 'Store upright on refrigerator shelves (2-5°C). Never freeze cans or glass bottles.';
+      how =
+          'Store upright on refrigerator shelves (2-5°C). Never freeze cans or glass bottles.';
     } else if (category == 'dairy') {
       why = 'Cold temperature keeps bacteria dormant.';
       how = 'Keep in the main fridge compartments, not the door.';
@@ -143,10 +173,13 @@ class AIServiceImpl implements IAIService {
       'estimated_remaining_days': remainingDays.toDouble(),
       'confidence': opened ? 'Low' : 'High',
       'predicted_expiry': predictedExpiry.toIso8601String().substring(0, 10),
-      'recommended_consumption_date': recommendedConsumption.toIso8601String().substring(0, 10),
+      'recommended_consumption_date': recommendedConsumption
+          .toIso8601String()
+          .substring(0, 10),
       'storage_recommendation_why': why,
       'storage_recommendation_how': how,
-      'storage_recommendation_shelf_life': 'Est. remaining: $remainingDays days.',
+      'storage_recommendation_shelf_life':
+          'Est. remaining: $remainingDays days.',
       'ai_explanation': 'Local prediction fallback calculation.',
     };
   }

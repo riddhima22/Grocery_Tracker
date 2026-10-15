@@ -19,10 +19,19 @@ void main() {
   });
 
   group('NotificationRouter Tests', () {
-    test('handles empty or null notification payload gracefully without crashing', () {
-      expect(() => NotificationRouter.handleNotificationTap(null), returnsNormally);
-      expect(() => NotificationRouter.handleNotificationTap({}), returnsNormally);
-    });
+    test(
+      'handles empty or null notification payload gracefully without crashing',
+      () {
+        expect(
+          () => NotificationRouter.handleNotificationTap(null),
+          returnsNormally,
+        );
+        expect(
+          () => NotificationRouter.handleNotificationTap({}),
+          returnsNormally,
+        );
+      },
+    );
 
     test('queues pending notification when navigator is not mounted', () {
       final payload = {
@@ -32,7 +41,10 @@ void main() {
       // Navigator state is null in this headless unit test environment
       NotificationRouter.handleNotificationTap(payload);
       // Ensure processing pending doesn't throw
-      expect(() => NotificationRouter.processPendingNotification(), returnsNormally);
+      expect(
+        () => NotificationRouter.processPendingNotification(),
+        returnsNormally,
+      );
     });
 
     test('parses shopping reminder payload safely', () {
@@ -40,7 +52,10 @@ void main() {
         'type': NotificationConstants.typeShoppingReminder,
         'list_id': 'list_999',
       };
-      expect(() => NotificationRouter.handleNotificationTap(payload), returnsNormally);
+      expect(
+        () => NotificationRouter.handleNotificationTap(payload),
+        returnsNormally,
+      );
     });
 
     test('parses low stock payload safely', () {
@@ -48,7 +63,10 @@ void main() {
         'type': NotificationConstants.typeLowStock,
         'grocery_id': 'item_456',
       };
-      expect(() => NotificationRouter.handleNotificationTap(payload), returnsNormally);
+      expect(
+        () => NotificationRouter.handleNotificationTap(payload),
+        returnsNormally,
+      );
     });
 
     test('parses shared list payload safely', () {
@@ -56,7 +74,10 @@ void main() {
         'type': NotificationConstants.typeSharedList,
         'list_id': 'list_shared_1',
       };
-      expect(() => NotificationRouter.handleNotificationTap(payload), returnsNormally);
+      expect(
+        () => NotificationRouter.handleNotificationTap(payload),
+        returnsNormally,
+      );
     });
   });
 }

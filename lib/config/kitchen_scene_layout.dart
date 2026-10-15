@@ -1,4 +1,3 @@
-
 class KitchenSceneLayout {
   KitchenSceneLayout._();
 

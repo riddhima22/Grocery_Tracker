@@ -9,7 +9,9 @@ void main() {
     test('maps HandshakeException to CertificateVerificationException', () {
       final dioException = DioException(
         requestOptions: RequestOptions(path: '/groceries/'),
-        error: const HandshakeException('Handshake error in client: CERTIFICATE_VERIFY_FAILED: self signed certificate in certificate chain'),
+        error: const HandshakeException(
+          'Handshake error in client: CERTIFICATE_VERIFY_FAILED: self signed certificate in certificate chain',
+        ),
         type: DioExceptionType.connectionError,
         message: 'Handshake error in client',
       );
@@ -17,21 +19,31 @@ void main() {
       final mapped = ApiErrorMapper.map(dioException);
 
       expect(mapped, isA<CertificateVerificationException>());
-      expect(mapped.message, 'Secure connection to the server failed. Please try again later.');
-    });
-
-    test('maps string certificate verification failure to CertificateVerificationException', () {
-      final dioException = DioException(
-        requestOptions: RequestOptions(path: '/groceries/123/consume/'),
-        type: DioExceptionType.unknown,
-        message: 'CERTIFICATE_VERIFY_FAILED: self signed certificate in certificate chain',
+      expect(
+        mapped.message,
+        'Secure connection to the server failed. Please try again later.',
       );
-
-      final mapped = ApiErrorMapper.map(dioException);
-
-      expect(mapped, isA<CertificateVerificationException>());
-      expect(mapped.message, 'Secure connection to the server failed. Please try again later.');
     });
+
+    test(
+      'maps string certificate verification failure to CertificateVerificationException',
+      () {
+        final dioException = DioException(
+          requestOptions: RequestOptions(path: '/groceries/123/consume/'),
+          type: DioExceptionType.unknown,
+          message:
+              'CERTIFICATE_VERIFY_FAILED: self signed certificate in certificate chain',
+        );
+
+        final mapped = ApiErrorMapper.map(dioException);
+
+        expect(mapped, isA<CertificateVerificationException>());
+        expect(
+          mapped.message,
+          'Secure connection to the server failed. Please try again later.',
+        );
+      },
+    );
 
     test('maps timeout to TimeoutException', () {
       final dioException = DioException(

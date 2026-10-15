@@ -25,7 +25,9 @@ class ImagePickerService {
       );
       if (file != null) {
         final bytes = await file.length();
-        AppLogger.info('Captured photo: ${file.name} (${(bytes / 1024).toStringAsFixed(1)} KB)');
+        AppLogger.info(
+          'Captured photo: ${file.name} (${(bytes / 1024).toStringAsFixed(1)} KB)',
+        );
       }
       return file;
     } catch (e, stack) {
@@ -44,7 +46,9 @@ class ImagePickerService {
       );
       if (file != null) {
         final bytes = await file.length();
-        AppLogger.info('Selected gallery image: ${file.name} (${(bytes / 1024).toStringAsFixed(1)} KB)');
+        AppLogger.info(
+          'Selected gallery image: ${file.name} (${(bytes / 1024).toStringAsFixed(1)} KB)',
+        );
       }
       return file;
     } catch (e, stack) {
@@ -62,7 +66,9 @@ class ImagePickerService {
       );
       for (final file in images) {
         final bytes = await file.length();
-        AppLogger.info('Selected multi-image: ${file.name} (${(bytes / 1024).toStringAsFixed(1)} KB)');
+        AppLogger.info(
+          'Selected multi-image: ${file.name} (${(bytes / 1024).toStringAsFixed(1)} KB)',
+        );
       }
       return images;
     } catch (e, stack) {

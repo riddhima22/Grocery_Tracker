@@ -47,9 +47,9 @@ class _BarcodeScannerViewState extends State<BarcodeScannerView> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Barcode lookup failed: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Barcode lookup failed: $e')));
         setState(() => _isProcessing = false);
         _controller.start();
       }
@@ -61,15 +61,15 @@ class _BarcodeScannerViewState extends State<BarcodeScannerView> {
     return AppScaffold(
       isLoading: _isProcessing,
       appBar: AppBar(
-        title: const Text('Scan Product Barcode', style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold)),
+        title: const Text(
+          'Scan Product Barcode',
+          style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold),
+        ),
         backgroundColor: Colors.transparent,
       ),
       body: Stack(
         children: [
-          MobileScanner(
-            controller: _controller,
-            onDetect: _onDetect,
-          ),
+          MobileScanner(controller: _controller, onDetect: _onDetect),
           // Overlay scanning frame
           Center(
             child: Container(
@@ -87,18 +87,23 @@ class _BarcodeScannerViewState extends State<BarcodeScannerView> {
             right: 20,
             child: Center(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.black.withValues(alpha: 0.7),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
                   'Point camera at a barcode',
-                  style: AppTextStyles.bodyMedium(context).copyWith(color: Colors.white),
+                  style: AppTextStyles.bodyMedium(
+                    context,
+                  ).copyWith(color: Colors.white),
                 ),
               ),
             ),
-          )
+          ),
         ],
       ),
     );

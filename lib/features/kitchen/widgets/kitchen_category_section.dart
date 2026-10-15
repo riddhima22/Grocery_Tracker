@@ -38,10 +38,22 @@ class _KitchenCategorySectionState extends State<KitchenCategorySection> {
   static const List<_CategoryItem> _categories = [
     _CategoryItem(key: 'fridge', name: 'Fridge', icon: Icons.kitchen_rounded),
     _CategoryItem(key: 'pantry', name: 'Pantry', icon: Icons.all_inbox_rounded),
-    _CategoryItem(key: 'basket', name: 'Basket', icon: Icons.shopping_basket_rounded),
+    _CategoryItem(
+      key: 'basket',
+      name: 'Basket',
+      icon: Icons.shopping_basket_rounded,
+    ),
     _CategoryItem(key: 'spice', name: 'Spices', icon: Icons.grass_rounded),
-    _CategoryItem(key: 'cabinet', name: 'Cabinet', icon: Icons.door_sliding_rounded),
-    _CategoryItem(key: 'counter', name: 'Counter', icon: Icons.table_restaurant_rounded),
+    _CategoryItem(
+      key: 'cabinet',
+      name: 'Cabinet',
+      icon: Icons.door_sliding_rounded,
+    ),
+    _CategoryItem(
+      key: 'counter',
+      name: 'Counter',
+      icon: Icons.table_restaurant_rounded,
+    ),
     _CategoryItem(key: 'freezer', name: 'Freezer', icon: Icons.ac_unit_rounded),
   ];
 
@@ -70,7 +82,9 @@ class _KitchenCategorySectionState extends State<KitchenCategorySection> {
 
   @override
   Widget build(BuildContext context) {
-    final visibleCategories = _isExpanded ? _categories : _categories.take(2).toList();
+    final visibleCategories = _isExpanded
+        ? _categories
+        : _categories.take(2).toList();
     final remainingCount = _categories.length - 2;
 
     return Column(
@@ -91,18 +105,18 @@ class _KitchenCategorySectionState extends State<KitchenCategorySection> {
                   children: [
                     Text(
                       'Your Kitchen',
-                      style: AppTextStyles.headingMedium(context).copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: AppTextStyles.headingMedium(
+                        context,
+                      ).copyWith(fontWeight: FontWeight.bold),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 2),
                     Text(
                       'Storage zones & freshness overview',
-                      style: AppTextStyles.caption(context).copyWith(
-                        color: AppColors.textSecondary,
-                      ),
+                      style: AppTextStyles.caption(
+                        context,
+                      ).copyWith(color: AppColors.textSecondary),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -116,12 +130,17 @@ class _KitchenCategorySectionState extends State<KitchenCategorySection> {
                   setState(() => _isExpanded = !_isExpanded);
                 },
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8.0,
+                    vertical: 4.0,
+                  ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        _isExpanded ? 'Show Less' : 'View All ($remainingCount)',
+                        _isExpanded
+                            ? 'Show Less'
+                            : 'View All ($remainingCount)',
                         style: AppTextStyles.labelMedium(context).copyWith(
                           color: AppColors.primary,
                           fontWeight: FontWeight.w600,
@@ -195,7 +214,10 @@ class _KitchenCategorySectionState extends State<KitchenCategorySection> {
               setState(() => _isExpanded = !_isExpanded);
             },
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16.0,
+                vertical: 8.0,
+              ),
               decoration: BoxDecoration(
                 color: AppColors.card,
                 borderRadius: BorderRadius.circular(20),

@@ -37,7 +37,9 @@ class ScanCandidateCard extends StatelessWidget {
     final double cardPadding = AppSpacing.sm(context);
 
     return Card(
-      color: isSelected ? AppColors.card : AppColors.card.withValues(alpha: 0.4),
+      color: isSelected
+          ? AppColors.card
+          : AppColors.card.withValues(alpha: 0.4),
       margin: EdgeInsets.symmetric(
         vertical: AppSpacing.xxs(context),
         horizontal: AppSpacing.xxs(context) * 0.5,
@@ -45,7 +47,9 @@ class ScanCandidateCard extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadius.card(context)),
         side: BorderSide(
-          color: isSelected ? AppColors.primary.withValues(alpha: 0.5) : AppColors.cardBorder,
+          color: isSelected
+              ? AppColors.primary.withValues(alpha: 0.5)
+              : AppColors.cardBorder,
           width: isSelected ? 1.5 : 1.0,
         ),
       ),
@@ -66,7 +70,9 @@ class ScanCandidateCard extends StatelessWidget {
                   height: AppSpacing.xxl(context) * 0.85,
                   decoration: BoxDecoration(
                     color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(AppRadius.card(context) * 0.6),
+                    borderRadius: BorderRadius.circular(
+                      AppRadius.card(context) * 0.6,
+                    ),
                     border: Border.all(color: AppColors.cardBorder),
                   ),
                   child: Center(
@@ -87,7 +93,9 @@ class ScanCandidateCard extends StatelessWidget {
                           Expanded(
                             child: Text(
                               candidate.name,
-                              style: AppTextStyles.labelMedium(context).copyWith(fontSize: 15),
+                              style: AppTextStyles.labelMedium(
+                                context,
+                              ).copyWith(fontSize: 15),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -98,7 +106,10 @@ class ScanCandidateCard extends StatelessWidget {
                       Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 1,
+                            ),
                             decoration: BoxDecoration(
                               color: AppColors.primary.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(4),
@@ -117,10 +128,11 @@ class ScanCandidateCard extends StatelessWidget {
                             Expanded(
                               child: Text(
                                 candidate.brand,
-                                style: AppTextStyles.bodySmall(context).copyWith(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 11,
-                                ),
+                                style: AppTextStyles.bodySmall(context)
+                                    .copyWith(
+                                      color: AppColors.textSecondary,
+                                      fontSize: 11,
+                                    ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -135,20 +147,31 @@ class ScanCandidateCard extends StatelessWidget {
                 AIConfidenceBadge(confidence: candidate.confidence),
               ],
             ),
-            
+
             // Package information banner if net content / package type available
-            if (candidate.packageType.isNotEmpty && candidate.netContentValue != null && candidate.netContentUnit.isNotEmpty) ...[
+            if (candidate.packageType.isNotEmpty &&
+                candidate.netContentValue != null &&
+                candidate.netContentUnit.isNotEmpty) ...[
               AppGap.xs(context),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.surface,
                   borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: AppColors.cardBorder.withValues(alpha: 0.6)),
+                  border: Border.all(
+                    color: AppColors.cardBorder.withValues(alpha: 0.6),
+                  ),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.inventory_2_outlined, size: 14, color: AppColors.primary),
+                    const Icon(
+                      Icons.inventory_2_outlined,
+                      size: 14,
+                      color: AppColors.primary,
+                    ),
                     const SizedBox(width: 6),
                     Text(
                       'Package Info: ${candidate.displayQuantityText}',
@@ -163,22 +186,33 @@ class ScanCandidateCard extends StatelessWidget {
             ],
 
             // Uncertain unit warning chip
-            if (candidate.isUncertain || candidate.unitConfidence.toLowerCase() == 'uncertain' || candidate.unitConfidence.toLowerCase() == 'low') ...[
+            if (candidate.isUncertain ||
+                candidate.unitConfidence.toLowerCase() == 'uncertain' ||
+                candidate.unitConfidence.toLowerCase() == 'low') ...[
               AppGap.xs(context),
               InkWell(
                 onTap: onEdit,
                 borderRadius: BorderRadius.circular(6),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.warning.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: AppColors.warning.withValues(alpha: 0.5)),
+                    border: Border.all(
+                      color: AppColors.warning.withValues(alpha: 0.5),
+                    ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.help_outline, size: 14, color: AppColors.warning),
+                      const Icon(
+                        Icons.help_outline,
+                        size: 14,
+                        color: AppColors.warning,
+                      ),
                       const SizedBox(width: 6),
                       Text(
                         'Unit uncertain • Tap Edit to confirm',
@@ -199,8 +233,12 @@ class ScanCandidateCard extends StatelessWidget {
                   ? candidate.description
                   : 'Detected ${candidate.category.toLowerCase()} item for ${candidate.storageZone.toLowerCase()} storage.',
               style: AppTextStyles.bodyMedium(context).copyWith(
-                color: candidate.description.isNotEmpty ? AppColors.textPrimary : AppColors.textSecondary,
-                fontStyle: candidate.description.isNotEmpty ? FontStyle.normal : FontStyle.italic,
+                color: candidate.description.isNotEmpty
+                    ? AppColors.textPrimary
+                    : AppColors.textSecondary,
+                fontStyle: candidate.description.isNotEmpty
+                    ? FontStyle.normal
+                    : FontStyle.italic,
               ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
@@ -217,7 +255,9 @@ class ScanCandidateCard extends StatelessWidget {
                     children: [
                       Text(
                         'Storage: ${candidate.storageZone.toUpperCase()}',
-                        style: AppTextStyles.caption(context).copyWith(color: AppColors.textSecondary),
+                        style: AppTextStyles.caption(
+                          context,
+                        ).copyWith(color: AppColors.textSecondary),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -225,12 +265,18 @@ class ScanCandidateCard extends StatelessWidget {
                       InkWell(
                         borderRadius: BorderRadius.circular(4),
                         onTap: () async {
-                          final initial = candidate.effectiveExpiryDate ?? DateTime.now().add(const Duration(days: 7));
+                          final initial =
+                              candidate.effectiveExpiryDate ??
+                              DateTime.now().add(const Duration(days: 7));
                           final picked = await showDatePicker(
                             context: context,
                             initialDate: initial,
-                            firstDate: DateTime.now().subtract(const Duration(days: 365)),
-                            lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
+                            firstDate: DateTime.now().subtract(
+                              const Duration(days: 365),
+                            ),
+                            lastDate: DateTime.now().add(
+                              const Duration(days: 365 * 5),
+                            ),
                           );
                           if (picked != null && onExpiryChanged != null) {
                             onExpiryChanged!(picked);
@@ -242,38 +288,56 @@ class ScanCandidateCard extends StatelessWidget {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(
-                                Icons.calendar_today_outlined, 
-                                size: 13, 
-                                color: candidate.effectiveExpiryDate != null ? AppColors.primary : AppColors.warning,
+                                Icons.calendar_today_outlined,
+                                size: 13,
+                                color: candidate.effectiveExpiryDate != null
+                                    ? AppColors.primary
+                                    : AppColors.warning,
                               ),
                               const SizedBox(width: 4),
                               Flexible(
                                 child: Builder(
                                   builder: (context) {
-                                    final effective = candidate.effectiveExpiryDate;
+                                    final effective =
+                                        candidate.effectiveExpiryDate;
                                     if (effective == null) {
                                       return Text(
                                         'Date: Set Date',
-                                        style: AppTextStyles.caption(context).copyWith(
-                                          color: AppColors.warning,
-                                          fontWeight: FontWeight.bold,
-                                          decoration: TextDecoration.underline,
-                                        ),
+                                        style: AppTextStyles.caption(context)
+                                            .copyWith(
+                                              color: AppColors.warning,
+                                              fontWeight: FontWeight.bold,
+                                              decoration:
+                                                  TextDecoration.underline,
+                                            ),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                       );
                                     }
-                                    final bool isEstimated = candidate.isExpiryEstimated || candidate.expiryDate == null;
-                                    final shelfText = DateHelpers.formatCandidateShelfText(effective, isEstimated: isEstimated);
-                                    final String labelPrefix = isEstimated ? 'Est. Consume' : 'Expiry';
+                                    final bool isEstimated =
+                                        candidate.isExpiryEstimated ||
+                                        candidate.expiryDate == null;
+                                    final shelfText =
+                                        DateHelpers.formatCandidateShelfText(
+                                          effective,
+                                          isEstimated: isEstimated,
+                                        );
+                                    final String labelPrefix = isEstimated
+                                        ? 'Est. Consume'
+                                        : 'Expiry';
                                     return Text(
                                       '$labelPrefix: ${effective.toString().substring(0, 10)} ($shelfText)',
-                                      style: AppTextStyles.caption(context).copyWith(
-                                        color: isEstimated ? AppColors.textSecondary : AppColors.textPrimary,
-                                        fontWeight: FontWeight.bold,
-                                        decoration: TextDecoration.underline,
-                                        decorationColor: AppColors.primary.withValues(alpha: 0.5),
-                                      ),
+                                      style: AppTextStyles.caption(context)
+                                          .copyWith(
+                                            color: isEstimated
+                                                ? AppColors.textSecondary
+                                                : AppColors.textPrimary,
+                                            fontWeight: FontWeight.bold,
+                                            decoration:
+                                                TextDecoration.underline,
+                                            decorationColor: AppColors.primary
+                                                .withValues(alpha: 0.5),
+                                          ),
                                       maxLines: 2,
                                       softWrap: true,
                                     );
@@ -304,14 +368,32 @@ class ScanCandidateCard extends StatelessWidget {
                 if (onEdit != null)
                   TextButton.icon(
                     onPressed: onEdit,
-                    icon: Icon(Icons.edit_outlined, size: AppIconSizes.sm(context), color: AppColors.primary),
-                    label: Text('Edit', style: AppTextStyles.caption(context).copyWith(color: AppColors.primary)),
+                    icon: Icon(
+                      Icons.edit_outlined,
+                      size: AppIconSizes.sm(context),
+                      color: AppColors.primary,
+                    ),
+                    label: Text(
+                      'Edit',
+                      style: AppTextStyles.caption(
+                        context,
+                      ).copyWith(color: AppColors.primary),
+                    ),
                   ),
                 if (onRemove != null)
                   TextButton.icon(
                     onPressed: onRemove,
-                    icon: Icon(Icons.delete_outline, size: AppIconSizes.sm(context), color: AppColors.danger),
-                    label: Text('Remove', style: AppTextStyles.caption(context).copyWith(color: AppColors.danger)),
+                    icon: Icon(
+                      Icons.delete_outline,
+                      size: AppIconSizes.sm(context),
+                      color: AppColors.danger,
+                    ),
+                    label: Text(
+                      'Remove',
+                      style: AppTextStyles.caption(
+                        context,
+                      ).copyWith(color: AppColors.danger),
+                    ),
                   ),
               ],
             ),

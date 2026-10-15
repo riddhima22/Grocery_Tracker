@@ -78,9 +78,9 @@ class _LoginViewState extends State<LoginView> {
         try {
           final fb_auth.OAuthCredential credential =
               fb_auth.GoogleAuthProvider.credential(
-            accessToken: authDetails.accessToken,
-            idToken: authDetails.idToken,
-          );
+                accessToken: authDetails.accessToken,
+                idToken: authDetails.idToken,
+              );
           await fb_auth.FirebaseAuth.instance.signInWithCredential(credential);
         } catch (fbError) {
           debugPrint('Firebase sign in sync note: $fbError');
@@ -251,7 +251,6 @@ class _LoginViewState extends State<LoginView> {
                     icon: Icons.g_mobiledata_rounded,
                   ),
                   AppGap.xl(context),
-
 
                   // Sign Up link
                   Row(

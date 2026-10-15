@@ -50,8 +50,14 @@ class ScanSessionModel {
       failedImageCount: json['failed_image_count'] ?? 0,
       candidateCount: json['candidate_count'] ?? 0,
       idempotencyKey: json['idempotency_key'],
-      completedAt: json['completed_at'] != null ? DateTime.tryParse(json['completed_at']) : null,
-      images: (json['images'] as List?)?.map((i) => ScanImageModel.fromJson(i)).toList() ?? const [],
+      completedAt: json['completed_at'] != null
+          ? DateTime.tryParse(json['completed_at'])
+          : null,
+      images:
+          (json['images'] as List?)
+              ?.map((i) => ScanImageModel.fromJson(i))
+              .toList() ??
+          const [],
     );
   }
 }

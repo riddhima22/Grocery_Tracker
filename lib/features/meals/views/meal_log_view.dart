@@ -41,7 +41,9 @@ class _MealLogViewState extends State<MealLogView> {
   void _analyzeMeal() async {
     if (_image == null && _descController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please add a photo or description of your meal')),
+        const SnackBar(
+          content: Text('Please add a photo or description of your meal'),
+        ),
       );
       return;
     }
@@ -59,7 +61,10 @@ class _MealLogViewState extends State<MealLogView> {
       );
     } else if (mounted && provider.errorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(provider.errorMessage!), backgroundColor: AppColors.danger),
+        SnackBar(
+          content: Text(provider.errorMessage!),
+          backgroundColor: AppColors.danger,
+        ),
       );
     }
   }
@@ -87,10 +92,12 @@ class _MealLogViewState extends State<MealLogView> {
             AppGap.sm(context),
             Text(
               'Snap a photo or describe your meal so FreshTrack can deduct the used ingredients from your pantry.',
-              style: AppTextStyles.bodyMedium(context).copyWith(color: AppColors.textSecondary),
+              style: AppTextStyles.bodyMedium(
+                context,
+              ).copyWith(color: AppColors.textSecondary),
             ),
             AppGap.lg(context),
-            
+
             // Image Picker Area
             GestureDetector(
               onTap: () {
@@ -98,13 +105,18 @@ class _MealLogViewState extends State<MealLogView> {
                   context: context,
                   backgroundColor: AppColors.card,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.card(context))),
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(AppRadius.card(context)),
+                    ),
                   ),
                   builder: (_) => SafeArea(
                     child: Wrap(
                       children: [
                         ListTile(
-                          leading: const Icon(Icons.camera_alt, color: AppColors.primary),
+                          leading: const Icon(
+                            Icons.camera_alt,
+                            color: AppColors.primary,
+                          ),
                           title: const Text('Take a photo'),
                           onTap: () {
                             Navigator.pop(context);
@@ -112,7 +124,10 @@ class _MealLogViewState extends State<MealLogView> {
                           },
                         ),
                         ListTile(
-                          leading: const Icon(Icons.photo_library, color: AppColors.primary),
+                          leading: const Icon(
+                            Icons.photo_library,
+                            color: AppColors.primary,
+                          ),
                           title: const Text('Choose from gallery'),
                           onTap: () {
                             Navigator.pop(context);
@@ -141,9 +156,16 @@ class _MealLogViewState extends State<MealLogView> {
                     ? Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.add_a_photo, size: 48, color: AppColors.primary.withValues(alpha: 0.5)),
+                          Icon(
+                            Icons.add_a_photo,
+                            size: 48,
+                            color: AppColors.primary.withValues(alpha: 0.5),
+                          ),
                           const SizedBox(height: 8),
-                          Text('Tap to add photo', style: AppTextStyles.labelMedium(context)),
+                          Text(
+                            'Tap to add photo',
+                            style: AppTextStyles.labelMedium(context),
+                          ),
                         ],
                       )
                     : null,
@@ -156,20 +178,24 @@ class _MealLogViewState extends State<MealLogView> {
                 child: TextButton.icon(
                   onPressed: () => setState(() => _image = null),
                   icon: const Icon(Icons.clear, color: AppColors.danger),
-                  label: const Text('Remove Photo', style: TextStyle(color: AppColors.danger)),
+                  label: const Text(
+                    'Remove Photo',
+                    style: TextStyle(color: AppColors.danger),
+                  ),
                 ),
-              )
+              ),
             ],
-            
+
             AppGap.lg(context),
-            
+
             // Description Field
             TextField(
               controller: _descController,
               maxLines: 3,
               style: AppTextStyles.bodyMedium(context),
               decoration: InputDecoration(
-                hintText: 'e.g., I cooked chicken biryani with rice and tomatoes',
+                hintText:
+                    'e.g., I cooked chicken biryani with rice and tomatoes',
                 filled: true,
                 fillColor: AppColors.card,
                 border: OutlineInputBorder(
@@ -182,13 +208,16 @@ class _MealLogViewState extends State<MealLogView> {
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(AppRadius.card(context)),
-                  borderSide: const BorderSide(color: AppColors.primary, width: 2),
+                  borderSide: const BorderSide(
+                    color: AppColors.primary,
+                    width: 2,
+                  ),
                 ),
               ),
             ),
-            
+
             AppGap.xl(context),
-            
+
             // Action Button
             ElevatedButton(
               onPressed: isLoading ? null : _analyzeMeal,
@@ -203,11 +232,16 @@ class _MealLogViewState extends State<MealLogView> {
                   ? const SizedBox(
                       height: 24,
                       width: 24,
-                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
                     )
                   : Text(
                       'Analyze Meal',
-                      style: AppTextStyles.labelLarge(context).copyWith(color: Colors.white),
+                      style: AppTextStyles.labelLarge(
+                        context,
+                      ).copyWith(color: Colors.white),
                     ),
             ),
           ],

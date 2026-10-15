@@ -20,7 +20,8 @@ class NotificationService {
   NotificationService._internal();
 
   final FirebaseMessaging _fcm = FirebaseMessaging.instance;
-  final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
+  final FlutterLocalNotificationsPlugin _localNotifications =
+      FlutterLocalNotificationsPlugin();
 
   bool _initialized = false;
   String? _cachedDeviceId;
@@ -34,21 +35,24 @@ class NotificationService {
       tz.initializeTimeZones();
 
       // 1. Android Notification Channel (High Importance / Heads-up)
-      const AndroidNotificationChannel androidChannel = AndroidNotificationChannel(
-        NotificationConstants.channelId,
-        NotificationConstants.channelName,
-        description: NotificationConstants.channelDescription,
-        importance: Importance.high,
-        playSound: true,
-      );
+      const AndroidNotificationChannel androidChannel =
+          AndroidNotificationChannel(
+            NotificationConstants.channelId,
+            NotificationConstants.channelName,
+            description: NotificationConstants.channelDescription,
+            importance: Importance.high,
+            playSound: true,
+          );
 
       // 2. Initialize Local Notifications Plugin
-      const AndroidInitializationSettings androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-      const DarwinInitializationSettings iosSettings = DarwinInitializationSettings(
-        requestAlertPermission: false,
-        requestBadgePermission: false,
-        requestSoundPermission: false,
-      );
+      const AndroidInitializationSettings androidSettings =
+          AndroidInitializationSettings('@mipmap/ic_launcher');
+      const DarwinInitializationSettings iosSettings =
+          DarwinInitializationSettings(
+            requestAlertPermission: false,
+            requestBadgePermission: false,
+            requestSoundPermission: false,
+          );
 
       const InitializationSettings initSettings = InitializationSettings(
         android: androidSettings,
@@ -58,7 +62,9 @@ class NotificationService {
       await _localNotifications.initialize(
         initSettings,
         onDidReceiveNotificationResponse: (NotificationResponse response) {
-          AppLogger.info('Local notification clicked with payload: ${response.payload}');
+          AppLogger.info(
+            'Local notification clicked with payload: ${response.payload}',
+          );
           if (response.payload != null && response.payload!.isNotEmpty) {
             try {
               final Map<String, dynamic> data = jsonDecode(response.payload!);
@@ -71,8 +77,10 @@ class NotificationService {
       );
 
       // 3. Register notification channel on Android
-      final androidImplementation =
-          _localNotifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+      final androidImplementation = _localNotifications
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >();
       if (androidImplementation != null) {
         await androidImplementation.createNotificationChannel(androidChannel);
       }
@@ -85,20 +93,26 @@ class NotificationService {
 
       // 6. Setup Foreground Message Handling
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-        AppLogger.info('Foreground FCM push received: ${message.notification?.title ?? message.data['title']}');
+        AppLogger.info(
+          'Foreground FCM push received: ${message.notification?.title ?? message.data['title']}',
+        );
         _showForegroundNotification(message);
       });
 
       // 7. Setup Background Notification Tap Handling (App resumed from background)
       FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-        AppLogger.info('Push notification clicked in background: ${message.data}');
+        AppLogger.info(
+          'Push notification clicked in background: ${message.data}',
+        );
         NotificationRouter.handleNotificationTap(message.data);
       });
 
       // 8. Handle Terminated App Notification Tap (Cold Start)
       final initialMessage = await _fcm.getInitialMessage();
       if (initialMessage != null) {
-        AppLogger.info('Terminated app launched from notification: ${initialMessage.data}');
+        AppLogger.info(
+          'Terminated app launched from notification: ${initialMessage.data}',
+        );
         NotificationRouter.handleNotificationTap(initialMessage.data);
       } else {
         NotificationRouter.processPendingNotification();
@@ -115,10 +129,13 @@ class NotificationService {
   }
 
   /// Request permissions on Android 13+ (POST_NOTIFICATIONS) and iOS
-  Future<void> _requestPermissions(AndroidFlutterLocalNotificationsPlugin? androidImplementation) async {
+  Future<void> _requestPermissions(
+    AndroidFlutterLocalNotificationsPlugin? androidImplementation,
+  ) async {
     try {
       if (defaultTargetPlatform == TargetPlatform.android) {
-        final granted = await androidImplementation?.requestNotificationsPermission();
+        final granted = await androidImplementation
+            ?.requestNotificationsPermission();
         AppLogger.info('Android notification permission granted: $granted');
       } else if (defaultTargetPlatform == TargetPlatform.iOS) {
         final settings = await _fcm.requestPermission(
@@ -127,7 +144,9 @@ class NotificationService {
           sound: true,
           provisional: false,
         );
-        AppLogger.info('iOS notification permission status: ${settings.authorizationStatus}');
+        AppLogger.info(
+          'iOS notification permission status: ${settings.authorizationStatus}',
+        );
       }
     } catch (e) {
       AppLogger.warning('Notification permission request skipped/failed: $e');
@@ -152,12 +171,16 @@ class NotificationService {
     try {
       final token = await _fcm.getToken();
       if (token != null && token.isNotEmpty) {
-        AppLogger.info('FCM Token generated: ${token.substring(0, token.length > 15 ? 15 : token.length)}...');
+        AppLogger.info(
+          'FCM Token generated: ${token.substring(0, token.length > 15 ? 15 : token.length)}...',
+        );
         await uploadFcmToken(token);
       }
 
       _fcm.onTokenRefresh.listen((newToken) async {
-        AppLogger.info('FCM Token refreshed: ${newToken.substring(0, newToken.length > 15 ? 15 : newToken.length)}...');
+        AppLogger.info(
+          'FCM Token refreshed: ${newToken.substring(0, newToken.length > 15 ? 15 : newToken.length)}...',
+        );
         await uploadFcmToken(newToken);
       });
     } catch (e) {
@@ -173,11 +196,7 @@ class NotificationService {
 
       await ApiClient().post(
         ApiEndpoints.deviceToken,
-        data: {
-          'token': token,
-          'platform': platform,
-          'device_id': deviceId,
-        },
+        data: {'token': token, 'platform': platform, 'device_id': deviceId},
       );
 
       final prefs = await SharedPreferences.getInstance();
@@ -193,16 +212,15 @@ class NotificationService {
   Future<void> unregisterFcmToken() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final lastToken = prefs.getString(NotificationConstants.prefsLastFcmTokenKey);
+      final lastToken = prefs.getString(
+        NotificationConstants.prefsLastFcmTokenKey,
+      );
       final deviceId = await getDeviceId();
 
       if (lastToken != null && lastToken.isNotEmpty) {
         await ApiClient().delete(
           ApiEndpoints.deviceToken,
-          data: {
-            'token': lastToken,
-            'device_id': deviceId,
-          },
+          data: {'token': lastToken, 'device_id': deviceId},
         );
         await prefs.remove(NotificationConstants.prefsLastFcmTokenKey);
         AppLogger.info('FCM device token unlinked from backend on logout.');
@@ -215,23 +233,27 @@ class NotificationService {
   /// Displays foreground notifications using flutter_local_notifications
   void _showForegroundNotification(RemoteMessage message) {
     try {
-      final title = message.notification?.title ?? message.data['title'] ?? 'FreshTrack Alert';
+      final title =
+          message.notification?.title ??
+          message.data['title'] ??
+          'FreshTrack Alert';
       final body = message.notification?.body ?? message.data['body'] ?? '';
 
-      final notificationId = message.messageId.hashCode != 0 
-          ? message.messageId.hashCode 
+      final notificationId = message.messageId.hashCode != 0
+          ? message.messageId.hashCode
           : DateTime.now().millisecondsSinceEpoch % 100000;
 
       final payloadString = jsonEncode(message.data);
 
-      const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-        NotificationConstants.channelId,
-        NotificationConstants.channelName,
-        channelDescription: NotificationConstants.channelDescription,
-        importance: Importance.max,
-        priority: Priority.high,
-        showWhen: true,
-      );
+      const AndroidNotificationDetails androidDetails =
+          AndroidNotificationDetails(
+            NotificationConstants.channelId,
+            NotificationConstants.channelName,
+            channelDescription: NotificationConstants.channelDescription,
+            importance: Importance.max,
+            priority: Priority.high,
+            showWhen: true,
+          );
 
       const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
         presentAlert: true,
@@ -270,13 +292,14 @@ class NotificationService {
     final tz.TZDateTime tzDate = tz.TZDateTime.from(scheduledDate, tz.local);
     if (tzDate.isBefore(DateTime.now())) return;
 
-    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-      NotificationConstants.channelId,
-      NotificationConstants.channelName,
-      channelDescription: NotificationConstants.channelDescription,
-      importance: Importance.max,
-      priority: Priority.high,
-    );
+    const AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
+          NotificationConstants.channelId,
+          NotificationConstants.channelName,
+          channelDescription: NotificationConstants.channelDescription,
+          importance: Importance.max,
+          priority: Priority.high,
+        );
 
     const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
       presentAlert: true,
@@ -295,7 +318,8 @@ class NotificationService {
       tzDate,
       details,
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
       payload: payload,
     );
   }
@@ -315,11 +339,18 @@ class NotificationService {
 
       // 1. One day prior alert (at 9:00 AM)
       final oneDayBefore = expiry.subtract(const Duration(days: 1));
-      final scheduledOneDay = DateTime(oneDayBefore.year, oneDayBefore.month, oneDayBefore.day, 9, 0);
+      final scheduledOneDay = DateTime(
+        oneDayBefore.year,
+        oneDayBefore.month,
+        oneDayBefore.day,
+        9,
+        0,
+      );
       await scheduleLocalNotification(
         id: id++,
         title: 'Expiry Tomorrow: ${item.name}',
-        body: '${item.name} will expire tomorrow. Use it soon to prevent waste!',
+        body:
+            '${item.name} will expire tomorrow. Use it soon to prevent waste!',
         scheduledDate: scheduledOneDay,
         payload: jsonEncode({
           'type': NotificationConstants.typeExpiryReminder,
@@ -328,7 +359,13 @@ class NotificationService {
       );
 
       // 2. Expiry day alert (at 9:00 AM)
-      final scheduledExpiry = DateTime(expiry.year, expiry.month, expiry.day, 9, 0);
+      final scheduledExpiry = DateTime(
+        expiry.year,
+        expiry.month,
+        expiry.day,
+        9,
+        0,
+      );
       await scheduleLocalNotification(
         id: id++,
         title: 'Expired Today: ${item.name}',

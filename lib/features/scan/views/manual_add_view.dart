@@ -23,14 +23,14 @@ class ManualAddView extends StatefulWidget {
 
 class _ManualAddViewState extends State<ManualAddView> {
   final _formKey = GlobalKey<FormState>();
-  
+
   final _nameController = TextEditingController();
   final _brandController = TextEditingController();
   final _descController = TextEditingController();
   final _barcodeController = TextEditingController();
   final _qtyController = TextEditingController(text: '1.0');
   final _netValController = TextEditingController();
-  
+
   String _category = 'Vegetables';
   String _unit = 'kg';
   String _unitCategory = 'weight';
@@ -45,21 +45,39 @@ class _ManualAddViewState extends State<ManualAddView> {
   final DateTime _purchaseDate = DateTime.now();
 
   final List<String> _categories = [
-    'Vegetables', 'Fruits', 'Dairy', 'Bakery', 'Meat', 'Grains', 'Snacks', 'Beverages', 'Spices', 'Other'
+    'Vegetables',
+    'Fruits',
+    'Dairy',
+    'Bakery',
+    'Meat',
+    'Grains',
+    'Snacks',
+    'Beverages',
+    'Spices',
+    'Other',
   ];
 
   final List<String> _units = UnitClassificationService.allUnits;
 
-  final List<String> _zones = ['fridge', 'freezer', 'pantry', 'counter', 'cabinet', 'basket', 'spice'];
+  final List<String> _zones = [
+    'fridge',
+    'freezer',
+    'pantry',
+    'counter',
+    'cabinet',
+    'basket',
+    'spice',
+  ];
 
   @override
   void initState() {
     super.initState();
     _nameController.addListener(_onNameChanged);
-    if (widget.initialZone != null && _zones.contains(widget.initialZone!.toLowerCase())) {
+    if (widget.initialZone != null &&
+        _zones.contains(widget.initialZone!.toLowerCase())) {
       _storageZone = widget.initialZone!.toLowerCase();
     }
-    
+
     if (widget.initialData != null) {
       final d = widget.initialData!;
       if (d['name'] != null) _nameController.text = d['name'];
@@ -68,7 +86,8 @@ class _ManualAddViewState extends State<ManualAddView> {
       if (d['category'] != null && _categories.contains(d['category'])) {
         _category = d['category'];
       }
-      if (d['storage_zone'] != null && _zones.contains(d['storage_zone'].toString().toLowerCase())) {
+      if (d['storage_zone'] != null &&
+          _zones.contains(d['storage_zone'].toString().toLowerCase())) {
         _storageZone = d['storage_zone'].toString().toLowerCase();
       }
 
@@ -80,10 +99,13 @@ class _ManualAddViewState extends State<ManualAddView> {
       if (d['quantity'] != null) {
         final q = double.tryParse(d['quantity'].toString());
         if (q != null && q > 0) {
-          _qtyController.text = q % 1 == 0 ? q.toInt().toString() : q.toString();
+          _qtyController.text = q % 1 == 0
+              ? q.toInt().toString()
+              : q.toString();
         }
       }
-      if (d['package_type'] != null && d['package_type'].toString().isNotEmpty) {
+      if (d['package_type'] != null &&
+          d['package_type'].toString().isNotEmpty) {
         _packageType = d['package_type'].toString();
       }
       if (d['net_content_value'] != null) {
@@ -132,9 +154,24 @@ class _ManualAddViewState extends State<ManualAddView> {
     if (text.isEmpty) return;
 
     final isBeverage = [
-      'soda', 'coke', 'coca-cola', 'pepsi', 'sprite', 'fanta', 'carbonated',
-      'cold drink', 'soft drink', 'energy drink', 'red bull', 'sting', 'beer',
-      'limca', 'thums up', 'dew', '7up', 'mirinda'
+      'soda',
+      'coke',
+      'coca-cola',
+      'pepsi',
+      'sprite',
+      'fanta',
+      'carbonated',
+      'cold drink',
+      'soft drink',
+      'energy drink',
+      'red bull',
+      'sting',
+      'beer',
+      'limca',
+      'thums up',
+      'dew',
+      '7up',
+      'mirinda',
     ].any((k) => text.contains(k));
 
     if (isBeverage && (_category != 'Beverages' || _storageZone != 'fridge')) {
@@ -233,13 +270,19 @@ class _ManualAddViewState extends State<ManualAddView> {
     final double? qty = double.tryParse(_qtyController.text);
     if (qty == null || qty <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a valid positive quantity.')),
+        const SnackBar(
+          content: Text('Please enter a valid positive quantity.'),
+        ),
       );
       return;
     }
 
     final double? netVal = double.tryParse(_netValController.text);
-    final pType = _packageType.isNotEmpty ? _packageType : (UnitClassificationService.unitCategories[_unit] == 'package' ? _unit : '');
+    final pType = _packageType.isNotEmpty
+        ? _packageType
+        : (UnitClassificationService.unitCategories[_unit] == 'package'
+              ? _unit
+              : '');
 
     final data = {
       'name': _nameController.text.trim(),
@@ -250,12 +293,15 @@ class _ManualAddViewState extends State<ManualAddView> {
       'barcode': _barcodeController.text.trim(),
       'quantity': qty,
       'unit': _unit,
-      'unit_category': UnitClassificationService.unitCategories[_unit] ?? _unitCategory,
+      'unit_category':
+          UnitClassificationService.unitCategories[_unit] ?? _unitCategory,
       'package_type': pType,
       'net_content_value': netVal,
       'net_content_unit': _netContentUnit,
       'package_count': pType.isNotEmpty ? qty.toInt() : null,
-      'identification_source': widget.initialData != null ? 'barcode' : 'manual',
+      'identification_source': widget.initialData != null
+          ? 'barcode'
+          : 'manual',
       'unit_confidence': _isUncertain ? 'Low' : 'High',
       'storage_zone': _storageZone,
       'expiry_date': _expiryDate?.toIso8601String().substring(0, 10),
@@ -266,7 +312,11 @@ class _ManualAddViewState extends State<ManualAddView> {
 
     if (kitchen.errorMessage == null && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Successfully added ${_nameController.text} to pantry.')),
+        SnackBar(
+          content: Text(
+            'Successfully added ${_nameController.text} to pantry.',
+          ),
+        ),
       );
       Navigator.pop(context);
     }
@@ -282,8 +332,12 @@ class _ManualAddViewState extends State<ManualAddView> {
       isLoading: kitchen.isLoading,
       appBar: AppBar(
         title: Text(
-          'Add Grocery Item', 
-          style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold, fontSize: context.scaleFont(20.0)),
+          'Add Grocery Item',
+          style: TextStyle(
+            fontFamily: 'Outfit',
+            fontWeight: FontWeight.bold,
+            fontSize: context.scaleFont(20.0),
+          ),
         ),
         backgroundColor: Colors.transparent,
       ),
@@ -301,7 +355,9 @@ class _ManualAddViewState extends State<ManualAddView> {
                     controller: _nameController,
                     label: 'Item Name',
                     hint: 'e.g. Potatoes, Chips, Cooking Oil',
-                    validator: (val) => val == null || val.isEmpty ? 'Item name is required' : null,
+                    validator: (val) => val == null || val.isEmpty
+                        ? 'Item name is required'
+                        : null,
                   ),
                   AppGap.sm(context),
                   AppTextField(
@@ -310,7 +366,7 @@ class _ManualAddViewState extends State<ManualAddView> {
                     hint: 'e.g. Lay\'s, Fortune, Amul',
                   ),
                   AppGap.sm(context),
-                  
+
                   // Category Selection Dropdown
                   Text('Category', style: AppTextStyles.labelMedium(context)),
                   const SizedBox(height: 6),
@@ -318,18 +374,29 @@ class _ManualAddViewState extends State<ManualAddView> {
                     key: ValueKey('cat_$_category'),
                     initialValue: _category,
                     decoration: const InputDecoration(
-                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                     ),
                     dropdownColor: AppColors.surface,
                     items: _categories.map((c) {
-                      return DropdownMenuItem(value: c, child: Text(c, style: AppTextStyles.bodyMedium(context)));
+                      return DropdownMenuItem(
+                        value: c,
+                        child: Text(
+                          c,
+                          style: AppTextStyles.bodyMedium(context),
+                        ),
+                      );
                     }).toList(),
                     onChanged: (val) {
                       if (val != null) {
                         setState(() {
                           _category = val;
                           final lower = val.toLowerCase();
-                          if (lower == 'beverages' || lower == 'dairy' || lower == 'meat') {
+                          if (lower == 'beverages' ||
+                              lower == 'dairy' ||
+                              lower == 'meat') {
                             _storageZone = 'fridge';
                           } else if (lower == 'spices') {
                             _storageZone = 'spice';
@@ -343,10 +410,11 @@ class _ManualAddViewState extends State<ManualAddView> {
 
                           // If user hasn't locked unit, classify with new category
                           if (!_isUnitCustomized) {
-                            final classified = UnitClassificationService.classifyProduct(
-                              productName: _nameController.text,
-                              category: val,
-                            );
+                            final classified =
+                                UnitClassificationService.classifyProduct(
+                                  productName: _nameController.text,
+                                  category: val,
+                                );
                             _unit = classified.unit;
                             _unitCategory = classified.unitCategory;
                             _qtyController.text = classified.quantity % 1 == 0
@@ -360,17 +428,28 @@ class _ManualAddViewState extends State<ManualAddView> {
                   AppGap.sm(context),
 
                   // Detected Package Size Info Banner
-                  if (_packageType.isNotEmpty && _netContentValue != null && _netContentUnit.isNotEmpty) ...[
+                  if (_packageType.isNotEmpty &&
+                      _netContentValue != null &&
+                      _netContentUnit.isNotEmpty) ...[
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
                         color: AppColors.surface,
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppColors.primary.withValues(alpha: 0.4)),
+                        border: Border.all(
+                          color: AppColors.primary.withValues(alpha: 0.4),
+                        ),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.info_outline, size: 16, color: AppColors.primary),
+                          const Icon(
+                            Icons.info_outline,
+                            size: 16,
+                            color: AppColors.primary,
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
@@ -396,8 +475,12 @@ class _ManualAddViewState extends State<ManualAddView> {
                         child: AppTextField(
                           controller: _qtyController,
                           label: 'Quantity',
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          validator: (val) => val == null || val.isEmpty ? 'Quantity is required' : null,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          validator: (val) => val == null || val.isEmpty
+                              ? 'Quantity is required'
+                              : null,
                         ),
                       ),
                       AppGap.sm(context),
@@ -406,25 +489,48 @@ class _ManualAddViewState extends State<ManualAddView> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Unit', style: AppTextStyles.labelMedium(context)),
+                            Text(
+                              'Unit',
+                              style: AppTextStyles.labelMedium(context),
+                            ),
                             const SizedBox(height: 6),
                             DropdownButtonFormField<String>(
                               key: ValueKey('unit_$_unit'),
-                              initialValue: _units.contains(_unit) ? _unit : _units.first,
+                              initialValue: _units.contains(_unit)
+                                  ? _unit
+                                  : _units.first,
                               decoration: const InputDecoration(
-                                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 12,
+                                ),
                               ),
                               dropdownColor: AppColors.surface,
                               items: _units.map((u) {
-                                return DropdownMenuItem(value: u, child: Text(u, style: AppTextStyles.bodyMedium(context)));
+                                return DropdownMenuItem(
+                                  value: u,
+                                  child: Text(
+                                    u,
+                                    style: AppTextStyles.bodyMedium(context),
+                                  ),
+                                );
                               }).toList(),
                               onChanged: (val) {
                                 if (val != null) {
-                                  final currentVal = double.tryParse(_qtyController.text);
+                                  final currentVal = double.tryParse(
+                                    _qtyController.text,
+                                  );
                                   if (currentVal != null) {
-                                    final converted = UnitClassificationService.convertQuantity(currentVal, _unit, val);
+                                    final converted =
+                                        UnitClassificationService.convertQuantity(
+                                          currentVal,
+                                          _unit,
+                                          val,
+                                        );
                                     if (converted != null) {
-                                      _qtyController.text = converted % 1 == 0 ? converted.toInt().toString() : converted.toString();
+                                      _qtyController.text = converted % 1 == 0
+                                          ? converted.toInt().toString()
+                                          : converted.toString();
                                     }
                                   }
                                   setState(() {
@@ -445,21 +551,41 @@ class _ManualAddViewState extends State<ManualAddView> {
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        Text('Quick Convert: ', style: AppTextStyles.caption(context).copyWith(color: AppColors.textSecondary)),
+                        Text(
+                          'Quick Convert: ',
+                          style: AppTextStyles.caption(
+                            context,
+                          ).copyWith(color: AppColors.textSecondary),
+                        ),
                         Wrap(
                           spacing: 6,
                           children: otherCompatible.map((altUnit) {
                             return ActionChip(
-                              label: Text('to $altUnit', style: const TextStyle(fontSize: 11)),
+                              label: Text(
+                                'to $altUnit',
+                                style: const TextStyle(fontSize: 11),
+                              ),
                               backgroundColor: AppColors.card,
-                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                                vertical: 0,
+                              ),
                               onPressed: () {
-                                final currentVal = double.tryParse(_qtyController.text);
+                                final currentVal = double.tryParse(
+                                  _qtyController.text,
+                                );
                                 if (currentVal != null) {
-                                  final converted = UnitClassificationService.convertQuantity(currentVal, _unit, altUnit);
+                                  final converted =
+                                      UnitClassificationService.convertQuantity(
+                                        currentVal,
+                                        _unit,
+                                        altUnit,
+                                      );
                                   if (converted != null) {
                                     setState(() {
-                                      _qtyController.text = converted % 1 == 0 ? converted.toInt().toString() : converted.toString();
+                                      _qtyController.text = converted % 1 == 0
+                                          ? converted.toInt().toString()
+                                          : converted.toString();
                                       _unit = altUnit;
                                       _isUnitCustomized = true;
                                     });
@@ -476,7 +602,8 @@ class _ManualAddViewState extends State<ManualAddView> {
                   AppGap.sm(context),
 
                   // Optional Package details if package type is selected
-                  if (UnitClassificationService.unitCategories[_unit] == UnitClassificationService.categoryPackage) ...[
+                  if (UnitClassificationService.unitCategories[_unit] ==
+                      UnitClassificationService.categoryPackage) ...[
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -486,7 +613,9 @@ class _ManualAddViewState extends State<ManualAddView> {
                             controller: _netValController,
                             label: 'Net Weight / Volume',
                             hint: 'e.g. 50 or 500',
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
                           ),
                         ),
                         AppGap.sm(context),
@@ -495,22 +624,53 @@ class _ManualAddViewState extends State<ManualAddView> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Size Unit', style: AppTextStyles.labelMedium(context)),
+                              Text(
+                                'Size Unit',
+                                style: AppTextStyles.labelMedium(context),
+                              ),
                               const SizedBox(height: 6),
                               DropdownButtonFormField<String>(
-                                initialValue: ['g', 'kg', 'ml', 'L', ''].contains(_netContentUnit) ? _netContentUnit : '',
+                                initialValue:
+                                    [
+                                      'g',
+                                      'kg',
+                                      'ml',
+                                      'L',
+                                      '',
+                                    ].contains(_netContentUnit)
+                                    ? _netContentUnit
+                                    : '',
                                 decoration: const InputDecoration(
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                  contentPadding: EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 12,
+                                  ),
                                 ),
                                 dropdownColor: AppColors.surface,
                                 items: const [
-                                  DropdownMenuItem(value: '', child: Text('None')),
-                                  DropdownMenuItem(value: 'g', child: Text('g')),
-                                  DropdownMenuItem(value: 'kg', child: Text('kg')),
-                                  DropdownMenuItem(value: 'ml', child: Text('ml')),
-                                  DropdownMenuItem(value: 'L', child: Text('L')),
+                                  DropdownMenuItem(
+                                    value: '',
+                                    child: Text('None'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'g',
+                                    child: Text('g'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'kg',
+                                    child: Text('kg'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'ml',
+                                    child: Text('ml'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'L',
+                                    child: Text('L'),
+                                  ),
                                 ],
-                                onChanged: (u) => setState(() => _netContentUnit = u ?? ''),
+                                onChanged: (u) =>
+                                    setState(() => _netContentUnit = u ?? ''),
                               ),
                             ],
                           ),
@@ -521,17 +681,29 @@ class _ManualAddViewState extends State<ManualAddView> {
                   ],
 
                   // Storage Zone selection
-                  Text('Storage Zone', style: AppTextStyles.labelMedium(context)),
+                  Text(
+                    'Storage Zone',
+                    style: AppTextStyles.labelMedium(context),
+                  ),
                   const SizedBox(height: 6),
                   DropdownButtonFormField<String>(
                     key: ValueKey('zone_$_storageZone'),
                     initialValue: _storageZone,
                     decoration: const InputDecoration(
-                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                     ),
                     dropdownColor: AppColors.surface,
                     items: _zones.map((z) {
-                      return DropdownMenuItem(value: z, child: Text(z.toUpperCase(), style: AppTextStyles.bodyMedium(context)));
+                      return DropdownMenuItem(
+                        value: z,
+                        child: Text(
+                          z.toUpperCase(),
+                          style: AppTextStyles.bodyMedium(context),
+                        ),
+                      );
                     }).toList(),
                     onChanged: (val) {
                       if (val != null) setState(() => _storageZone = val);
@@ -546,22 +718,33 @@ class _ManualAddViewState extends State<ManualAddView> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Expiry Date', style: AppTextStyles.labelMedium(context)),
+                          Text(
+                            'Expiry Date',
+                            style: AppTextStyles.labelMedium(context),
+                          ),
                           const SizedBox(height: 4),
                           Text(
-                            _expiryDate != null 
-                                ? _expiryDate!.toIso8601String().substring(0, 10) 
+                            _expiryDate != null
+                                ? _expiryDate!.toIso8601String().substring(
+                                    0,
+                                    10,
+                                  )
                                 : 'No Expiry Set',
                             style: AppTextStyles.bodyLarge(context).copyWith(
-                              color: _expiryDate != null ? AppColors.primary : AppColors.textSecondary,
+                              color: _expiryDate != null
+                                  ? AppColors.primary
+                                  : AppColors.textSecondary,
                             ),
-                          )
+                          ),
                         ],
                       ),
                       GestureDetector(
                         onTap: _selectExpiryDate,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
                           decoration: BoxDecoration(
                             border: Border.all(color: AppColors.primary),
                             borderRadius: BorderRadius.circular(12),
@@ -585,11 +768,8 @@ class _ManualAddViewState extends State<ManualAddView> {
                     maxLines: 2,
                   ),
                   AppGap.md(context),
-                  
-                  AppButton(
-                    text: 'Add to Pantry',
-                    onPressed: _submit,
-                  ),
+
+                  AppButton(text: 'Add to Pantry', onPressed: _submit),
                   AppGap.sm(context),
                 ],
               ),
