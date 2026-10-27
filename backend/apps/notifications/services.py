@@ -1,7 +1,9 @@
-import os
 import json
 import logging
+import os
+
 from django.conf import settings
+
 from .models import DeviceToken
 
 logger = logging.getLogger('freshtrack.notifications')
@@ -25,7 +27,7 @@ def get_or_initialize_firebase():
 
         cred_json_str = getattr(settings, 'FIREBASE_CREDENTIALS_JSON', None) or os.environ.get('FIREBASE_CREDENTIALS_JSON')
         cred_path = (
-            getattr(settings, 'GOOGLE_APPLICATION_CREDENTIALS', None) 
+            getattr(settings, 'GOOGLE_APPLICATION_CREDENTIALS', None)
             or getattr(settings, 'FIREBASE_CREDENTIALS_PATH', None)
             or os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
             or os.environ.get('FIREBASE_CREDENTIALS_PATH')
@@ -103,7 +105,6 @@ class FCMNotificationService:
             return {"sent": len(tokens), "failed": 0, "cleaned": 0, "simulated": True}
 
         try:
-            import firebase_admin
             from firebase_admin import messaging
 
             # Ensure all data values are strings (FCM requirement for data payload)

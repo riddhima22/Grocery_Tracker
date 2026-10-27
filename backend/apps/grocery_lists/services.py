@@ -1,5 +1,6 @@
 import logging
 from decimal import Decimal
+
 from .models import GroceryList, GroceryListItem
 
 logger = logging.getLogger('freshtrack.grocery_lists')

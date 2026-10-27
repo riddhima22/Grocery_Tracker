@@ -1,7 +1,8 @@
 import logging
+
 from django.db import transaction
 from django.utils import timezone
-from rest_framework import viewsets, status, parsers
+from rest_framework import parsers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
@@ -10,7 +11,7 @@ from apps.groceries.services import deduct_pantry_items_bulk
 from integrations.ai.ai_service import AIService
 from integrations.ai.gemini_client import AIContentBlockedError
 
-from .models import MealLog, MealIngredientCandidate
+from .models import MealIngredientCandidate, MealLog
 from .serializers import MealLogSerializer
 
 logger = logging.getLogger(__name__)
@@ -38,10 +39,10 @@ class MealLogViewSet(viewsets.ModelViewSet):
         )
         if image_file:
             meal_log.image = image_file
-        
+
         # Save so image is on disk and we have an ID
         meal_log.save()
-        
+
         # Gather pantry items
         groceries = GroceryItem.objects.filter(user=user, quantity__gt=0).exclude(status='expired')
         grocery_data = []
@@ -56,7 +57,7 @@ class MealLogViewSet(viewsets.ModelViewSet):
 
         ai_service = AIService()
         image_path = meal_log.image.path if meal_log.image else None
-        
+
         try:
             ai_output = ai_service.infer_meal_ingredients(image_path, text_description, grocery_data)
         except AIContentBlockedError as e:
@@ -94,7 +95,7 @@ class MealLogViewSet(viewsets.ModelViewSet):
                         pantry_item_ref = GroceryItem.objects.get(id=p_item_id, user=user)
                     except (GroceryItem.DoesNotExist, Exception):
                         pass
-                
+
                 candidates.append(MealIngredientCandidate(
                     meal_log=meal_log,
                     pantry_item=pantry_item_ref,
@@ -105,7 +106,7 @@ class MealLogViewSet(viewsets.ModelViewSet):
                     confidence=item.get('confidence', 'Low'),
                     confirmed=True if pantry_item_ref else False
                 ))
-            
+
             MealIngredientCandidate.objects.bulk_create(candidates)
 
         serializer = self.get_serializer(meal_log)
@@ -143,16 +144,16 @@ class MealLogViewSet(viewsets.ModelViewSet):
                 c_id = c_data.get('candidate_id')
                 confirmed = c_data.get('confirmed', False)
                 quantity = c_data.get('quantity', 0)
-                
+
                 try:
                     candidate = MealIngredientCandidate.objects.select_for_update().get(id=c_id, meal_log=meal_log)
                 except MealIngredientCandidate.DoesNotExist:
                     continue
-                
+
                 candidate.confirmed = confirmed
                 candidate.deduct_quantity = quantity
                 candidate.save(update_fields=['confirmed', 'deduct_quantity'])
-                
+
                 if confirmed and quantity > 0:
                     items_to_deduct.append({
                         'pantry_item_id': str(candidate.pantry_item.id) if candidate.pantry_item else None,
@@ -160,9 +161,9 @@ class MealLogViewSet(viewsets.ModelViewSet):
                         'quantity': quantity,
                         'unit': candidate.unit
                     })
-            
+
             summary, errors = deduct_pantry_items_bulk(user, items_to_deduct, activity_source='meal_log')
-            
+
             meal_log.status = MealLog.StatusChoices.CONFIRMED
             meal_log.confirmed_at = timezone.now()
             meal_log.deduction_result = {
@@ -170,9 +171,9 @@ class MealLogViewSet(viewsets.ModelViewSet):
                 'errors': errors
             }
             meal_log.save(update_fields=['status', 'confirmed_at', 'deduction_result', 'updated_at'])
-            
+
             serializer = self.get_serializer(meal_log)
-            
+
             return Response({
                 "success": True,
                 "data": serializer.data,

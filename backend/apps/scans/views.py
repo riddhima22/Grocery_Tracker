@@ -1,17 +1,19 @@
-from rest_framework import viewsets, status
-from rest_framework.response import Response
-from rest_framework.decorators import action
+import logging
+import os
+import uuid
+
 from django.db import transaction
 from django.utils import timezone
-from .models import ScanSession, ScanImage, ScanCandidate
-from .serializers import ScanSessionSerializer, ScanCandidateSerializer
-from .tasks import process_scan_session_task
-from apps.groceries.models import GroceryItem, GroceryActivity
+from rest_framework import status, viewsets
+from rest_framework.decorators import action
+from rest_framework.response import Response
+
+from apps.groceries.models import GroceryActivity, GroceryItem
 from apps.groceries.serializers import GroceryItemSerializer
-from common.exceptions import ResourceNotFoundException, ForbiddenException
-import uuid
-import os
-import logging
+
+from .models import ScanCandidate, ScanImage, ScanSession
+from .serializers import ScanCandidateSerializer, ScanSessionSerializer
+from .tasks import process_scan_session_task
 
 logger = logging.getLogger('freshtrack.scans.views')
 
@@ -24,10 +26,10 @@ class ScanSessionViewSet(viewsets.ReadOnlyModelViewSet):
 
     def create(self, request, *args, **kwargs):
         images_files = request.FILES.getlist('images')
-        
+
         if not images_files:
             return Response({"success": False, "error": "No images provided."}, status=400)
-            
+
         if len(images_files) > 10:
             return Response({"success": False, "error": "Maximum 10 images allowed per scan session."}, status=400)
 
@@ -55,7 +57,7 @@ class ScanSessionViewSet(viewsets.ReadOnlyModelViewSet):
         for img in images_files:
             if img.size > 5 * 1024 * 1024: # 5MB limit
                 return Response({"success": False, "error": f"Image {img.name} exceeds 5MB size limit."}, status=400)
-            
+
             ext = os.path.splitext(img.name)[1].lower()
             if ext not in ALLOWED_IMAGE_FORMATS:
                 return Response({"success": False, "error": f"Unsupported file type: {ext}."}, status=400)
@@ -167,38 +169,54 @@ class ScanSessionViewSet(viewsets.ReadOnlyModelViewSet):
             created_groceries = []
 
             def sanitize_unit(u):
-                if not u: return 'pcs'
+                if not u:
+                    return 'pcs'
                 u_str = str(u).lower().strip()
                 if u_str in ['kg', 'g', 'l', 'ml', 'pcs', 'pack', 'packet', 'bottle', 'box', 'dozen', 'jar', 'can', 'pouch']:
                     return 'L' if u_str == 'l' else u_str
-                if u_str in ['pkt']: return 'packet'
-                if u_str in ['piece', 'pieces', 'pc']: return 'pcs'
-                if u_str in ['bunch', 'bunches']: return 'pcs'
-                if u_str in ['liter', 'liters', 'litre', 'litres']: return 'L'
-                if u_str in ['gram', 'grams', 'gm']: return 'g'
-                if u_str in ['kilogram', 'kilograms', 'kgs']: return 'kg'
+                if u_str in ['pkt']:
+                    return 'packet'
+                if u_str in ['piece', 'pieces', 'pc']:
+                    return 'pcs'
+                if u_str in ['bunch', 'bunches']:
+                    return 'pcs'
+                if u_str in ['liter', 'liters', 'litre', 'litres']:
+                    return 'L'
+                if u_str in ['gram', 'grams', 'gm']:
+                    return 'g'
+                if u_str in ['kilogram', 'kilograms', 'kgs']:
+                    return 'kg'
                 return 'pcs'
 
             def sanitize_zone(z):
-                if not z: return 'pantry'
+                if not z:
+                    return 'pantry'
                 z_str = str(z).lower().strip()
                 if z_str in ['fridge', 'freezer', 'pantry', 'counter', 'cabinet', 'basket', 'spice']:
                     return z_str
-                if 'fridge' in z_str or 'refrigerator' in z_str or 'chiller' in z_str: return 'fridge'
-                if 'freezer' in z_str: return 'freezer'
-                if 'basket' in z_str: return 'basket'
-                if 'spice' in z_str: return 'spice'
-                if 'counter' in z_str: return 'counter'
+                if 'fridge' in z_str or 'refrigerator' in z_str or 'chiller' in z_str:
+                    return 'fridge'
+                if 'freezer' in z_str:
+                    return 'freezer'
+                if 'basket' in z_str:
+                    return 'basket'
+                if 'spice' in z_str:
+                    return 'spice'
+                if 'counter' in z_str:
+                    return 'counter'
                 return 'pantry'
 
             def sanitize_confidence(c):
-                if not c: return 'Low'
+                if not c:
+                    return 'Low'
                 c_str = str(c).strip().capitalize()
-                if c_str in ['High', 'Medium', 'Low']: return c_str
+                if c_str in ['High', 'Medium', 'Low']:
+                    return c_str
                 return 'Low'
 
-            from apps.groceries.prediction_engine import calculate_item_shelf_life
             import datetime
+
+            from apps.groceries.prediction_engine import calculate_item_shelf_life
 
             def to_calendar_date(val):
                 if val is None:
@@ -341,7 +359,7 @@ class ScanSessionViewSet(viewsets.ReadOnlyModelViewSet):
 
 class ScanCandidateViewSet(viewsets.ModelViewSet):
     serializer_class = ScanCandidateSerializer
-    
+
     def get_queryset(self):
         # Prevent IDOR: candidates scoped to session owned by request.user
         return ScanCandidate.objects.filter(scan_session__user=self.request.user)

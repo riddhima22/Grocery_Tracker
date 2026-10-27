@@ -1,22 +1,33 @@
 import logging
 import uuid
+
 from django.core.exceptions import (
-    ValidationError as DjangoValidationError,
     ObjectDoesNotExist,
+)
+from django.core.exceptions import (
     PermissionDenied as DjangoPermissionDenied,
 )
-from django.http import Http404
+from django.core.exceptions import (
+    ValidationError as DjangoValidationError,
+)
 from django.db import IntegrityError
-from rest_framework.views import exception_handler
-from rest_framework.response import Response
+from django.http import Http404
 from rest_framework import status
 from rest_framework.exceptions import (
-    ValidationError as DRFValidationError,
-    Throttled,
     NotAuthenticated,
-    PermissionDenied as DRFPermissionDenied,
+    Throttled,
+)
+from rest_framework.exceptions import (
     NotFound as DRFNotFound,
 )
+from rest_framework.exceptions import (
+    PermissionDenied as DRFPermissionDenied,
+)
+from rest_framework.exceptions import (
+    ValidationError as DRFValidationError,
+)
+from rest_framework.response import Response
+from rest_framework.views import exception_handler
 
 logger = logging.getLogger('freshtrack.api')
 
@@ -71,7 +82,7 @@ def custom_exception_handler(exc, context):
 
     # Log the error safely
     logger.error(
-        f"API Error [{correlation_id}] on {method} {path} by user {user_str}: {str(exc)}",
+        f"API Error [{correlation_id}] on {method} {path} by user {user_str}: {exc!s}",
         exc_info=True
     )
 

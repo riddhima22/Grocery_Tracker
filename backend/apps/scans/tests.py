@@ -1,8 +1,18 @@
+import datetime
+
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.utils import timezone
-import datetime
-from integrations.ocr.text_parser import parse_absolute_date, OCRDateParser
+from rest_framework.test import APITestCase
+
+from apps.groceries.models import GroceryItem
+from apps.groceries.serializers import GroceryItemSerializer
+from apps.scans.models import ScanCandidate, ScanSession
 from integrations.ai.model_router import ModelRouter
+from integrations.ocr.text_parser import OCRDateParser, parse_absolute_date
+
+User = get_user_model()
+
 
 class OCRTextParserTests(TestCase):
     def test_parse_absolute_dates(self):
@@ -10,11 +20,11 @@ class OCRTextParserTests(TestCase):
         self.assertEqual(parse_absolute_date("18/07/2026"), datetime.date(2026, 7, 18))
         self.assertEqual(parse_absolute_date("15-05-2025"), datetime.date(2025, 5, 15))
         self.assertEqual(parse_absolute_date("01.12.2024"), datetime.date(2024, 12, 1))
-        
+
         # Test month name formats
         self.assertEqual(parse_absolute_date("15-JUL-2026"), datetime.date(2026, 7, 15))
         self.assertEqual(parse_absolute_date("20-October-2027"), datetime.date(2027, 10, 20))
-        
+
         # Test partial formats (MM/YYYY)
         self.assertEqual(parse_absolute_date("08/2026"), datetime.date(2026, 8, 1))
 
@@ -22,7 +32,7 @@ class OCRTextParserTests(TestCase):
         # Mock packaging text
         text = "PKD: 10/01/2026\nBEST BEFORE 6 MONTHS FROM PACKING\n"
         res = OCRDateParser.extract_dates(text)
-        
+
         # 10th Jan 2026 + 6 months (180 days) = 9th July 2026
         self.assertIsNotNone(res["expiry_date"])
         self.assertEqual(res["date_type"], "best_before")
@@ -33,7 +43,7 @@ class OCRTextParserTests(TestCase):
     def test_relative_date_parsing_days(self):
         text = "MFD: 15-07-2026\nBEST BEFORE 15 DAYS\n"
         res = OCRDateParser.extract_dates(text)
-        
+
         self.assertEqual(res["expiry_date"], datetime.date(2026, 7, 30))
         self.assertEqual(res["date_type"], "best_before")
         self.assertEqual(res["date_source"], "calculated_from_packaging")
@@ -41,7 +51,7 @@ class OCRTextParserTests(TestCase):
     def test_absolute_ocr_extraction(self):
         text = "EXPIRY DATE: 18/12/2026\nLOT 18273"
         res = OCRDateParser.extract_dates(text)
-        
+
         self.assertEqual(res["expiry_date"], datetime.date(2026, 12, 18))
         self.assertEqual(res["date_type"], "use_by")
         self.assertEqual(res["date_source"], "ocr_verified")
@@ -73,13 +83,7 @@ class ScanTaskRetryTests(TestCase):
         self.assertFalse(is_transient_error(Exception("Invalid argument: JSONDecodeError")))
 
 
-from rest_framework.test import APITestCase
-from django.contrib.auth import get_user_model
-from apps.scans.models import ScanSession, ScanCandidate
-from apps.groceries.models import GroceryItem
-from apps.groceries.serializers import GroceryItemSerializer
 
-User = get_user_model()
 
 class ScanConfirmationDateRegressionTests(APITestCase):
     def setUp(self):
@@ -136,7 +140,7 @@ class ScanConfirmationDateRegressionTests(APITestCase):
             unit="kg",
             expiry_date=datetime.date(2026, 11, 1),
         )
-        candidate.expiry_date = datetime.datetime(2026, 11, 1, 12, 0, 0, tzinfo=datetime.timezone.utc)
+        candidate.expiry_date = datetime.datetime(2026, 11, 1, 12, 0, 0, tzinfo=datetime.UTC)
         candidate.save()
 
         url = f"/api/v1/scans/sessions/{self.session.id}/confirm/"
@@ -164,11 +168,12 @@ class ScanConfirmationDateRegressionTests(APITestCase):
 
 class ScanUploadValidationTests(TestCase):
     def test_scan_upload_rejects_corrupted_or_mismatched_image(self):
-        from rest_framework.test import APIClient
-        from django.core.files.uploadedfile import SimpleUploadedFile
-        from django.contrib.auth import get_user_model
         import io
+
+        from django.contrib.auth import get_user_model
+        from django.core.files.uploadedfile import SimpleUploadedFile
         from PIL import Image
+        from rest_framework.test import APIClient
 
         user = get_user_model().objects.create_user(
             email='scan_validator@example.com',
@@ -261,7 +266,7 @@ class ScanCandidateExpirySemanticsTests(TestCase):
         Must succeed, not throw NOT NULL error, shift estimated date, and set is_expiry_estimated=True.
         """
         from apps.scans.serializers import ScanCandidateSerializer
-        
+
         # Test 1: Direct model creation
         candidate = ScanCandidate.objects.create(
             scan_session=self.session,
@@ -306,8 +311,9 @@ class ScanCandidateExpirySemanticsTests(TestCase):
 
     def test_tasks_processing_with_red_onion_item_data(self):
         """Simulate task processing loop with the exact AI dictionary for Red Onion."""
+        from unittest.mock import MagicMock, patch
+
         from apps.scans.tasks import process_scan_session_task
-        from unittest.mock import patch, MagicMock
 
         mock_router_result = {
             "success": True,
@@ -341,8 +347,9 @@ class ScanCandidateExpirySemanticsTests(TestCase):
             MockRouter.return_value = mock_instance
 
             # Create pending image for session
-            from apps.scans.models import ScanImage
             from django.core.files.uploadedfile import SimpleUploadedFile
+
+            from apps.scans.models import ScanImage
             img_file = SimpleUploadedFile("onion.jpg", b"fake-jpg", content_type="image/jpeg")
             ScanImage.objects.create(scan_session=self.session, image=img_file, status=ScanImage.Statuses.PENDING)
 

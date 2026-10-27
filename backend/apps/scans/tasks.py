@@ -1,12 +1,15 @@
-from celery import shared_task
-from celery.exceptions import MaxRetriesExceededError, Retry
-from django.utils import timezone
-from django.db import transaction
-from .models import ScanSession, ScanImage, ScanCandidate
-from integrations.ai.model_router import ModelRouter
-from integrations.ai.gemini_client import AIContentBlockedError
-import logging
 import datetime
+import logging
+
+from celery import shared_task
+from celery.exceptions import Retry
+from django.db import transaction
+from django.utils import timezone
+
+from integrations.ai.gemini_client import AIContentBlockedError
+from integrations.ai.model_router import ModelRouter
+
+from .models import ScanCandidate, ScanImage, ScanSession
 
 logger = logging.getLogger('freshtrack.scans.tasks')
 
@@ -85,6 +88,7 @@ def process_scan_session_task(self, session_id=None):
         session_id = self
 
     import time
+
     from django.db import connection
 
     # Ensure clean database connection in thread context
@@ -161,7 +165,7 @@ def process_scan_session_task(self, session_id=None):
                 else:
                     # Distribute items across images proportionally
                     source_image = image_list[min(idx, len(image_list) - 1)]
-                
+
                 # Normalize enums and bounds
                 quantity = 1.0
                 try:
@@ -255,7 +259,9 @@ def process_scan_session_task(self, session_id=None):
                     date_type_val = 'estimated'
                     date_src_val = 'calculated_shelf_life'
                     if estimated_dt is None:
-                        from apps.groceries.prediction_engine import calculate_item_shelf_life
+                        from apps.groceries.prediction_engine import (
+                            calculate_item_shelf_life,
+                        )
                         real_shelf_days = calculate_item_shelf_life(item_name, item_category, zone)
                         if real_shelf_days:
                             estimated_dt = timezone.now().date() + datetime.timedelta(days=real_shelf_days)
@@ -273,7 +279,9 @@ def process_scan_session_task(self, session_id=None):
                         date_src_val = 'ocr_verified'
                 else:
                     # No printed packaging date exists -> compute estimated shelf life
-                    from apps.groceries.prediction_engine import calculate_item_shelf_life
+                    from apps.groceries.prediction_engine import (
+                        calculate_item_shelf_life,
+                    )
                     real_shelf_days = calculate_item_shelf_life(item_name, item_category, zone)
                     if real_shelf_days:
                         is_estimated = True
@@ -365,7 +373,7 @@ def process_scan_session_task(self, session_id=None):
             connection.close_if_unusable_or_obsolete()
             raise self.retry(exc=e, countdown=countdown)
 
-        logger.error(f"Permanent error or max retries exceeded for session {session_id}: {str(e)}", exc_info=True)
+        logger.error(f"Permanent error or max retries exceeded for session {session_id}: {e!s}", exc_info=True)
         # Directly mark images failed and record error message
         for scan_image in images:
             scan_image.status = ScanImage.Statuses.FAILED
@@ -385,17 +393,17 @@ def process_scan_session_task(self, session_id=None):
             session.successful_image_count = successful_count
             session.failed_image_count = failed_count
             session.candidate_count = candidate_count
-            
+
             if failed_count == 0 and successful_count > 0:
                 session.status = ScanSession.Statuses.COMPLETED
             elif successful_count > 0 and failed_count > 0:
                 session.status = ScanSession.Statuses.PARTIAL
             else:
                 session.status = ScanSession.Statuses.FAILED
-                
+
             session.completed_at = timezone.now()
             session.save(update_fields=['status', 'successful_image_count', 'failed_image_count', 'candidate_count', 'completed_at'])
-            
+
             elapsed = time.time() - start_time
             logger.info(
                 f"Completed scan processing task for session {session_id} in {elapsed:.2f}s: "

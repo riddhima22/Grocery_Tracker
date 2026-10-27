@@ -1,13 +1,15 @@
+import datetime
+import logging
+
 from celery import shared_task
-from django.utils import timezone
-from django.db import transaction, models
 from django.contrib.auth import get_user_model
+from django.db import models
+from django.utils import timezone
+
 from apps.groceries.models import GroceryItem
 from apps.grocery_lists.models import GroceryList
-from .models import DeviceToken
+
 from .services import FCMNotificationService
-import logging
-import datetime
 
 logger = logging.getLogger('freshtrack.notifications.tasks')
 User = get_user_model()
@@ -20,13 +22,13 @@ def send_expiry_alerts_task():
     """
     logger.info("Executing periodic expiry check alerts task...")
     today = timezone.localdate() if hasattr(timezone, 'localdate') else timezone.now().date()
-    
+
     target_3d = today + datetime.timedelta(days=3)
     target_1d = today + datetime.timedelta(days=1)
 
     # 1. Query active items that reach effective expiry in 3 days
     items_3d = GroceryItem.objects.filter(
-        models.Q(expiry_date=target_3d) | 
+        models.Q(expiry_date=target_3d) |
         (models.Q(expiry_date__isnull=True) & models.Q(estimated_consumption_date=target_3d)),
         notified_3d=False,
         quantity__gt=0
@@ -34,7 +36,7 @@ def send_expiry_alerts_task():
 
     # 2. Query active items that reach effective expiry tomorrow (1 day)
     items_1d = GroceryItem.objects.filter(
-        models.Q(expiry_date=target_1d) | 
+        models.Q(expiry_date=target_1d) |
         (models.Q(expiry_date__isnull=True) & models.Q(estimated_consumption_date=target_1d)),
         notified_1d=False,
         quantity__gt=0
@@ -48,7 +50,7 @@ def send_expiry_alerts_task():
                 body = f"Your {item.name} has an estimated consumption window ending in 3 days! Plan a recipe to cook it soon."
             else:
                 body = f"Your {item.name} printed expiry date is in 3 days! Plan a recipe to cook it soon."
-            
+
             payload_data = {
                 "type": "expiry_reminder",
                 "grocery_id": str(item.id),
@@ -66,7 +68,7 @@ def send_expiry_alerts_task():
                 body = f"Urgent: Your {item.name} is estimated to spoil tomorrow! Cook it today to avoid waste."
             else:
                 body = f"Urgent: Your {item.name} printed expiry date is tomorrow! Cook it today to avoid waste."
-            
+
             payload_data = {
                 "type": "expiry_reminder",
                 "grocery_id": str(item.id),
@@ -78,7 +80,7 @@ def send_expiry_alerts_task():
 
     # 5. Auto-update expired statuses daily based on effective date
     expired_items = GroceryItem.objects.filter(
-        models.Q(expiry_date__lt=today) | 
+        models.Q(expiry_date__lt=today) |
         (models.Q(expiry_date__isnull=True) & models.Q(estimated_consumption_date__lt=today)),
         quantity__gt=0
     ).exclude(status='expired')

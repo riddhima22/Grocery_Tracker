@@ -1,17 +1,20 @@
-from rest_framework.test import APITestCase
+import datetime
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.utils import timezone
+from rest_framework.test import APITestCase
+
 from apps.groceries.models import GroceryItem
 from apps.grocery_lists.models import GroceryList, GroceryListItem
+
 from .models import DeviceToken
 from .tasks import (
+    _send_push_notification,
     send_expiry_alerts_task,
     send_low_stock_alerts_task,
     send_shopping_reminder_task,
-    _send_push_notification,
 )
-from unittest.mock import patch, MagicMock
-import datetime
 
 User = get_user_model()
 
@@ -50,7 +53,7 @@ class NotificationTests(APITestCase):
     def test_delete_device_token_on_logout(self):
         url = "/api/v1/notifications/device-token/"
         DeviceToken.objects.create(user=self.user, token="fcm_logout_token", platform="android", device_id="dev_1")
-        
+
         # Test delete by token
         res = self.client.delete(url, {"token": "fcm_logout_token"}, format="json")
         self.assertEqual(res.status_code, 200)
@@ -143,7 +146,7 @@ class NotificationTests(APITestCase):
 
     def test_fcm_unregistered_token_cleanup(self):
         token_obj = DeviceToken.objects.create(user=self.user, token="unregistered_fcm_token_xyz")
-        
+
         # Test token cleanup using mock
         with patch('firebase_admin.messaging.send') as mock_send, \
              patch('firebase_admin._apps', True):

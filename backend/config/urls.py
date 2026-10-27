@@ -1,10 +1,12 @@
-from django.contrib import admin
-from django.urls import path, include
+import logging
+
 from django.conf import settings
 from django.conf.urls.static import static
+from django.contrib import admin
 from django.http import JsonResponse
-import logging
-from apps.accounts.views import MeView, DeleteAccountView
+from django.urls import include, path
+
+from apps.accounts.views import DeleteAccountView, MeView
 
 logger = logging.getLogger('freshtrack.health')
 

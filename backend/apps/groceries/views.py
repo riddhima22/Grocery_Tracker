@@ -1,14 +1,15 @@
-from rest_framework import viewsets, status, filters
-from rest_framework.response import Response
-from rest_framework.decorators import action
-from django.db import models, transaction
-from django.utils import timezone
-from django.db.models import Sum, Count
-from .models import GroceryItem, GroceryActivity
-from .serializers import GroceryItemSerializer
-from common.exceptions import ResourceNotFoundException, ForbiddenException
 import decimal
 import logging
+
+from django.db import models, transaction
+from django.db.models import Count
+from django.utils import timezone
+from rest_framework import filters, status, viewsets
+from rest_framework.decorators import action
+from rest_framework.response import Response
+
+from .models import GroceryActivity, GroceryItem
+from .serializers import GroceryItemSerializer
 
 logger = logging.getLogger('freshtrack.groceries')
 
@@ -44,14 +45,14 @@ class GroceryItemViewSet(viewsets.ModelViewSet):
             old_qty = self.get_object().quantity
             item = serializer.save()
             new_qty = item.quantity
-            
+
             activity_type = GroceryActivity.ActivityTypes.ITEM_UPDATED
             if old_qty != new_qty:
                 activity_type = (
-                    GroceryActivity.ActivityTypes.QUANTITY_INCREASED 
+                    GroceryActivity.ActivityTypes.QUANTITY_INCREASED
                     if new_qty > old_qty else GroceryActivity.ActivityTypes.QUANTITY_DECREASED
                 )
-            
+
             GroceryActivity.objects.create(
                 user=self.request.user,
                 grocery_item=item,
@@ -79,7 +80,7 @@ class GroceryItemViewSet(viewsets.ModelViewSet):
         adjustment = request.data.get('adjustment')
         if adjustment is None:
             return Response({"success": False, "error": "Adjustment field is required."}, status=400)
-            
+
         try:
             adjustment_val = decimal.Decimal(str(adjustment))
         except (ValueError, TypeError):
@@ -90,10 +91,10 @@ class GroceryItemViewSet(viewsets.ModelViewSet):
             item = GroceryItem.objects.select_for_update().get(pk=item.pk)
             old_qty = item.quantity
             new_qty = old_qty + adjustment_val
-            
+
             if new_qty < 0:
                 return Response({
-                    "success": False, 
+                    "success": False,
                     "error": f"Insufficient inventory quantity: adjusting by {adjustment_val} would make stock negative (current stock: {old_qty} {item.unit})."
                 }, status=400)
 
@@ -108,7 +109,7 @@ class GroceryItemViewSet(viewsets.ModelViewSet):
                 new_quantity=new_qty,
                 unit=item.unit
             )
-            
+
             return Response({
                 "success": True,
                 "data": GroceryItemSerializer(item).data,
@@ -119,11 +120,11 @@ class GroceryItemViewSet(viewsets.ModelViewSet):
     def consume(self, request, pk=None):
         item = self.get_object()
         consume_qty = request.data.get('quantity')
-        
+
         with transaction.atomic():
             item = GroceryItem.objects.select_for_update().get(pk=item.pk)
             old_qty = item.quantity
-            
+
             if consume_qty is None:
                 consume_val = old_qty
             else:
@@ -181,11 +182,11 @@ class GroceryItemViewSet(viewsets.ModelViewSet):
     def waste(self, request, pk=None):
         item = self.get_object()
         waste_qty = request.data.get('quantity')
-        
+
         with transaction.atomic():
             item = GroceryItem.objects.select_for_update().get(pk=item.pk)
             old_qty = item.quantity
-            
+
             if waste_qty is None:
                 waste_val = old_qty
             else:
@@ -251,11 +252,11 @@ class GroceryItemViewSet(viewsets.ModelViewSet):
             models.Q(expiry_date__isnull=False) | models.Q(estimated_consumption_date__isnull=False),
             quantity__gt=0
         ).exclude(status='expired'))
-        
+
         # Sort by effective date (earliest first)
         items.sort(key=lambda x: (x.expiry_date or x.estimated_consumption_date))
         selected_items = items[:5]
-        
+
         serializer = GroceryItemSerializer(selected_items, many=True)
         return Response({
             "success": True,
@@ -285,7 +286,7 @@ class GroceryItemViewSet(viewsets.ModelViewSet):
                 expiring += 1
             else:
                 fresh += 1
-        
+
         return Response({
             "success": True,
             "data": {
@@ -301,7 +302,7 @@ class GroceryItemViewSet(viewsets.ModelViewSet):
         queryset = self.get_queryset()
         # Group counts by storage zones
         zones_counts = queryset.values('storage_zone').annotate(count=Count('id'))
-        
+
         data = {zone[0]: 0 for zone in GroceryItem.StorageZones.choices}
         for item in zones_counts:
             data[item['storage_zone']] = item['count']
@@ -316,11 +317,11 @@ class GroceryItemViewSet(viewsets.ModelViewSet):
         data = request.data
         from .prediction_engine import ShelfLifePredictionEngine
         prediction = ShelfLifePredictionEngine.predict(data)
-        
+
         # Serialize dates to string
         prediction['predicted_expiry'] = prediction['predicted_expiry'].isoformat()
         prediction['recommended_consumption_date'] = prediction['recommended_consumption_date'].isoformat()
-        
+
         return Response({
             "success": True,
             "data": prediction
@@ -394,14 +395,14 @@ class GroceryItemViewSet(viewsets.ModelViewSet):
             .exclude(quantity=0)
             .only('name', 'status', 'category', 'freshness_score')
         )
-        
+
         insights = []
-        
+
         # In-memory partitioning to eliminate 8+ redundant DB network queries
         expiring_items = [item for item in items if item.status == 'expiring']
         expired_items = [item for item in items if item.status == 'expired']
         categories = {item.category.lower() for item in items if item.category}
-        
+
         # 1. Check expiring soon
         if expiring_items:
             names = [item.name for item in expiring_items[:3]]
@@ -409,11 +410,11 @@ class GroceryItemViewSet(viewsets.ModelViewSet):
                 insights.append(f"You have {len(expiring_items)} items expiring soon, including {', '.join(names)}, and others.")
             else:
                 insights.append(f"You have items expiring soon: {', '.join(names)}.")
-        
+
         # 2. Check expired
         if expired_items:
             insights.append(f"Warning: {len(expired_items)} items have already expired. Please clear them out to keep your kitchen clean.")
-        
+
         # 3. Dynamic conservation advice
         if 'fruits' in categories or 'fruit' in categories:
             insights.append("Keeping bananas separate from other fruits prevents ethylene gas from ripening them too quickly.")

@@ -1,6 +1,6 @@
-import re
 import datetime
 import logging
+import re
 
 logger = logging.getLogger('freshtrack.ocr.text_parser')
 
@@ -18,7 +18,7 @@ def parse_absolute_date(text: str) -> datetime.date:
     """
     # 1. Clean and normalize spaces/characters
     text = re.sub(r'[\s\.\-/]+', '-', text.strip())
-    
+
     # 2. Try DD-MM-YYYY
     match = re.search(r'\b(\d{1,2})-(\d{1,2})-(\d{4})\b', text)
     if match:
@@ -63,7 +63,7 @@ class OCRDateParser:
         """
         Scans OCR raw text for expiry dates, manufacturing dates, packing dates,
         and relative best-before calculations.
-        
+
         Returns a dict:
         {
             "expiry_date": date or None,
@@ -78,21 +78,21 @@ class OCRDateParser:
         }
         """
         lines = [line.strip() for line in text.split('\n') if line.strip()]
-        
+
         mfg_date = None
         pkd_date = None
         exp_date = None
         bb_date = None
-        
+
         raw_mfg_text = ""
         raw_pkd_text = ""
         raw_exp_text = ""
-        
+
         # Regex search patterns
         mfg_pattern = re.compile(r'\b(mfg|mfd|mfg\s*date|mfd\s*date|manufacturing|manufactured)\b', re.IGNORECASE)
         pkd_pattern = re.compile(r'\b(pkd|packed|packed\s*on|packing|pkg)\b', re.IGNORECASE)
         exp_pattern = re.compile(r'\b(exp|use\s*by|expiry|expiry\s*date|best\s*before|use\s*before)\b', re.IGNORECASE)
-        
+
         # Find dates on lines or surrounding lines
         for i, line in enumerate(lines):
             # Check Mfg
@@ -152,14 +152,14 @@ class OCRDateParser:
             if duration_match:
                 amount = int(duration_match.group(1))
                 unit = duration_match.group(2).lower()
-                
+
                 if "month" in unit:
                     # Calculate new date by shifting months
                     # We can use simple 30 days shift or datetime calculation
                     exp_calculated = reference_date + datetime.timedelta(days=amount * 30)
                 else:
                     exp_calculated = reference_date + datetime.timedelta(days=amount)
-                
+
                 exp_date = exp_calculated
                 bb_date = exp_calculated
                 source = "calculated_from_packaging"

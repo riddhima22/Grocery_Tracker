@@ -1,10 +1,11 @@
-from rest_framework.exceptions import APIException
 from rest_framework import status
+from rest_framework.exceptions import APIException
+
 
 class BaseAPIException(APIException):
     status_code = status.HTTP_400_BAD_REQUEST
     code = "VALIDATION_ERROR"
-    
+
     def __init__(self, detail=None, code=None):
         if detail is not None:
             self.detail = detail

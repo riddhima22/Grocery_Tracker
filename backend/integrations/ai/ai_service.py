@@ -1,7 +1,9 @@
 import logging
+
 from django.conf import settings
-from .base import GroceryVisionService, RecipeGenerationService, MealInferenceService
-from .gemini_client import GeminiClient, AIContentBlockedError
+
+from .base import GroceryVisionService, MealInferenceService, RecipeGenerationService
+from .gemini_client import AIContentBlockedError, GeminiClient
 from .openai_client import OpenAIClient
 
 logger = logging.getLogger('freshtrack.ai.service')

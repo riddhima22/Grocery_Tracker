@@ -1,6 +1,8 @@
-from django.db import models
-from django.conf import settings
 import uuid
+
+from django.conf import settings
+from django.db import models
+
 
 class DeviceToken(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -9,7 +11,7 @@ class DeviceToken(models.Model):
     platform = models.CharField(max_length=20, default='android', blank=True)
     device_id = models.CharField(max_length=255, blank=True, null=True)
     is_active = models.BooleanField(default=True)
-    
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

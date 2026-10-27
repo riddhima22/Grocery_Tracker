@@ -1,28 +1,29 @@
-from rest_framework import status, generics
-from rest_framework.response import Response
-from rest_framework.views import APIView
-from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework_simplejwt.tokens import RefreshToken
-from django.contrib.auth import get_user_model
-from rest_framework.throttling import UserRateThrottle
-from django.core.mail import send_mail
+import json
+import logging
+import os
+
+import jwt
+import requests
 from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.core.mail import send_mail
+from google.auth.transport import requests as google_requests
+from google.oauth2 import id_token as google_id_token
+from jwt.algorithms import RSAAlgorithm
+from rest_framework import generics, status
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.throttling import UserRateThrottle
+from rest_framework.views import APIView
+from rest_framework_simplejwt.tokens import RefreshToken
+
+from .models import EmailVerificationToken, PasswordResetToken
 from .serializers import (
+    PasswordResetConfirmSerializer,
+    PasswordResetSerializer,
     UserRegisterSerializer,
     UserSerializer,
-    PasswordResetSerializer,
-    PasswordResetConfirmSerializer,
-    VerifyEmailSerializer,
 )
-from .models import EmailVerificationToken, PasswordResetToken
-import os
-import logging
-import requests
-import json
-import jwt
-from jwt.algorithms import RSAAlgorithm
-from google.oauth2 import id_token as google_id_token
-from google.auth.transport import requests as google_requests
 
 User = get_user_model()
 logger = logging.getLogger('freshtrack.accounts')

@@ -1,10 +1,11 @@
-from django.urls import reverse
-from rest_framework import status
-from rest_framework.test import APITestCase
+import datetime
+
 from django.contrib.auth import get_user_model
 from django.utils import timezone
+from rest_framework import status
+from rest_framework.test import APITestCase
+
 from .models import GroceryItem
-import datetime
 
 User = get_user_model()
 
@@ -20,7 +21,7 @@ class GroceryAPITests(APITestCase):
             password='Password123!',
             display_name='User Two'
         )
-        
+
         # Create item for User 1
         self.item1 = GroceryItem.objects.create(
             user=self.user1,
@@ -30,14 +31,14 @@ class GroceryAPITests(APITestCase):
             storage_zone='fridge',
             expiry_date=timezone.now().date() + datetime.timedelta(days=5)
         )
-        
+
         self.list_url = '/api/v1/groceries/'
         self.detail_url = f'/api/v1/groceries/{self.item1.id}/'
 
     def test_status_calculation_fresh(self):
         """Ensure status calculates correctly based on expiry date."""
         self.assertEqual(self.item1.status, 'fresh')
-        
+
         # Test expiring
         item2 = GroceryItem.objects.create(
             user=self.user1,
@@ -46,7 +47,7 @@ class GroceryAPITests(APITestCase):
             expiry_date=timezone.now().date() + datetime.timedelta(days=2)
         )
         self.assertEqual(item2.status, 'expiring')
-        
+
         # Test expired
         item3 = GroceryItem.objects.create(
             user=self.user1,
@@ -60,7 +61,7 @@ class GroceryAPITests(APITestCase):
         """Ensure User 2 cannot access or modify User 1's grocery items."""
         # Authenticate as User 2
         self.client.force_authenticate(user=self.user2)
-        
+
         # GET list should be empty for User 2
         response = self.client.get(self.list_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -131,7 +132,7 @@ class GroceryAPITests(APITestCase):
 
     def test_barcode_lookup_open_food_facts_hit(self):
         """Barcode lookup should query and parse Open Food Facts if not in pantry history."""
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
 
         barcode = '3017620422003'
         mock_response = MagicMock()
@@ -170,7 +171,7 @@ class GroceryAPITests(APITestCase):
 
     def test_barcode_lookup_not_found_fallback(self):
         """Barcode lookup should return 200 with found=False if product is not in history or Open Food Facts."""
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
 
         barcode = '0000000000000'
         mock_response = MagicMock()
@@ -193,6 +194,7 @@ class GroceryAPITests(APITestCase):
     def test_barcode_lookup_network_exception_fallback(self):
         """Barcode lookup should gracefully handle external network errors and return found=False."""
         from unittest.mock import patch
+
         import requests
 
         barcode = '1111111111111'
@@ -366,21 +368,21 @@ class SmartUnitClassificationBackendTests(APITestCase):
     """Automated backend test suite covering the 14 smart quantity & unit detection scenarios."""
 
     def test_scenario_1_loose_potato_weight_based(self):
-        from apps.groceries.unit_classifier import classify_product_unit, UnitCategory
+        from apps.groceries.unit_classifier import UnitCategory, classify_product_unit
         res = classify_product_unit(product_name='Potato', category='Vegetables')
         self.assertEqual(res['unit'], 'kg')
         self.assertEqual(res['unit_category'], UnitCategory.WEIGHT)
         self.assertNotEqual(res['unit'], 'pcs')
 
     def test_scenario_2_onion_barcode_weight_based(self):
-        from apps.groceries.unit_classifier import classify_product_unit, UnitCategory
+        from apps.groceries.unit_classifier import UnitCategory, classify_product_unit
         res = classify_product_unit(product_name='Red Onion', category='Vegetables')
         self.assertIn(res['unit'], ['kg', 'g'])
         self.assertEqual(res['unit_category'], UnitCategory.WEIGHT)
         self.assertNotEqual(res['unit'], 'pcs')
 
     def test_scenario_3_branded_50g_chips_packet(self):
-        from apps.groceries.unit_classifier import classify_product_unit, UnitCategory
+        from apps.groceries.unit_classifier import UnitCategory, classify_product_unit
         res = classify_product_unit(
             product_name="Lay's Classic Potato Chips",
             category='Snacks',
@@ -393,7 +395,7 @@ class SmartUnitClassificationBackendTests(APITestCase):
         self.assertEqual(res['net_content_unit'], 'g')
 
     def test_scenario_4_two_packets_biscuits(self):
-        from apps.groceries.unit_classifier import classify_product_unit, UnitCategory
+        from apps.groceries.unit_classifier import classify_product_unit
         res = classify_product_unit(
             product_name="Oreo Biscuit 2 pack",
             category='Snacks'
@@ -403,7 +405,7 @@ class SmartUnitClassificationBackendTests(APITestCase):
         self.assertEqual(res['package_count'], 2)
 
     def test_scenario_5_cooking_oil_bottle(self):
-        from apps.groceries.unit_classifier import classify_product_unit, UnitCategory
+        from apps.groceries.unit_classifier import UnitCategory, classify_product_unit
         res = classify_product_unit(
             product_name="Fortune Sunflower Cooking Oil 1L Bottle",
             category='Beverages',
@@ -416,14 +418,14 @@ class SmartUnitClassificationBackendTests(APITestCase):
         self.assertEqual(res['net_content_unit'], 'L')
 
     def test_scenario_6_loose_dal_weight_based(self):
-        from apps.groceries.unit_classifier import classify_product_unit, UnitCategory
+        from apps.groceries.unit_classifier import UnitCategory, classify_product_unit
         res = classify_product_unit(product_name="Toor Dal", category='Grains')
         self.assertEqual(res['unit'], 'g')
         self.assertEqual(res['unit_category'], UnitCategory.WEIGHT)
         self.assertNotEqual(res['unit'], 'pcs')
 
     def test_scenario_7_six_eggs_count(self):
-        from apps.groceries.unit_classifier import classify_product_unit, UnitCategory
+        from apps.groceries.unit_classifier import UnitCategory, classify_product_unit
         res = classify_product_unit(product_name="Farm Fresh Brown Eggs 6 pcs", category='Dairy')
         self.assertEqual(res['unit'], 'pcs')
         self.assertEqual(res['quantity'], 6.0)
@@ -446,31 +448,34 @@ class SmartUnitClassificationBackendTests(APITestCase):
         self.assertEqual(res['unit_confidence'], 'Low')
 
     def test_scenario_10_quantity_conversion_g_to_kg(self):
-        from apps.groceries.unit_classifier import convert_quantity_units
         from decimal import Decimal
-        val, ok = convert_quantity_units(Decimal('500'), 'g', 'kg')
+
+        from apps.groceries.unit_classifier import convert_quantity_units
+        val, ok = convert_quantity_units(Decimal(500), 'g', 'kg')
         self.assertTrue(ok)
         self.assertEqual(val, Decimal('0.5'))
 
         val2, ok2 = convert_quantity_units(Decimal('1.5'), 'kg', 'g')
         self.assertTrue(ok2)
-        self.assertEqual(val2, Decimal('1500'))
+        self.assertEqual(val2, Decimal(1500))
 
     def test_scenario_11_quantity_conversion_ml_to_L(self):
-        from apps.groceries.unit_classifier import convert_quantity_units
         from decimal import Decimal
-        val, ok = convert_quantity_units(Decimal('500'), 'ml', 'L')
+
+        from apps.groceries.unit_classifier import convert_quantity_units
+        val, ok = convert_quantity_units(Decimal(500), 'ml', 'L')
         self.assertTrue(ok)
         self.assertEqual(val, Decimal('0.5'))
 
-        val2, ok2 = convert_quantity_units(Decimal('2'), 'L', 'ml')
+        val2, ok2 = convert_quantity_units(Decimal(2), 'L', 'ml')
         self.assertTrue(ok2)
-        self.assertEqual(val2, Decimal('2000'))
+        self.assertEqual(val2, Decimal(2000))
 
     def test_prevention_cross_category_conversions(self):
-        from apps.groceries.unit_classifier import convert_quantity_units
         from decimal import Decimal
-        val, ok = convert_quantity_units(Decimal('500'), 'g', 'L')
+
+        from apps.groceries.unit_classifier import convert_quantity_units
+        val, ok = convert_quantity_units(Decimal(500), 'g', 'L')
         self.assertFalse(ok)
         self.assertIsNone(val)
 
@@ -495,7 +500,7 @@ class SmartUnitClassificationBackendTests(APITestCase):
         self.assertEqual(item.quantity, 1.0)
 
     def test_scenario_13_scan_session_deduplication(self):
-        from apps.scans.models import ScanSession, ScanCandidate
+        from apps.scans.models import ScanCandidate, ScanSession
         user = User.objects.create_user(email='scan_dedup@example.com', password='Password123!', display_name='Scan User')
         session = ScanSession.objects.create(user=user)
         c1 = ScanCandidate.objects.create(

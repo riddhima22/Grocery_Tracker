@@ -1,13 +1,14 @@
+import datetime
+from decimal import Decimal
 from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
-import datetime
-from decimal import Decimal
 
-from apps.groceries.models import GroceryItem, GroceryActivity
-from apps.meals.models import MealLog, MealIngredientCandidate
+from apps.groceries.models import GroceryActivity, GroceryItem
+from apps.meals.models import MealLog
 
 User = get_user_model()
 
@@ -77,7 +78,7 @@ class MealLogAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['name'], 'French Toast & Milk')
         self.assertEqual(response.data['status'], MealLog.StatusChoices.PENDING_CONFIRMATION)
-        
+
         # Check candidates saved
         meal_id = response.data['id']
         meal_log = MealLog.objects.get(id=meal_id)

@@ -1,7 +1,10 @@
-from rest_framework import serializers
-from .models import GroceryItem, GroceryActivity
-from rest_framework.exceptions import ValidationError
 import math
+
+from rest_framework import serializers
+from rest_framework.exceptions import ValidationError
+
+from .models import GroceryActivity, GroceryItem
+
 
 class GroceryItemSerializer(serializers.ModelSerializer):
     status = serializers.SerializerMethodField()

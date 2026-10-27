@@ -1,14 +1,21 @@
-from rest_framework import viewsets, status
-from rest_framework.response import Response
-from rest_framework.decorators import action
+import logging
+
 from django.db import transaction
 from django.db.models import Count
-from .models import GroceryList, GroceryListItem
-from .serializers import GroceryListSerializer, GroceryListItemSerializer, GroceryListItemCreateSerializer
-from apps.groceries.models import GroceryItem, GroceryActivity
+from rest_framework import viewsets
+from rest_framework.decorators import action
+from rest_framework.response import Response
+
+from apps.groceries.models import GroceryActivity, GroceryItem
 from apps.groceries.serializers import GroceryItemSerializer
-from common.exceptions import ResourceNotFoundException, ForbiddenException
-import logging
+from common.exceptions import ResourceNotFoundException
+
+from .models import GroceryList, GroceryListItem
+from .serializers import (
+    GroceryListItemCreateSerializer,
+    GroceryListItemSerializer,
+    GroceryListSerializer,
+)
 
 logger = logging.getLogger('freshtrack.grocery_lists')
 
@@ -40,7 +47,7 @@ class GroceryListViewSet(viewsets.ModelViewSet):
     def generate(self, request):
         user = request.user
         from decimal import Decimal
-        
+
         # 1. Get or create the active grocery list (Preserve existing active items!)
         active_list = GroceryList.objects.filter(
             user=user,
@@ -83,8 +90,8 @@ class GroceryListViewSet(viewsets.ModelViewSet):
 
             # Source 2: Items in kitchen running low (0 < quantity <= 1 or status == 'expiring_soon')
             low_stock_items = GroceryItem.objects.filter(
-                user=user, 
-                quantity__gt=0, 
+                user=user,
+                quantity__gt=0,
                 quantity__lte=1
             ).order_by('expiry_date')[:8]
             for li in low_stock_items:
@@ -171,7 +178,7 @@ class GroceryListViewSet(viewsets.ModelViewSet):
         list_obj = self.get_object()
         serializer = GroceryListItemCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        
+
         with transaction.atomic():
             item = GroceryListItem.objects.create(
                 grocery_list=list_obj,

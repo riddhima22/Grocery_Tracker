@@ -1,14 +1,12 @@
 from decimal import Decimal
+
 from django.contrib.auth import get_user_model
-from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
-import datetime
 
 from apps.groceries.models import GroceryItem
 from apps.groceries.services import deduct_pantry_items_bulk
-from apps.grocery_lists.models import GroceryList, GroceryListItem
-from apps.grocery_lists.services import add_to_active_grocery_list
+from apps.grocery_lists.models import GroceryList
 
 User = get_user_model()
 
@@ -36,7 +34,7 @@ class SmartGroceryListTests(APITestCase):
         GroceryItem.objects.create(
             user=self.user,
             name='Fresh Milk',
-            quantity=Decimal('0'),
+            quantity=Decimal(0),
             unit='L',
             storage_zone='fridge'
         )
@@ -44,7 +42,7 @@ class SmartGroceryListTests(APITestCase):
         response = self.client.post(self.generate_url, {})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(response.data['success'])
-        
+
         items = response.data['data']['items']
         item_names = [i['name'] for i in items]
         self.assertIn('Fresh Milk', item_names)
@@ -76,7 +74,7 @@ class SmartGroceryListTests(APITestCase):
         item = GroceryItem.objects.create(
             user=self.user,
             name='Coriander Seeds',
-            quantity=Decimal('100'),
+            quantity=Decimal(100),
             unit='g',
             storage_zone='spice'
         )

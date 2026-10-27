@@ -1,18 +1,20 @@
 import logging
 from decimal import Decimal
+
 from django.db import transaction
 from django.utils import timezone
-from .models import GroceryItem, GroceryActivity
+
+from .models import GroceryActivity, GroceryItem
 
 logger = logging.getLogger(__name__)
 
 # Unit conversion factors: (from_unit, to_unit) -> factor
 UNIT_CONVERSIONS = {
-    ('kg', 'g'): Decimal('1000'),
+    ('kg', 'g'): Decimal(1000),
     ('g', 'kg'): Decimal('0.001'),
-    ('l', 'ml'): Decimal('1000'),
+    ('l', 'ml'): Decimal(1000),
     ('ml', 'l'): Decimal('0.001'),
-    ('dozen', 'pcs'): Decimal('12'),
+    ('dozen', 'pcs'): Decimal(12),
     ('pcs', 'dozen'): Decimal('0.083333'),
 }
 
@@ -66,8 +68,8 @@ def deduct_pantry_items_bulk(user, items_to_deduct, activity_source='meal_log', 
 
             if not grocery_item:
                 grocery_item = GroceryItem.objects.select_for_update().filter(
-                    user=user, 
-                    name__iexact=item_name, 
+                    user=user,
+                    name__iexact=item_name,
                     quantity__gt=0
                 ).order_by('expiry_date').first()
 

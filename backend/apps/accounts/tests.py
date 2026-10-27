@@ -1,10 +1,12 @@
-from django.urls import reverse
-from rest_framework import status
-from rest_framework.test import APITestCase
-from django.contrib.auth import get_user_model
-from django.utils import timezone
 from datetime import timedelta
 from unittest.mock import patch
+
+from django.contrib.auth import get_user_model
+from django.urls import reverse
+from django.utils import timezone
+from rest_framework import status
+from rest_framework.test import APITestCase
+
 from apps.accounts.models import EmailVerificationToken, PasswordResetToken
 
 User = get_user_model()
@@ -71,8 +73,9 @@ class AuthTests(APITestCase):
             display_name='Avatar Tester'
         )
         self.client.force_authenticate(user=user)
-        from django.core.files.uploadedfile import SimpleUploadedFile
         import io
+
+        from django.core.files.uploadedfile import SimpleUploadedFile
         from PIL import Image
 
         fake_file = SimpleUploadedFile("avatar.png", b"not-a-valid-png-stream", content_type="image/png")

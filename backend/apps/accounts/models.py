@@ -1,6 +1,8 @@
+import uuid
+
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
-import uuid
+
 
 class UserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
@@ -19,36 +21,36 @@ class UserManager(BaseUserManager):
 
 class User(AbstractUser):
     objects = UserManager()
-    
+
     # Overwrite username fields since email is the primary login
     username = None
     email = models.EmailField(unique=True)
-    
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     display_name = models.CharField(max_length=80, blank=True)
     avatar_url = models.URLField(blank=True, null=True)
     email_verified = models.BooleanField(default=False)
-    
+
     # Preferences
     diet_type = models.CharField(
-        max_length=20, 
-        choices=[('veg', 'Vegetarian'), ('non-veg', 'Non-Vegetarian'), ('any', 'Any')], 
+        max_length=20,
+        choices=[('veg', 'Vegetarian'), ('non-veg', 'Non-Vegetarian'), ('any', 'Any')],
         default='any'
     )
     cuisine_pref = models.CharField(max_length=100, blank=True)
     allergies = models.JSONField(default=list, blank=True)
     household_size = models.PositiveIntegerField(default=1)
-    
+
     # Notifications Settings
     notify_3_days = models.BooleanField(default=True)
     notify_1_day = models.BooleanField(default=True)
     notify_daily_recipe = models.BooleanField(default=True)
-    
+
     # Server-derived stats
     total_tracked = models.PositiveIntegerField(default=0)
     saved_from_waste = models.PositiveIntegerField(default=0)
     recipes_cooked = models.PositiveIntegerField(default=0)
-    
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -68,9 +70,10 @@ class EmailVerificationToken(models.Model):
 
     @classmethod
     def create_for_user(cls, user, expires_hours=24):
-        from django.utils import timezone
         import secrets
         from datetime import timedelta
+
+        from django.utils import timezone
         # Invalidate existing unused tokens for this user
         cls.objects.filter(user=user, is_used=False).update(is_used=True)
         token = secrets.token_urlsafe(32)
@@ -94,9 +97,10 @@ class PasswordResetToken(models.Model):
 
     @classmethod
     def create_for_user(cls, user, expires_hours=1):
-        from django.utils import timezone
         import secrets
         from datetime import timedelta
+
+        from django.utils import timezone
         # Invalidate existing unused tokens for this user
         cls.objects.filter(user=user, is_used=False).update(is_used=True)
         token = secrets.token_urlsafe(32)

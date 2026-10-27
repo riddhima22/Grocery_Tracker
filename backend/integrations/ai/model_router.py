@@ -1,15 +1,17 @@
-import os
 import hashlib
 import logging
+import os
 import tempfile
 
 import cv2
 import numpy as np
-from PIL import Image, ImageStat, ImageOps
 from django.conf import settings
 from django.utils import timezone
+from PIL import Image, ImageOps, ImageStat
+
 from integrations.ocr.google_vision_client import GoogleCloudVisionOCR
 from integrations.ocr.text_parser import OCRDateParser
+
 from .ai_service import AIService
 from .gemini_client import AIContentBlockedError
 
@@ -50,7 +52,7 @@ class ModelRouter:
                     buf = f.read()
                 hasher.update(buf)
                 img_hash = hasher.hexdigest()
-                
+
                 if img_hash in seen_hashes:
                     warnings.append(f"Duplicate image detected: {os.path.basename(path)}")
                     continue
@@ -63,7 +65,7 @@ class ModelRouter:
             try:
                 with Image.open(path) as img:
                     width, height = img.size
-                    
+
                     # Low resolution check
                     if width < 150 or height < 150:
                         errors.append(f"Image {os.path.basename(path)} resolution is too low ({width}x{height}).")
@@ -170,7 +172,7 @@ class ModelRouter:
 
         # 2. Preprocess images for AI (EXIF auto-orientation, CLAHE for dark images)
         dark_warning_filenames = {
-            os.path.basename(path) for path in valid_paths 
+            os.path.basename(path) for path in valid_paths
             if any(f"Lighting is too dark in {os.path.basename(path)}" in w for w in warnings)
         }
 
@@ -190,7 +192,7 @@ class ModelRouter:
             ocr_context = ""
             ocr_dates = {}
             ocr_enabled = getattr(settings, 'OCR_ENABLED', True)
-            
+
             if ocr_enabled:
                 ocr_results = []
                 detected_objects = []
@@ -205,7 +207,7 @@ class ModelRouter:
                                 name = o.get("name", "Item")
                                 score = o.get("score", 1.0)
                                 detected_objects.append(f"{name} (confidence: {score:.2f})")
-                
+
                 context_sections = []
                 if ocr_results:
                     ocr_text = "\n---\n".join(ocr_results)
@@ -213,7 +215,7 @@ class ModelRouter:
                     # Parse expiry dates from OCR text directly
                     ocr_dates = OCRDateParser.extract_dates(ocr_text)
                     logger.info(f"OCR parsed packaging dates: {ocr_dates}")
-                
+
                 if detected_objects:
                     obj_hint_text = f"GOOGLE VISION OBJECT-DETECTION HINTS (DETECTED ITEMS COUNT: {len(detected_objects)}):\n" + "\n".join(f"- {d}" for d in detected_objects)
                     context_sections.append(obj_hint_text)
@@ -224,7 +226,7 @@ class ModelRouter:
             # 4. Gemini Multimodal Analysis Stage
             ai_result = self.ai_client.analyze_grocery_images(prepared_paths, ocr_context=ocr_context)
             items = ai_result.get("items", [])
-            
+
             # 5. Accuracy Alignment: Resolve date conflicts & append warnings
             items = self.align_item_dates(items, ocr_dates=ocr_dates, warnings=warnings)
 
@@ -327,7 +329,9 @@ class ModelRouter:
                 item["date_type"] = "estimated"
                 item["date_source"] = "calculated_shelf_life"
                 try:
-                    from apps.groceries.prediction_engine import ShelfLifePredictionEngine
+                    from apps.groceries.prediction_engine import (
+                        ShelfLifePredictionEngine,
+                    )
                     prediction = ShelfLifePredictionEngine.predict({
                         'category': item.get('category', 'default'),
                         'storage_zone': item.get('storage_zone', 'pantry'),

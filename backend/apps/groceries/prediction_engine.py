@@ -1,5 +1,5 @@
-from datetime import timedelta, date
 import logging
+from datetime import date, timedelta
 
 logger = logging.getLogger('freshtrack.prediction')
 
@@ -48,7 +48,7 @@ class ShelfLifePredictionEngine:
 
         # 1. Resolve base shelf life
         base_days = cls.BASE_SHELF_LIFE.get(category, cls.BASE_SHELF_LIFE['default'])
-        
+
         # Scale base days by current freshness score (deterioration factor)
         freshness_factor = max(0.1, freshness_score / 100.0)
         estimated_days = base_days * freshness_factor
@@ -66,7 +66,7 @@ class ShelfLifePredictionEngine:
         }
 
         optimal_min, optimal_max = optimal_temps.get(storage_zone, (15.0, 22.0))
-        
+
         # If actual temperature is higher than optimal, accelerate spoilage
         if temperature > optimal_max:
             temp_diff = temperature - optimal_max
@@ -152,7 +152,7 @@ class ShelfLifePredictionEngine:
             else:
                 why = "Ambient temperature allows natural starches to convert to sugars at a normal rate."
                 how = "Place in a breathable basket away from direct sunlight. Do not store potatoes and onions together."
-            
+
             if ripeness == 'overripe':
                 explanation = "This item is overripe and respiring rapidly. Consume immediately or freeze to prevent wastage."
             else:

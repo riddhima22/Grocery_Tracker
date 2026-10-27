@@ -1,5 +1,7 @@
 from rest_framework import serializers
-from .models import ScanSession, ScanImage, ScanCandidate
+
+from .models import ScanCandidate, ScanImage, ScanSession
+
 
 class ScanImageSerializer(serializers.ModelSerializer):
     class Meta:
@@ -27,7 +29,7 @@ class ScanCandidateSerializer(serializers.ModelSerializer):
             estimated_dt = attrs.get('estimated_consumption_date', getattr(self.instance, 'estimated_consumption_date', None))
             date_type = attrs.get('date_type', getattr(self.instance, 'date_type', 'unknown'))
             date_source = attrs.get('date_source', getattr(self.instance, 'date_source', 'unknown'))
-            
+
             if expiry is None and estimated_dt is None:
                 attrs['is_expiry_estimated'] = False
             elif estimated_dt is not None or date_type == 'estimated' or date_source == 'calculated_shelf_life':
@@ -42,7 +44,7 @@ class ScanCandidateSerializer(serializers.ModelSerializer):
 
 class ScanSessionSerializer(serializers.ModelSerializer):
     images = ScanImageSerializer(many=True, read_only=True)
-    
+
     class Meta:
         model = ScanSession
         fields = (

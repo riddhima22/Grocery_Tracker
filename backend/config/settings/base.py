@@ -1,7 +1,8 @@
 import os
 import sys
-from pathlib import Path
 from datetime import timedelta
+from pathlib import Path
+
 import environ
 from django.core.exceptions import ImproperlyConfigured
 
@@ -39,13 +40,13 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    
+
     # Third-party apps
     'rest_framework',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
-    
+
     # Local apps
     'apps.accounts.apps.AccountsConfig',
     'apps.groceries.apps.GroceriesConfig',

@@ -1,9 +1,11 @@
 from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated
+
 from .models import DeviceToken
 from .serializers import DeviceTokenSerializer
+
 
 class DeviceTokenView(APIView):
     permission_classes = (IsAuthenticated,)
@@ -14,7 +16,7 @@ class DeviceTokenView(APIView):
         token = serializer.validated_data['token']
         platform = serializer.validated_data.get('platform', 'android')
         device_id = serializer.validated_data.get('device_id')
-        
+
         defaults = {
             "user": request.user,
             "platform": platform,
@@ -28,7 +30,7 @@ class DeviceTokenView(APIView):
             token=token,
             defaults=defaults
         )
-        
+
         return Response({
             "success": True,
             "data": {
@@ -45,7 +47,7 @@ class DeviceTokenView(APIView):
 
         if not token and not device_id:
             return Response({"success": False, "error": "Token or device_id is required."}, status=400)
-            
+
         qs = DeviceToken.objects.filter(user=request.user)
         if token:
             qs = qs.filter(token=token)
@@ -82,7 +84,7 @@ class NotificationPreferencesView(APIView):
             user.notify_1_day = bool(request.data['notify_1_day'])
         if 'notify_daily_recipe' in request.data:
             user.notify_daily_recipe = bool(request.data['notify_daily_recipe'])
-        
+
         user.save(update_fields=['notify_3_days', 'notify_1_day', 'notify_daily_recipe'])
 
         return Response({

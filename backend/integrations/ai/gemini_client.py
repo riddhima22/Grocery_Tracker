@@ -1,12 +1,12 @@
-import os
 import json
 import logging
+import os
 import time
-from PIL import Image, ImageOps
+import warnings
+
 from django.conf import settings
 from django.utils import timezone
-
-import warnings
+from PIL import Image, ImageOps
 
 # Force REST transport across all Google API calls to avoid gRPC socket hangs
 os.environ['GOOGLE_API_USE_REST'] = '1'
@@ -27,15 +27,23 @@ except ImportError:
         types = None
         GENAI_NEW_SDK = False
 
-from .base import GroceryVisionService, RecipeGenerationService, MealInferenceService
-from .prompts import SYSTEM_INSTRUCTION, GROCERY_SCAN_PROMPT, RECIPE_GENERATION_PROMPT, MEAL_INFERENCE_PROMPT
-from .schemas import GROCERY_SCAN_SCHEMA, RECIPE_GENERATION_SCHEMA, MEAL_INFERENCE_SCHEMA
+from .base import GroceryVisionService, MealInferenceService, RecipeGenerationService
+from .prompts import (
+    GROCERY_SCAN_PROMPT,
+    MEAL_INFERENCE_PROMPT,
+    RECIPE_GENERATION_PROMPT,
+    SYSTEM_INSTRUCTION,
+)
+from .schemas import (
+    GROCERY_SCAN_SCHEMA,
+    MEAL_INFERENCE_SCHEMA,
+    RECIPE_GENERATION_SCHEMA,
+)
 
 logger = logging.getLogger('freshtrack.ai.gemini')
 
 class AIContentBlockedError(Exception):
     """Raised when Gemini response is empty or blocked by safety/recitation/content filters."""
-    pass
 
 
 def translate_gemini_error(exc: Exception, raw_text: str = None, stage_name: str = "operation") -> str:
@@ -106,7 +114,7 @@ class GeminiClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
     def __init__(self):
         self.api_key = getattr(settings, 'GEMINI_API_KEY', '')
         self.enabled = bool(self.api_key and genai is not None)
-        
+
         self.scan_model_name = getattr(settings, 'GEMINI_MODEL_NAME', 'gemini-3.5-flash-lite')
         self.recipe_model_name = getattr(settings, 'GEMINI_RECIPE_MODEL_NAME', 'gemini-3.5-flash-lite')
         self.fallback_models = getattr(
@@ -224,9 +232,7 @@ class GeminiClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
         text = text.strip()
         if text.startswith('```'):
             lines = text.splitlines()
-            if lines[0].startswith('```json'):
-                text = '\n'.join(lines[1:-1])
-            elif lines[0].startswith('```'):
+            if lines[0].startswith('```json') or lines[0].startswith('```'):
                 text = '\n'.join(lines[1:-1])
         return text.strip()
 
@@ -273,7 +279,7 @@ class GeminiClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
                     }
                     if types and hasattr(types, 'HttpOptions'):
                         config_kwargs["http_options"] = types.HttpOptions(timeout=self.timeout_seconds * 1000)
-                    
+
                     config = types.GenerateContentConfig(**config_kwargs) if types else config_kwargs
                     response = self.client.models.generate_content(
                         model=model_name,
@@ -297,7 +303,7 @@ class GeminiClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
                 text_response = self._clean_json_text(raw_text)
                 data = json.loads(text_response)
                 items = data.get('items', [])
-                
+
                 attempt_elapsed = time.time() - attempt_start
                 total_elapsed = time.time() - overall_start
                 logger.info(
@@ -360,7 +366,7 @@ class GeminiClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
                     }
                     if types and hasattr(types, 'HttpOptions'):
                         config_kwargs["http_options"] = types.HttpOptions(timeout=self.timeout_seconds * 1000)
-                    
+
                     config = types.GenerateContentConfig(**config_kwargs) if types else config_kwargs
                     response = self.client.models.generate_content(
                         model=model_name,
@@ -384,7 +390,7 @@ class GeminiClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
                 text_response = self._clean_json_text(raw_text)
                 data = json.loads(text_response)
                 recipes = data.get('recipes', [])
-                
+
                 attempt_elapsed = time.time() - attempt_start
                 logger.info(f"Gemini successfully generated {len(recipes)} recipes with '{model_name}' in {attempt_elapsed:.2f}s.")
                 return data
@@ -435,7 +441,7 @@ class GeminiClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
                     }
                     if types and hasattr(types, 'HttpOptions'):
                         config_kwargs["http_options"] = types.HttpOptions(timeout=self.timeout_seconds * 1000)
-                    
+
                     config = types.GenerateContentConfig(**config_kwargs) if types else config_kwargs
                     response = self.client.models.generate_content(
                         model=model_name,
@@ -459,7 +465,7 @@ class GeminiClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
                 text_response = self._clean_json_text(raw_text)
                 data = json.loads(text_response)
                 ingredients = data.get('ingredients', [])
-                
+
                 attempt_elapsed = time.time() - attempt_start
                 logger.info(f"Gemini successfully inferred {len(ingredients)} ingredients with '{model_name}' in {attempt_elapsed:.2f}s.")
                 return data

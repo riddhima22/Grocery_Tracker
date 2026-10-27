@@ -1,7 +1,9 @@
-from django.db import models
-from django.conf import settings
-from django.utils import timezone
 import uuid
+
+from django.conf import settings
+from django.db import models
+from django.utils import timezone
+
 
 class GroceryItem(models.Model):
     class StorageZones(models.TextChoices):
@@ -41,14 +43,14 @@ class GroceryItem(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='groceries')
-    
+
     name = models.CharField(max_length=150)
     brand = models.CharField(max_length=100, blank=True)
     description = models.TextField(blank=True)
     icon_key = models.CharField(max_length=50, default='grocery')
     category = models.CharField(max_length=100, default='Uncategorized')
     barcode = models.CharField(max_length=50, blank=True)
-    
+
     quantity = models.DecimalField(max_digits=7, decimal_places=2, default=1.0)
     unit = models.CharField(max_length=20, choices=Units.choices, default=Units.PCS)
     unit_category = models.CharField(max_length=30, blank=True, default='')
@@ -61,7 +63,7 @@ class GroceryItem(models.Model):
     storage_zone = models.CharField(max_length=20, choices=StorageZones.choices, default=StorageZones.PANTRY)
     storage_notes = models.TextField(blank=True)
     scan_session = models.ForeignKey('scans.ScanSession', on_delete=models.SET_NULL, null=True, blank=True, related_name='created_groceries')
-    
+
     expiry_date = models.DateField(null=True, blank=True)
     estimated_consumption_date = models.DateField(null=True, blank=True)
     is_expiry_estimated = models.BooleanField(default=False, db_default=False)
@@ -75,14 +77,14 @@ class GroceryItem(models.Model):
     storage_reason = models.TextField(blank=True)
     shelf_life_guidance = models.TextField(blank=True)
     purchase_date = models.DateField(default=timezone.localdate)
-    
+
     # Server-side auto calculated fields
     status = models.CharField(max_length=20, default='fresh')
-    
+
     # Metrics
     calories_per_100g = models.PositiveIntegerField(null=True, blank=True)
     allergens = models.JSONField(default=list, blank=True)
-    
+
     # AI Predictions & Parameters
     ripeness = models.CharField(max_length=30, choices=RipenessLevels.choices, default=RipenessLevels.NA)
     temperature = models.DecimalField(max_digits=5, decimal_places=2, default=20.00)
@@ -92,7 +94,7 @@ class GroceryItem(models.Model):
     predicted_expiry = models.DateField(null=True, blank=True)
     recommended_consumption_date = models.DateField(null=True, blank=True)
     confidence_score = models.DecimalField(max_digits=4, decimal_places=3, default=1.000)
-    
+
     storage_recommendation_why = models.TextField(blank=True)
     storage_recommendation_how = models.TextField(blank=True)
     storage_recommendation_shelf_life = models.TextField(blank=True)
@@ -101,11 +103,11 @@ class GroceryItem(models.Model):
     # Detections
     ai_detected = models.BooleanField(default=False)
     ai_confidence = models.CharField(max_length=20, choices=Confidence.choices, null=True, blank=True)
-    
+
     # Alarm flags
     notified_3d = models.BooleanField(default=False)
     notified_1d = models.BooleanField(default=False)
-    
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -192,12 +194,12 @@ class GroceryActivity(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='activities')
     grocery_item = models.ForeignKey(GroceryItem, on_delete=models.SET_NULL, null=True, blank=True, related_name='activities')
-    
+
     activity_type = models.CharField(max_length=50, choices=ActivityTypes.choices)
     previous_quantity = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True)
     new_quantity = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True)
     unit = models.CharField(max_length=20, blank=True)
-    
+
     metadata = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

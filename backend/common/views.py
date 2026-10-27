@@ -1,5 +1,6 @@
-import uuid
 import logging
+import uuid
+
 from django.http import JsonResponse
 
 logger = logging.getLogger('freshtrack.errors')

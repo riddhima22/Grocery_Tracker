@@ -1,7 +1,7 @@
 import os
-import hashlib
-from PIL import Image, ImageOps
+
 from django.core.exceptions import ValidationError
+from PIL import Image
 
 # Protect against decompression bombs (max 25 Megapixels)
 Image.MAX_IMAGE_PIXELS = 25_000_000
@@ -33,7 +33,7 @@ def validate_and_sanitize_image(image_file, max_size=MAX_IMAGE_SIZE_BYTES):
         with Image.open(image_file) as img:
             img.verify()
             actual_format = img.format
-            
+
         if actual_format != ALLOWED_IMAGE_FORMATS[ext]:
             raise ValidationError(f"Image extension '{ext}' does not match real format '{actual_format}'.")
 
@@ -45,7 +45,7 @@ def validate_and_sanitize_image(image_file, max_size=MAX_IMAGE_SIZE_BYTES):
     except ValidationError:
         raise
     except Exception as e:
-        raise ValidationError(f"Invalid or corrupted image: {str(e)}")
+        raise ValidationError(f"Invalid or corrupted image: {e!s}")
     finally:
         image_file.seek(0)
 

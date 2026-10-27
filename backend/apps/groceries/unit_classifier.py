@@ -4,7 +4,7 @@ Shared across barcode/API scanning, camera AI/ML detection, and manual grocery o
 """
 import re
 from decimal import Decimal
-from typing import Optional, Dict, Any, Tuple
+from typing import Any
 
 
 class UnitCategory:
@@ -33,13 +33,13 @@ CANONICAL_UNITS = {
 
 # Unit conversion factors within compatible categories
 UNIT_CONVERSIONS = {
-    ('kg', 'g'): Decimal('1000'),
+    ('kg', 'g'): Decimal(1000),
     ('g', 'kg'): Decimal('0.001'),
-    ('L', 'ml'): Decimal('1000'),
+    ('L', 'ml'): Decimal(1000),
     ('ml', 'L'): Decimal('0.001'),
-    ('l', 'ml'): Decimal('1000'),
+    ('l', 'ml'): Decimal(1000),
     ('ml', 'l'): Decimal('0.001'),
-    ('dozen', 'pcs'): Decimal('12'),
+    ('dozen', 'pcs'): Decimal(12),
     ('pcs', 'dozen'): Decimal('0.083333'),
 }
 
@@ -110,7 +110,7 @@ PACKAGE_TYPE_KEYWORDS = {
 }
 
 
-def parse_quantity_string(quantity_str: str) -> Optional[Dict[str, Any]]:
+def parse_quantity_string(quantity_str: str) -> dict[str, Any] | None:
     """
     Parses Open Food Facts quantity strings or text descriptions such as:
     - "50 g", "50g", "1 kg", "2.5kg", "500 ml", "1 L", "1.5 l", "6 x 330 ml", "1 bottle (1 L)"
@@ -167,7 +167,7 @@ def parse_quantity_string(quantity_str: str) -> Optional[Dict[str, Any]]:
     return None
 
 
-def detect_package_type_from_text(text: str) -> Optional[str]:
+def detect_package_type_from_text(text: str) -> str | None:
     """Detects packaging container type from string."""
     if not text:
         return None
@@ -178,7 +178,7 @@ def detect_package_type_from_text(text: str) -> Optional[str]:
     return None
 
 
-def convert_quantity_units(quantity: Decimal, from_unit: str, to_unit: str) -> Tuple[Optional[Decimal], bool]:
+def convert_quantity_units(quantity: Decimal, from_unit: str, to_unit: str) -> tuple[Decimal | None, bool]:
     """
     Safely converts between compatible measurement units.
     Rejects incompatible conversions (e.g. weight to volume or count).
@@ -200,7 +200,7 @@ def convert_quantity_units(quantity: Decimal, from_unit: str, to_unit: str) -> T
     # Check reverse or uppercase variations
     key_rev = (f_norm.lower(), t_norm.lower())
     if key_rev in [('l', 'ml'), ('ml', 'l')]:
-        factor = Decimal('1000') if key_rev == ('l', 'ml') else Decimal('0.001')
+        factor = Decimal(1000) if key_rev == ('l', 'ml') else Decimal('0.001')
         return (quantity * factor).quantize(Decimal('0.001')), True
 
     return None, False
@@ -213,7 +213,7 @@ def classify_product_unit(
     ai_predicted_unit: str = '',
     ai_confidence: str = 'High',
     source: str = 'barcode'
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     res = _classify_product_unit_internal(
         product_name=product_name,
         category=category,
@@ -235,7 +235,7 @@ def _classify_product_unit_internal(
     ai_predicted_unit: str = '',
     ai_confidence: str = 'High',
     source: str = 'barcode'
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Central classification engine following strict priority rules:
     1. Explicit product metadata / package size.
