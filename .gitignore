@@ -2,6 +2,8 @@
 *.class
 *.log
 *.pyc
+*.pyo
+*.pyd
 *.swp
 .DS_Store
 .atom/
@@ -12,31 +14,61 @@
 .swiftpm/
 migrate_working_dir/
 
+# Python / Virtual Environments / Cache
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
 # IntelliJ related
 *.iml
 *.ipr
 *.iws
 .idea/
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
+# VS Code
 #.vscode/
 
-# Flutter/Dart/Pub related
+# Flutter / Dart / Pub related
 **/doc/api/
 **/ios/Flutter/.last_build_id
 .dart_tool/
 .flutter-plugins-dependencies
 .pub-cache/
 .pub/
+build/
 /build/
+coverage/
 /coverage/
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
 
-# Environment files
+# Environment files & Secrets
 .env
 .env.*
-.venv
+!.env.example
+!.env.*.example
+*.keystore
+*.jks
+**/key.properties
+
+# Credentials and sensitive JSON files
+*credentials*.json
+*service_account*.json
+*service-account*.json
+*secret*.json
+firebase-adminsdk*.json
+gcp-key*.json
+google-credentials*.json
+credentials.json
+client_secret*.json
 
 # Backend database, data, and media files
 backend/db.sqlite3
@@ -44,18 +76,16 @@ backend/media/
 backend/data/
 backend/staticfiles/
 *.sqlite3
+*.db
 
-# Symbolication related
+# Symbolication & Obfuscation
 app.*.symbols
-
-# Obfuscation related
 app.*.map.json
 
-# Android Studio will place build artifacts here
+# Android Studio / Gradle build artifacts
 /android/app/debug
 /android/app/profile
 /android/app/release
 .kotlin/
-*.keystore
-*.jks
-**/key.properties
+.gradle/
+local.properties
