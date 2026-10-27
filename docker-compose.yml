@@ -30,7 +30,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: freshtrack_api
-    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3
+    command: gunicorn --config gunicorn.conf.py config.wsgi:application
     volumes:
       - ./backend:/app
       - static_volume:/app/staticfiles

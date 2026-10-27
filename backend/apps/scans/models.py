@@ -28,6 +28,7 @@ class ScanSession(models.Model):
     candidate_count = models.PositiveIntegerField(default=0)
 
     idempotency_key = models.UUIDField(null=True, blank=True, unique=True)
+    error_message = models.TextField(blank=True, default='')
     completed_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

@@ -48,8 +48,8 @@ class ScanSessionSerializer(serializers.ModelSerializer):
     class Meta:
         model = ScanSession
         fields = (
-            'id', 'status', 'image_count', 'successful_image_count',
+            'id', 'status', 'error_message', 'image_count', 'successful_image_count',
             'failed_image_count', 'candidate_count', 'idempotency_key',
             'completed_at', 'created_at', 'updated_at', 'images'
         )
-        read_only_fields = ('id', 'status', 'image_count', 'successful_image_count', 'failed_image_count', 'candidate_count', 'completed_at', 'created_at', 'updated_at')
+        read_only_fields = ('id', 'status', 'error_message', 'image_count', 'successful_image_count', 'failed_image_count', 'candidate_count', 'completed_at', 'created_at', 'updated_at')

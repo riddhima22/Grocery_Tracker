@@ -120,6 +120,7 @@ def process_scan_session_task(self, session_id=None):
     successful_count = 0
     failed_count = 0
     candidate_count = 0
+    last_error_message = ""
 
     try:
         # 2. Process all images through the router pipeline
@@ -374,6 +375,7 @@ def process_scan_session_task(self, session_id=None):
             raise self.retry(exc=e, countdown=countdown)
 
         logger.error(f"Permanent error or max retries exceeded for session {session_id}: {e!s}", exc_info=True)
+        last_error_message = str(e)
         # Directly mark images failed and record error message
         for scan_image in images:
             scan_image.status = ScanImage.Statuses.FAILED
@@ -396,13 +398,16 @@ def process_scan_session_task(self, session_id=None):
 
             if failed_count == 0 and successful_count > 0:
                 session.status = ScanSession.Statuses.COMPLETED
+                session.error_message = ''
             elif successful_count > 0 and failed_count > 0:
                 session.status = ScanSession.Statuses.PARTIAL
+                session.error_message = last_error_message
             else:
                 session.status = ScanSession.Statuses.FAILED
+                session.error_message = last_error_message or 'Scan processing failed.'
 
             session.completed_at = timezone.now()
-            session.save(update_fields=['status', 'successful_image_count', 'failed_image_count', 'candidate_count', 'completed_at'])
+            session.save(update_fields=['status', 'error_message', 'successful_image_count', 'failed_image_count', 'candidate_count', 'completed_at'])
 
             elapsed = time.time() - start_time
             logger.info(

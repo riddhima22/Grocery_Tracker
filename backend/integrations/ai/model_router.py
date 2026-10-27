@@ -105,24 +105,33 @@ class ModelRouter:
 
     def _preprocess_image_for_ai(self, image_path: str, is_dark: bool) -> tuple:
         """
-        Auto-orients (EXIF) and applies light contrast/brightness normalization (CLAHE)
-        ONLY if the image was flagged as too dark.
-        Saves modified image to a new temp file so raw user upload is never overwritten.
+        Preprocesses an image for AI consumption:
+        1. Auto-orients (EXIF).
+        2. Downscales longest dimension to max 1280px (maintaining aspect ratio).
+        3. Applies light contrast/brightness normalization (CLAHE) if flagged as too dark.
+        4. Converts to JPEG quality ~80 to drastically minimize memory consumption on Render.
+        Always saves to a temporary file to keep raw upload intact and minimize in-memory buffers.
         Returns: (file_path_to_use, is_temporary)
         """
-        needs_temp = False
         try:
             with Image.open(image_path) as pil_img:
                 # 1. EXIF orientation correction
                 transposed = ImageOps.exif_transpose(pil_img)
-                if transposed is not pil_img:
-                    needs_temp = True
-                else:
+                if transposed is pil_img:
                     transposed = pil_img.copy()
 
-                # 2. Contrast/brightness normalization ONLY if flagged as too dark
+                # 2. Downscale to max 1280px on the long side
+                width, height = transposed.size
+                longest = max(width, height)
+                max_dim = 1280
+                if longest > max_dim:
+                    scale = max_dim / float(longest)
+                    new_w = max(150, int(round(width * scale)))
+                    new_h = max(150, int(round(height * scale)))
+                    transposed = transposed.resize((new_w, new_h), resample=Image.LANCZOS)
+
+                # 3. Contrast/brightness normalization ONLY if flagged as too dark
                 if is_dark:
-                    needs_temp = True
                     np_rgb = np.array(transposed.convert('RGB'))
                     lab = cv2.cvtColor(np_rgb, cv2.COLOR_RGB2LAB)
                     l_chan, a_chan, b_chan = cv2.split(lab)
@@ -131,12 +140,16 @@ class ModelRouter:
                     enhanced_lab = cv2.merge([l_enhanced, a_chan, b_chan])
                     enhanced_rgb = cv2.cvtColor(enhanced_lab, cv2.COLOR_LAB2RGB)
                     transposed = Image.fromarray(enhanced_rgb)
+                    del np_rgb, lab, l_chan, a_chan, b_chan, l_enhanced, enhanced_lab, enhanced_rgb
 
-                if needs_temp:
-                    tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.jpg', prefix='freshtrack_prep_')
-                    transposed.convert('RGB').save(tmp.name, format='JPEG', quality=95)
-                    tmp.close()
-                    return tmp.name, True
+                # 4. Save to temporary JPEG file with quality 80
+                tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.jpg', prefix='freshtrack_prep_')
+                transposed.convert('RGB').save(tmp.name, format='JPEG', quality=80, optimize=True)
+                tmp.close()
+                del transposed
+                import gc
+                gc.collect()
+                return tmp.name, True
 
         except Exception as e:
             logger.warning(f"Image preprocessing failed for {image_path}: {e}")
@@ -207,6 +220,8 @@ class ModelRouter:
                                 name = o.get("name", "Item")
                                 score = o.get("score", 1.0)
                                 detected_objects.append(f"{name} (confidence: {score:.2f})")
+                    import gc
+                    gc.collect()
 
                 context_sections = []
                 if ocr_results:
