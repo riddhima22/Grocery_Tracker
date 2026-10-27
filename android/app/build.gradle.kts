@@ -52,20 +52,21 @@ android {
                 storePassword = System.getenv("KEYSTORE_PASSWORD") ?: keystoreProperties.getProperty("storePassword")
                 keyAlias = System.getenv("KEY_ALIAS") ?: keystoreProperties.getProperty("keyAlias")
                 keyPassword = System.getenv("KEY_PASSWORD") ?: keystoreProperties.getProperty("keyPassword")
-            } else {
-                // Safe fallback to debug keystore for development / PR CI checks
-                val debugConfig = signingConfigs.getByName("debug")
-                storeFile = debugConfig.storeFile
-                storePassword = debugConfig.storePassword
-                keyAlias = debugConfig.keyAlias
-                keyPassword = debugConfig.keyPassword
             }
         }
     }
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("release")
+            val envKeystore = System.getenv("KEYSTORE_PATH")
+            val propKeystore = keystoreProperties.getProperty("storeFile")
+            val targetStorePath = envKeystore ?: propKeystore
+
+            if (!targetStorePath.isNullOrEmpty() && file(targetStorePath).exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            } else {
+                signingConfig = signingConfigs.getByName("debug")
+            }
         }
     }
 }
