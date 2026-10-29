@@ -122,7 +122,12 @@ class GeminiClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
             'GEMINI_FALLBACK_MODELS',
             ['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.8-flash']
         )
-        self.timeout_seconds = getattr(settings, 'GEMINI_TIMEOUT_SECONDS', 25)
+        # Configurable timeout via AI_REQUEST_TIMEOUT_SECONDS (default 45s / 45000ms)
+        timeout_env = getattr(settings, 'AI_REQUEST_TIMEOUT_SECONDS', None)
+        if timeout_env is None:
+            timeout_env = getattr(settings, 'GEMINI_TIMEOUT_SECONDS', 45)
+        self.timeout_seconds = int(timeout_env)
+        self.timeout_ms = self.timeout_seconds * 1000
 
         self.client = None
         if self.enabled:
@@ -130,8 +135,9 @@ class GeminiClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
                 os.environ['GOOGLE_API_USE_REST'] = '1'
                 if GENAI_NEW_SDK and hasattr(genai, 'Client'):
                     client_kwargs = {'api_key': self.api_key}
-                    if types and hasattr(types, 'HttpOptions'):
-                        client_kwargs['http_options'] = types.HttpOptions(timeout=self.timeout_seconds * 1000)
+                    http_opts = self._get_http_options()
+                    if http_opts is not None:
+                        client_kwargs['http_options'] = http_opts
                     self.client = genai.Client(**client_kwargs)
                 else:
                     try:
@@ -144,7 +150,19 @@ class GeminiClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
         else:
             logger.warning("GEMINI_API_KEY is missing or genai package not available. Gemini client disabled.")
 
-    def _prepare_image(self, image_or_path, max_dim: int = 1568) -> Image.Image:
+    def _get_http_options(self):
+        """
+        Builds explicit HttpOptions with timeout (default 45000ms) and limited SDK retries (attempts=2)
+        so that slow or hung calls fail fast, allowing AIService to fall back to OpenAI.
+        """
+        if types and hasattr(types, 'HttpOptions'):
+            http_kwargs = {'timeout': self.timeout_ms}
+            if hasattr(types, 'HttpRetryOptions'):
+                http_kwargs['retry_options'] = types.HttpRetryOptions(attempts=2)
+            return types.HttpOptions(**http_kwargs)
+        return None
+
+    def _prepare_image(self, image_or_path, max_dim: int = 1280) -> Image.Image:
         """
         Loads, auto-orients (EXIF), and downscales an image if its longest side exceeds max_dim,
         maintaining aspect ratio with Image.LANCZOS resampling.
@@ -277,8 +295,9 @@ class GeminiClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
                         "response_mime_type": "application/json",
                         "response_schema": GROCERY_SCAN_SCHEMA,
                     }
-                    if types and hasattr(types, 'HttpOptions'):
-                        config_kwargs["http_options"] = types.HttpOptions(timeout=self.timeout_seconds * 1000)
+                    http_opts = self._get_http_options()
+                    if http_opts is not None:
+                        config_kwargs["http_options"] = http_opts
 
                     config = types.GenerateContentConfig(**config_kwargs) if types else config_kwargs
                     response = self.client.models.generate_content(
@@ -364,8 +383,9 @@ class GeminiClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
                         "response_mime_type": "application/json",
                         "response_schema": RECIPE_GENERATION_SCHEMA,
                     }
-                    if types and hasattr(types, 'HttpOptions'):
-                        config_kwargs["http_options"] = types.HttpOptions(timeout=self.timeout_seconds * 1000)
+                    http_opts = self._get_http_options()
+                    if http_opts is not None:
+                        config_kwargs["http_options"] = http_opts
 
                     config = types.GenerateContentConfig(**config_kwargs) if types else config_kwargs
                     response = self.client.models.generate_content(
@@ -439,8 +459,9 @@ class GeminiClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
                         "response_mime_type": "application/json",
                         "response_schema": MEAL_INFERENCE_SCHEMA,
                     }
-                    if types and hasattr(types, 'HttpOptions'):
-                        config_kwargs["http_options"] = types.HttpOptions(timeout=self.timeout_seconds * 1000)
+                    http_opts = self._get_http_options()
+                    if http_opts is not None:
+                        config_kwargs["http_options"] = http_opts
 
                     config = types.GenerateContentConfig(**config_kwargs) if types else config_kwargs
                     response = self.client.models.generate_content(

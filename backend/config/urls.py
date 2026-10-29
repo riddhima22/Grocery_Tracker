@@ -54,6 +54,7 @@ v1_patterns = [
 ]
 
 urlpatterns = [
+    path('health', health_check, name='root_health_check_noslash'),
     path('health/', health_check, name='root_health_check'),
     path('admin/', admin.site.urls),
     path('api/v1/', include(v1_patterns)),

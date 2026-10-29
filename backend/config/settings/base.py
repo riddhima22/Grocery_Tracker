@@ -247,7 +247,8 @@ GEMINI_FALLBACK_MODELS = env.list(
     'GEMINI_FALLBACK_MODELS',
     default=['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.8-flash']
 )
-GEMINI_TIMEOUT_SECONDS = env.int('GEMINI_TIMEOUT_SECONDS', default=25)
+AI_REQUEST_TIMEOUT_SECONDS = env.int('AI_REQUEST_TIMEOUT_SECONDS', default=45)
+GEMINI_TIMEOUT_SECONDS = env.int('GEMINI_TIMEOUT_SECONDS', default=AI_REQUEST_TIMEOUT_SECONDS)
 
 # OpenAI configuration
 OPENAI_API_KEY = env('OPENAI_API_KEY', default='')
