@@ -9,10 +9,6 @@ on:
       - '.github/workflows/backend-ci.yml'
   pull_request:
     branches: [ main ]
-    paths-ignore:
-      - 'backend/**'
-      - 'docker-compose.yml'
-      - '.github/workflows/backend-ci.yml'
 
 concurrency:
   group: frontend-ci-${{ github.workflow }}-${{ github.ref }}
