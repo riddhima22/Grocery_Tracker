@@ -1,4 +1,3 @@
-import multiprocessing
 import os
 
 # Gunicorn configuration tailored for Render Free Tier (512MB RAM)

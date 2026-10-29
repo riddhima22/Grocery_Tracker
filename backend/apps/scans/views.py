@@ -1,7 +1,9 @@
 import logging
 import os
+import threading
 import uuid
 
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import status, viewsets
@@ -91,7 +93,7 @@ class ScanSessionViewSet(viewsets.ReadOnlyModelViewSet):
         with transaction.atomic():
             session = ScanSession.objects.create(
                 user=request.user,
-                status=ScanSession.Statuses.PENDING,
+                status=ScanSession.Statuses.PROCESSING,
                 image_count=len(images_files)
             )
             for file in images_files:
@@ -101,18 +103,58 @@ class ScanSessionViewSet(viewsets.ReadOnlyModelViewSet):
                     status=ScanImage.Statuses.PENDING
                 )
 
-        # Enqueue background processing via Celery
-        try:
-            process_scan_session_task.delay(str(session.id))
-        except Exception as queue_err:
-            logger.warning(f"Celery delay failed, executing task synchronously as fallback: {queue_err}")
-            process_scan_session_task.apply(args=(str(session.id),))
+        # Enqueue background processing asynchronously
+        # If a broker is configured and Celery is not in eager mode, dispatch via Celery .delay()
+        # Otherwise, run in a background daemon thread so the Gunicorn web worker returns immediately.
+        is_eager = getattr(settings, 'CELERY_TASK_ALWAYS_EAGER', False)
+        dispatched_via_celery = False
+
+        if not is_eager:
+            try:
+                process_scan_session_task.delay(str(session.id))
+                dispatched_via_celery = True
+            except Exception as queue_err:
+                logger.warning(
+                    f"Celery delay failed ({queue_err}), falling back to background thread."
+                )
+
+        if not dispatched_via_celery:
+            def _async_scan_worker(session_id_str):
+                from django.db import connection
+                try:
+                    connection.close()
+                    process_scan_session_task(session_id_str)
+                except Exception as worker_err:
+                    logger.error(
+                        f"Background thread scan processing failed for session {session_id_str}: {worker_err}",
+                        exc_info=True
+                    )
+                finally:
+                    try:
+                        connection.close()
+                    except Exception:
+                        pass
+
+            worker_thread = threading.Thread(
+                target=_async_scan_worker,
+                args=(str(session.id),),
+                daemon=True,
+                name=f"scan-session-{session.id}"
+            )
+            worker_thread.start()
 
         return Response({
             "success": True,
             "data": ScanSessionSerializer(session).data,
-            "message": "Images uploaded and AI processing queued."
-        }, status=status.HTTP_201_CREATED)
+            "message": "Scan session created and processing started."
+        }, status=status.HTTP_202_ACCEPTED)
+
+    def retrieve(self, request, *args, **kwargs):
+        session = self.get_object()
+        return Response({
+            "success": True,
+            "data": ScanSessionSerializer(session).data
+        })
 
 
     @action(detail=True, methods=['get'])

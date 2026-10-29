@@ -363,4 +363,164 @@ class ScanCandidateExpirySemanticsTests(TestCase):
             self.assertEqual(created_candidate.estimated_consumption_date, datetime.date(2026, 11, 7))
 
 
+class ScanFlowAsyncAndPollingTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="async_scan_user@example.com",
+            password="StrongPassword123!",
+            display_name="Async Scan Tester"
+        )
+        self.client.force_authenticate(user=self.user)
+
+    def _create_dummy_image_file(self, filename="groceries.jpg"):
+        import io
+
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from PIL import Image
+
+        buf = io.BytesIO()
+        img = Image.new("RGB", (300, 300), color="green")
+        img.save(buf, format="JPEG")
+        buf.seek(0)
+        return SimpleUploadedFile(filename, buf.read(), content_type="image/jpeg")
+
+    def test_post_scan_session_returns_202_accepted_and_processing_status(self):
+        """
+        POST /api/v1/scans/sessions/ must return HTTP 202 Accepted immediately
+        with status 'processing' and the session ID, without blocking the web worker.
+        """
+        from unittest.mock import patch
+
+        image_file = self._create_dummy_image_file()
+
+        with patch("apps.scans.views.threading.Thread"), \
+             patch("apps.scans.tasks.process_scan_session_task.delay") as mock_delay:
+            mock_delay.return_value = None
+            response = self.client.post(
+                "/api/v1/scans/sessions/",
+                {"images": [image_file]},
+                format="multipart"
+            )
+
+        self.assertEqual(response.status_code, 202)
+        self.assertTrue(response.data.get("success"))
+        data = response.data.get("data", {})
+        session_id = data.get("id")
+        self.assertIsNotNone(session_id)
+        self.assertEqual(data.get("status"), "processing")
+
+        # Verify session in database is in processing status
+        session = ScanSession.objects.get(id=session_id)
+        self.assertEqual(session.status, ScanSession.Statuses.PROCESSING)
+        self.assertEqual(session.image_count, 1)
+
+    def test_polling_get_scan_session_endpoint(self):
+        """
+        GET /api/v1/scans/sessions/{id}/ returns session details in standard envelope.
+        """
+        session = ScanSession.objects.create(
+            user=self.user,
+            status=ScanSession.Statuses.PROCESSING,
+            image_count=1
+        )
+
+        response = self.client.get(f"/api/v1/scans/sessions/{session.id}/")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data.get("success"))
+        data = response.data.get("data", {})
+        self.assertEqual(data.get("id"), str(session.id))
+        self.assertEqual(data.get("status"), "processing")
+        self.assertEqual(data.get("error_message"), "")
+
+    def test_scan_task_failure_path_sets_failed_status_and_error_message(self):
+        """
+        When the AI/OCR pipeline encounters an unrecoverable failure,
+        the task sets session status='failed' and records error_message.
+        """
+        from unittest.mock import MagicMock, patch
+
+        from apps.scans.models import ScanImage
+        from apps.scans.tasks import process_scan_session_task
+
+        session = ScanSession.objects.create(
+            user=self.user,
+            status=ScanSession.Statuses.PROCESSING,
+            image_count=1
+        )
+        image_file = self._create_dummy_image_file()
+        ScanImage.objects.create(
+            scan_session=session,
+            image=image_file,
+            status=ScanImage.Statuses.PENDING
+        )
+
+        with patch("apps.scans.tasks.ModelRouter") as MockRouter:
+            mock_instance = MagicMock()
+            mock_instance.process_scan.return_value = {
+                "success": False,
+                "error": "Image resolution too low or corrupted."
+            }
+            MockRouter.return_value = mock_instance
+
+            # Execute task directly with mocked AI/OCR
+            process_scan_session_task(str(session.id))
+
+        session.refresh_from_db()
+        self.assertEqual(session.status, ScanSession.Statuses.FAILED)
+        self.assertIn("Image resolution too low or corrupted.", session.error_message)
+
+        # Polling endpoint reflects failed status and error message
+        response = self.client.get(f"/api/v1/scans/sessions/{session.id}/")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data.get("success"))
+        data = response.data.get("data", {})
+        self.assertEqual(data.get("status"), "failed")
+        self.assertIn("Image resolution too low or corrupted.", data.get("error_message"))
+
+    def test_gemini_timeout_falls_back_to_openai(self):
+        """
+        When Gemini raises a TimeoutError / deadline exceeded, AIService
+        falls back to OpenAI and returns candidates successfully.
+        """
+        from integrations.ai.ai_service import AIService
+
+        class TimeoutGeminiProvider:
+            def analyze_grocery_images(self, *args, **kwargs):
+                raise TimeoutError("Gemini request timed out after 45s")
+
+        class SuccessfulOpenAIProvider:
+            def analyze_grocery_images(self, *args, **kwargs):
+                return {
+                    "items": [
+                        {
+                            "name": "Organic Whole Milk",
+                            "quantity": 1.0,
+                            "unit": "bottle",
+                            "confidence": "High",
+                            "storage_zone": "fridge",
+                        }
+                    ]
+                }
+
+        service = AIService(
+            provider_order=["gemini", "openai"],
+            provider_instances={
+                "gemini": TimeoutGeminiProvider(),
+                "openai": SuccessfulOpenAIProvider(),
+            }
+        )
+
+        res = service.analyze_grocery_images(["/dummy/path.jpg"])
+        self.assertIn("items", res)
+        self.assertEqual(res["items"][0]["name"], "Organic Whole Milk")
+
+    def test_health_check_endpoints_return_200(self):
+        """Verify /health, /health/, and /api/v1/health/ all return 200 OK."""
+        for path in ["/health", "/health/", "/api/v1/health/"]:
+            res = self.client.get(path)
+            self.assertEqual(res.status_code, 200, f"Failed for {path}")
+            self.assertEqual(res.json().get("status"), "healthy")
+
+
+
 
