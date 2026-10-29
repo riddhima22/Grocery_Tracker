@@ -33,7 +33,11 @@ class ScanRepository {
     final response = await _apiClient.post(
       ApiEndpoints.scanSessions,
       data: formData,
-      options: Options(contentType: 'multipart/form-data'),
+      options: Options(
+        contentType: 'multipart/form-data',
+        sendTimeout: const Duration(seconds: 90),
+        receiveTimeout: const Duration(seconds: 90),
+      ),
     );
 
     stopwatch.stop();
