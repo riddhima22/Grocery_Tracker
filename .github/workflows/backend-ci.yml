@@ -9,10 +9,6 @@ on:
       - '.github/workflows/backend-ci.yml'
   pull_request:
     branches: [ main ]
-    paths:
-      - 'backend/**'
-      - 'docker-compose.yml'
-      - '.github/workflows/backend-ci.yml'
 
 concurrency:
   group: backend-ci-${{ github.workflow }}-${{ github.ref }}
@@ -96,7 +92,7 @@ jobs:
             ghcr.io/${{ steps.repo_owner.outputs.owner }}/freshtrack-backend:latest
             ghcr.io/${{ steps.repo_owner.outputs.owner }}/freshtrack-backend:${{ github.sha }}
 
-      - name: Deploy to Render (CD Placeholder)
+      - name: Deploy to Render
         # =========================================================================
         # Render Deployment Target
         # =========================================================================
@@ -106,7 +102,6 @@ jobs:
         # 3. Add it as a secret in your GitHub repo:
         #    Settings -> Secrets and variables -> Actions -> Repository secrets
         #    Name: RENDER_DEPLOY_HOOK_URL
-        # 4. Uncomment the curl step below.
         # =========================================================================
         env:
           RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
@@ -116,7 +111,10 @@ jobs:
             echo "Triggering Render deployment hook..."
             curl -fsS -X POST "$RENDER_DEPLOY_HOOK_URL"
             echo "Render deployment triggered successfully."
+          elif [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "::error::RENDER_DEPLOY_HOOK_URL secret is not configured! Deployment cannot proceed on main branch."
+            echo "Please configure RENDER_DEPLOY_HOOK_URL in repository secrets to enable automated deployment."
+            exit 1
           else
-            echo "RENDER_DEPLOY_HOOK_URL secret not configured. Skipping automated deploy step."
-            echo "See comments in .github/workflows/backend-ci.yml for setup instructions."
+            echo "RENDER_DEPLOY_HOOK_URL secret not configured. Skipping automated deploy step on ${{ github.ref }}."
           fi
