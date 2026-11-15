@@ -11,6 +11,9 @@ from apps.groceries.serializers import GroceryItemSerializer
 from common.exceptions import ResourceNotFoundException, ForbiddenException
 import uuid
 import os
+import logging
+
+logger = logging.getLogger('freshtrack.scans.views')
 
 class ScanSessionViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = ScanSessionSerializer
@@ -30,8 +33,7 @@ class ScanSessionViewSet(viewsets.ReadOnlyModelViewSet):
 
         # Validate total request size
         total_size = sum(img.size for img in images_files)
-        import logging
-        logging.getLogger('freshtrack.scans.views').info(
+        logger.info(
             f"Received scan upload request with {len(images_files)} image(s) ({total_size / 1024:.1f} KB total) from user {request.user}"
         )
         if total_size > 20 * 1024 * 1024: # 20MB limit
@@ -99,9 +101,32 @@ class ScanSessionViewSet(viewsets.ReadOnlyModelViewSet):
         # Enqueue background processing via Celery
         try:
             process_scan_session_task.delay(str(session.id))
+            logger.info(f"Queued Celery processing task for scan session {session.id}.")
         except Exception as queue_err:
-            logger.warning(f"Celery delay failed, executing task synchronously as fallback: {queue_err}")
-            process_scan_session_task.apply(args=(str(session.id),))
+            logger.error(
+                f"Celery task dispatch failed for scan session {session.id}: {queue_err}",
+                exc_info=True,
+                extra={"session_id": str(session.id), "user_id": str(request.user.id)}
+            )
+            # Mark scan session and images as FAILED to prevent indefinite pending state
+            session.status = ScanSession.Statuses.FAILED
+            session.completed_at = timezone.now()
+            session.save(update_fields=['status', 'completed_at'])
+
+            for scan_image in session.images.all():
+                scan_image.status = ScanImage.Statuses.FAILED
+                scan_image.error_message = f"Failed to enqueue processing task: {queue_err}"
+                scan_image.save(update_fields=['status', 'error_message'])
+
+            return Response({
+                "success": False,
+                "error": {
+                    "code": "TASK_DISPATCH_FAILED",
+                    "message": "Scan image upload succeeded, but background processing could not be queued. Please try again.",
+                    "details": str(queue_err),
+                    "session_id": str(session.id),
+                }
+            }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
         return Response({
             "success": True,
