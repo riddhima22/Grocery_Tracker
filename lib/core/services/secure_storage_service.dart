@@ -14,6 +14,13 @@ class SecureStorageService {
   static const String _keyAccess = 'jwt_access_token';
   static const String _keyRefresh = 'jwt_refresh_token';
 
+  Future<void> saveTokens({required String access, String? refresh}) async {
+    await _storage.write(key: _keyAccess, value: access);
+    if (refresh != null && refresh.isNotEmpty) {
+      await _storage.write(key: _keyRefresh, value: refresh);
+    }
+  }
+
   Future<void> saveAccessToken(String token) async {
     await _storage.write(key: _keyAccess, value: token);
   }

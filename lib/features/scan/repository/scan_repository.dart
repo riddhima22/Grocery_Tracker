@@ -34,7 +34,6 @@ class ScanRepository {
       ApiEndpoints.scanSessions,
       data: formData,
       options: Options(
-        contentType: 'multipart/form-data',
         sendTimeout: const Duration(seconds: 90),
         receiveTimeout: const Duration(seconds: 90),
       ),

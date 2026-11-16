@@ -78,6 +78,55 @@ class ApiClient {
         errorStr.contains('certificateexception');
   }
 
+  static bool _isLoggingOut = false;
+
+  /// Prevents multiple simultaneous logout and navigation operations
+  static Future<void> _handlePermanentSessionExpiry() async {
+    if (_isLoggingOut) return;
+    _isLoggingOut = true;
+    try {
+      AppLogger.error(
+        'Session expired permanently. Clearing credentials and redirecting to Login screen...',
+      );
+      await SecureStorageService().clearTokens();
+      AppNavigation.toAndRemoveUntil(AppRoutes.login);
+    } finally {
+      // Release lock after navigation delay
+      Future.delayed(const Duration(seconds: 3), () {
+        _isLoggingOut = false;
+      });
+    }
+  }
+
+  /// Recreates a FormData object with clean unfinalized streams for retry
+  static FormData _recreateFormData(FormData original) {
+    final fresh = FormData();
+    fresh.fields.addAll(original.fields);
+    for (final file in original.files) {
+      try {
+        fresh.files.add(MapEntry(file.key, file.value.clone()));
+      } catch (_) {
+        fresh.files.add(file);
+      }
+    }
+    return fresh;
+  }
+
+  /// Cleans Content-Type and Content-Length headers and options so Dio regenerates
+  /// fresh boundaries and content lengths for retried requests.
+  static void _prepareOptionsForRetry(RequestOptions options) {
+    if (options.data is FormData) {
+      options.data = _recreateFormData(options.data as FormData);
+      options.contentType = null;
+      options.headers.remove(Headers.contentTypeHeader);
+      options.headers.remove('content-type');
+      options.headers.remove('Content-Type');
+      options.headers.remove(Headers.contentLengthHeader);
+      options.headers.remove('content-length');
+      options.headers.remove('Content-Length');
+    }
+  }
+
   Interceptor _authInterceptor() => InterceptorsWrapper(
     onRequest: (options, handler) async {
       // Do NOT attach Authorization header to unauthenticated/public auth endpoints
@@ -121,12 +170,7 @@ class ApiClient {
         );
         await Future.delayed(const Duration(seconds: 2));
         try {
-          if (options.data is FormData) {
-            options.data = (options.data as FormData).clone();
-            options.headers.remove(Headers.contentTypeHeader);
-            options.headers.remove('content-type');
-            options.headers.remove('Content-Type');
-          }
+          _prepareOptionsForRetry(options);
           final response = await _dio.fetch(options);
           return handler.resolve(response);
         } catch (retryErr) {
@@ -136,13 +180,13 @@ class ApiClient {
         }
       }
 
-      // 2. Token refresh on 401
+      // 2. Token refresh and original request retry on HTTP 401
       if (err.response?.statusCode == 401 &&
           !_isPublicEndpoint(path) &&
           options.extra['isRetry'] != true) {
         options.extra['isRetry'] = true;
         AppLogger.warning(
-          'Received 401 Unauthorized on $path. Attempting token refresh...',
+          'Access token expired on ${options.method} $path (HTTP 401). Initiating token refresh...',
         );
 
         final authHeader = options.headers['Authorization'] as String?;
@@ -152,40 +196,45 @@ class ApiClient {
           final newAccessToken = await TokenRefreshManager()
               .refreshAccessToken(failedToken: failedToken);
           if (newAccessToken != null) {
-            // Update Authorization header with the new token
+            // Update Authorization header with the newly minted access token
             options.headers['Authorization'] = 'Bearer $newAccessToken';
 
-            // Re-clone FormData if necessary to avoid finalized stream error
-            if (options.data is FormData) {
-              options.data = (options.data as FormData).clone();
-              options.headers.remove(Headers.contentTypeHeader);
-              options.headers.remove('content-type');
-              options.headers.remove('Content-Type');
-            }
-            // Clone and retry request
+            // Clean headers and prepare fresh unfinalized streams for multipart uploads
+            _prepareOptionsForRetry(options);
+
+            AppLogger.info(
+              'Retrying original request: ${options.method} $path with refreshed token...',
+            );
             final response = await _dio.fetch(options);
+            AppLogger.info(
+              'Original request retry succeeded: ${options.method} $path (HTTP ${response.statusCode}).',
+            );
             return handler.resolve(response);
           }
         } on RefreshTokenException catch (refreshErr) {
           if (refreshErr.isSessionExpired) {
-            // Only kick user to login if refresh token is genuinely expired or invalid
             AppLogger.error(
-              'Session expired permanently. Redirecting to Login screen...',
+              'Session expired permanently on $path. Refresh token rejected (${refreshErr.message}).',
             );
-            await _secureStorage.clearTokens();
-            AppNavigation.toAndRemoveUntil(AppRoutes.login);
+            await _handlePermanentSessionExpiry();
             return handler.next(err);
           } else {
-            // Transient error: do NOT kick user to login screen!
+            // Transient error (timeout / 5xx): do NOT kick user to login screen
             AppLogger.warning(
-              'Token refresh failed due to network/server timeout. User session preserved.',
+              'Token refresh encountered transient error: ${refreshErr.message}. Session preserved.',
             );
             return handler.next(err);
           }
-        } catch (e) {
+        } on DioException catch (retryDioErr) {
           AppLogger.error(
-            'Token refresh retry encountered unexpected error',
-            e,
+            'Original request retry failed: ${options.method} $path (HTTP ${retryDioErr.response?.statusCode ?? 'NO_STATUS'}).',
+          );
+          return handler.next(retryDioErr);
+        } catch (retryOtherErr, stack) {
+          AppLogger.error(
+            'Original request retry failed unexpectedly: ${options.method} $path',
+            retryOtherErr,
+            stack,
           );
           return handler.next(err);
         }

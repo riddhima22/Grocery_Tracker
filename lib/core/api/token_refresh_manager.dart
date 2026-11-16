@@ -65,10 +65,10 @@ class TokenRefreshManager {
     _refreshCompleter = completer;
 
     try {
-      AppLogger.info('Initiating centralized JWT token refresh...');
+      AppLogger.info('Centralized JWT refresh started.');
       final refreshToken = await _secureStorage.getRefreshToken();
       if (refreshToken == null || refreshToken.isEmpty) {
-        AppLogger.warning('No refresh token found in storage.');
+        AppLogger.warning('No refresh token found in storage. Centralized JWT refresh failed.');
         final err = RefreshTokenException(
           'No refresh token found in storage.',
           isSessionExpired: true,
@@ -120,13 +120,17 @@ class TokenRefreshManager {
           );
         }
 
-        await _secureStorage.saveAccessToken(newAccess);
+        await _secureStorage.saveTokens(
+          access: newAccess,
+          refresh: (newRefresh != null && newRefresh.isNotEmpty) ? newRefresh : null,
+        );
         if (newRefresh != null && newRefresh.isNotEmpty) {
-          await _secureStorage.saveRefreshToken(newRefresh);
           AppLogger.info('Rotated refresh token saved to secure storage.');
         }
 
-        AppLogger.info('Centralized token refresh succeeded. New access token secured.');
+        AppLogger.info(
+          'Centralized JWT refresh succeeded. New access token and rotated refresh token secured.',
+        );
         if (!completer.isCompleted) completer.complete(newAccess);
         return newAccess;
       } else {
@@ -153,7 +157,7 @@ class TokenRefreshManager {
 
       if (isBlacklistedOrInvalid) {
         AppLogger.warning(
-          'Refresh token was rejected by server (HTTP $statusCode). Session expired.',
+          'Refresh token was rejected by server (HTTP $statusCode). Centralized JWT refresh failed.',
         );
         final err = RefreshTokenException(
           'Refresh token is invalid, expired, or blacklisted.',
@@ -164,7 +168,7 @@ class TokenRefreshManager {
       }
 
       AppLogger.warning(
-        'Token refresh encountered network/server error: ${dioErr.type} ${dioErr.message}',
+        'Centralized JWT refresh encountered transient network/server error: ${dioErr.type} ${dioErr.message}',
       );
       final err = RefreshTokenException(
         'Transient network error during token refresh: ${dioErr.message}',
@@ -173,7 +177,7 @@ class TokenRefreshManager {
       if (!completer.isCompleted) completer.completeError(err);
       throw err;
     } catch (e, stack) {
-      AppLogger.error('Centralized token refresh unexpected error', e, stack);
+      AppLogger.error('Centralized JWT refresh unexpected error', e, stack);
       if (e is RefreshTokenException) {
         if (!completer.isCompleted) completer.completeError(e);
         rethrow;
