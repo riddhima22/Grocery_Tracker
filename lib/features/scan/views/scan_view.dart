@@ -76,7 +76,7 @@ class _ScanViewState extends State<ScanView>
       canPop: canPopRoute || !isScanTabActive,
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop && isScanTabActive) {
-          HomeShell.switchTab(0);
+          HomeShell.navigateBack();
         }
       },
       child: AppScaffold(
@@ -106,7 +106,7 @@ class _ScanViewState extends State<ScanView>
     if (Navigator.of(context).canPop()) {
       Navigator.of(context).pop();
     } else {
-      HomeShell.switchTab(0);
+      HomeShell.navigateBack();
     }
   }
 

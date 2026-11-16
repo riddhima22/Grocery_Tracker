@@ -133,4 +133,52 @@ void main() {
     expect(find.text('Whole Grain Bread'), findsOneWidget);
     expect(find.text('Red Apples'), findsOneWidget);
   });
+
+  testWidgets('TabNotifier accurately tracks previous tab and navigates back', (WidgetTester tester) async {
+    // 1. Initial tab is 0
+    HomeShell.switchTab(0);
+    expect(HomeShell.activeTabNotifier.value, 0);
+
+    // 2. Switch to Kitchen tab 1
+    HomeShell.switchTab(1);
+    expect(HomeShell.activeTabNotifier.value, 1);
+    expect(HomeShell.activeTabNotifier.previousTab, 0);
+
+    // 3. Switch to Scan tab 2
+    HomeShell.switchTab(2);
+    expect(HomeShell.activeTabNotifier.value, 2);
+    expect(HomeShell.activeTabNotifier.previousTab, 1);
+
+    // 4. Navigate back from ScanView
+    HomeShell.navigateBack();
+    expect(HomeShell.activeTabNotifier.value, 1);
+
+    // 5. From Dashboard (0) to Scan (2) and navigate back
+    HomeShell.switchTab(0);
+    HomeShell.switchTab(2);
+    expect(HomeShell.activeTabNotifier.previousTab, 0);
+    HomeShell.navigateBack();
+    expect(HomeShell.activeTabNotifier.value, 0);
+  });
+
+  testWidgets('ScanView Back Arrow returns to previous tab in HomeShell', (WidgetTester tester) async {
+    // User came from Kitchen (tab 1) to Scan (tab 2)
+    HomeShell.switchTab(1);
+    HomeShell.switchTab(2);
+
+    await tester.pumpWidget(buildTestableWidget(child: const ScanView()));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    final backButtonFinder = find.byTooltip('Back');
+    expect(backButtonFinder, findsOneWidget);
+
+    // Tap back button
+    await tester.tap(backButtonFinder);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    // Navigates back to Kitchen (tab 1)
+    expect(HomeShell.activeTabNotifier.value, 1);
+  });
 }

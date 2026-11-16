@@ -8,12 +8,36 @@ import '../../../config/app_colors.dart';
 import '../../../core/extensions/responsive_context_extension.dart';
 import '../../../core/widgets/responsive_layout.dart';
 
+class TabNotifier extends ValueNotifier<int> {
+  TabNotifier(super.value);
+
+  int previousTab = 0;
+
+  void switchTab(int index) {
+    if (value != index) {
+      previousTab = value;
+      value = index;
+    } else {
+      notifyListeners();
+    }
+  }
+
+  void navigateBack() {
+    final target = (previousTab != value) ? previousTab : 0;
+    switchTab(target);
+  }
+}
+
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
 
-  static final ValueNotifier<int> activeTabNotifier = ValueNotifier<int>(0);
+  static final TabNotifier activeTabNotifier = TabNotifier(0);
   static void switchTab(int index) {
-    activeTabNotifier.value = index;
+    activeTabNotifier.switchTab(index);
+  }
+
+  static void navigateBack() {
+    activeTabNotifier.navigateBack();
   }
 
   @override
@@ -26,6 +50,7 @@ class _HomeShellState extends State<HomeShell> {
   @override
   void initState() {
     super.initState();
+    _currentIndex = HomeShell.activeTabNotifier.value;
     HomeShell.activeTabNotifier.addListener(_onTabNotification);
   }
 
@@ -41,6 +66,10 @@ class _HomeShellState extends State<HomeShell> {
         _currentIndex = HomeShell.activeTabNotifier.value;
       });
     }
+  }
+
+  void _onTabSelected(int index) {
+    HomeShell.switchTab(index);
   }
 
   final List<Widget> _pages = [
@@ -60,11 +89,7 @@ class _HomeShellState extends State<HomeShell> {
         body: IndexedStack(index: _currentIndex, children: _pages),
         bottomNavigationBar: BottomNavigationBar(
           currentIndex: _currentIndex,
-          onTap: (index) {
-            setState(() {
-              _currentIndex = index;
-            });
-          },
+          onTap: _onTabSelected,
           type: BottomNavigationBarType.fixed,
           backgroundColor: AppColors.surface,
           selectedItemColor: AppColors.primary,
@@ -112,11 +137,7 @@ class _HomeShellState extends State<HomeShell> {
           children: [
             NavigationRail(
               selectedIndex: _currentIndex,
-              onDestinationSelected: (index) {
-                setState(() {
-                  _currentIndex = index;
-                });
-              },
+              onDestinationSelected: _onTabSelected,
               backgroundColor: AppColors.surface,
               selectedIconTheme: const IconThemeData(color: AppColors.primary),
               unselectedIconTheme: const IconThemeData(
