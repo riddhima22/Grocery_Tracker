@@ -1,4 +1,4 @@
-from django.core.checks import Error, Tags, register
+from django.core.checks import Error, Warning, Tags, register
 from django.conf import settings
 
 INSECURE_SECRET_KEY = 'django-insecure-freshtrack-secret'
@@ -23,3 +23,18 @@ def check_secret_key_not_insecure(app_configs, **kwargs):
             )
         )
     return errors
+
+@register(Tags.compatibility, deploy=True)
+def check_celery_broker_in_production(app_configs, **kwargs):
+    warnings = []
+    if not settings.DEBUG and not getattr(settings, 'CELERY_TASK_ALWAYS_EAGER', True):
+        broker = getattr(settings, 'CELERY_BROKER_URL', '')
+        if 'localhost' in broker or '127.0.0.1' in broker:
+            warnings.append(
+                Warning(
+                    f'CELERY_BROKER_URL is configured to localhost ({broker}) in production.',
+                    hint='Ensure REDIS_URL or CELERY_BROKER_URL points to your production Redis instance (e.g. Render internal Redis URL).',
+                    id='freshtrack.W001',
+                )
+            )
+    return warnings
