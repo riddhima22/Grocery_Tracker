@@ -1,9 +1,7 @@
 import logging
 import os
-import threading
 import uuid
 
-from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import status, viewsets
@@ -37,8 +35,7 @@ class ScanSessionViewSet(viewsets.ReadOnlyModelViewSet):
 
         # Validate total request size
         total_size = sum(img.size for img in images_files)
-        import logging
-        logging.getLogger('freshtrack.scans.views').info(
+        logger.info(
             f"Received scan upload request with {len(images_files)} image(s) ({total_size / 1024:.1f} KB total) from user {request.user}"
         )
         if total_size > 20 * 1024 * 1024: # 20MB limit
@@ -93,7 +90,7 @@ class ScanSessionViewSet(viewsets.ReadOnlyModelViewSet):
         with transaction.atomic():
             session = ScanSession.objects.create(
                 user=request.user,
-                status=ScanSession.Statuses.PROCESSING,
+                status=ScanSession.Statuses.PENDING,
                 image_count=len(images_files)
             )
             for file in images_files:
@@ -103,51 +100,41 @@ class ScanSessionViewSet(viewsets.ReadOnlyModelViewSet):
                     status=ScanImage.Statuses.PENDING
                 )
 
-        # Enqueue background processing asynchronously
-        # If a broker is configured and Celery is not in eager mode, dispatch via Celery .delay()
-        # Otherwise, run in a background daemon thread so the Gunicorn web worker returns immediately.
-        is_eager = getattr(settings, 'CELERY_TASK_ALWAYS_EAGER', False)
-        dispatched_via_celery = False
-
-        if not is_eager:
-            try:
-                process_scan_session_task.delay(str(session.id))
-                dispatched_via_celery = True
-            except Exception as queue_err:
-                logger.warning(
-                    f"Celery delay failed ({queue_err}), falling back to background thread."
-                )
-
-        if not dispatched_via_celery:
-            def _async_scan_worker(session_id_str):
-                from django.db import connection
-                try:
-                    connection.close()
-                    process_scan_session_task(session_id_str)
-                except Exception as worker_err:
-                    logger.error(
-                        f"Background thread scan processing failed for session {session_id_str}: {worker_err}",
-                        exc_info=True
-                    )
-                finally:
-                    try:
-                        connection.close()
-                    except Exception:
-                        pass
-
-            worker_thread = threading.Thread(
-                target=_async_scan_worker,
-                args=(str(session.id),),
-                daemon=True,
-                name=f"scan-session-{session.id}"
+        # Enqueue background processing via Celery
+        try:
+            process_scan_session_task.delay(str(session.id))
+            logger.info(f"Queued Celery processing task for scan session {session.id}.")
+        except Exception as queue_err:
+            logger.error(
+                f"Celery task dispatch failed for scan session {session.id}: {queue_err}",
+                exc_info=True,
+                extra={"session_id": str(session.id), "user_id": str(request.user.id)}
             )
-            worker_thread.start()
+            # Mark scan session and images as FAILED to prevent indefinite pending state
+            session.status = ScanSession.Statuses.FAILED
+            session.completed_at = timezone.now()
+            session.save(update_fields=['status', 'completed_at'])
+
+            for scan_image in session.images.all():
+                scan_image.status = ScanImage.Statuses.FAILED
+                scan_image.error_message = f"Failed to enqueue processing task: {queue_err}"
+                scan_image.save(update_fields=['status', 'error_message'])
+
+            return Response({
+                "success": False,
+                "error": {
+                    "code": "TASK_DISPATCH_FAILED",
+                    "message": "Scan image upload succeeded, but background processing could not be queued. Please try again.",
+                    "details": str(queue_err),
+                    "session_id": str(session.id),
+                }
+            }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
         return Response({
             "success": True,
             "data": ScanSessionSerializer(session).data,
-            "message": "Scan session created and processing started."
-        }, status=status.HTTP_202_ACCEPTED)
+            "message": "Scan session created and processing queued."
+        }, status=status.HTTP_201_CREATED)
 
     def retrieve(self, request, *args, **kwargs):
         session = self.get_object()

@@ -219,14 +219,37 @@ SIMPLE_JWT = {
 CORS_ALLOW_ALL_ORIGINS = False # In production this would be locked down
 
 # Redis & Celery Settings
-CELERY_BROKER_URL = env('REDIS_URL', default='redis://localhost:6379/0')
-CELERY_RESULT_BACKEND = env('REDIS_URL', default='redis://localhost:6379/0')
+# Support CELERY_BROKER_URL, REDIS_URL, or REDIS_TLS_URL (e.g. Render/Upstash/AWS)
+CELERY_BROKER_URL = env(
+    'CELERY_BROKER_URL',
+    default=env('REDIS_URL', default=env('REDIS_TLS_URL', default=None))
+)
+if not CELERY_BROKER_URL:
+    if is_dev_or_test:
+        CELERY_BROKER_URL = 'redis://localhost:6379/0'
+    else:
+        raise ImproperlyConfigured(
+            "REDIS_URL or CELERY_BROKER_URL environment variable is required in production."
+        )
+
+CELERY_RESULT_BACKEND = env(
+    'CELERY_RESULT_BACKEND',
+    default=CELERY_BROKER_URL
+)
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_ALWAYS_EAGER = env.bool('CELERY_TASK_ALWAYS_EAGER', default=True)
 CELERY_TASK_EAGER_PROPAGATES = True
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+
+CELERY_BROKER_TRANSPORT_OPTIONS = {
+    'visibility_timeout': 3600,
+    'socket_timeout': env.float('REDIS_SOCKET_TIMEOUT', default=15.0),
+    'socket_connect_timeout': env.float('REDIS_CONNECT_TIMEOUT', default=15.0),
+    'retry_on_timeout': True,
+}
 
 from celery.schedules import crontab
 
@@ -247,7 +270,8 @@ GEMINI_FALLBACK_MODELS = env.list(
     'GEMINI_FALLBACK_MODELS',
     default=['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.8-flash']
 )
-GEMINI_TIMEOUT_SECONDS = env.int('GEMINI_TIMEOUT_SECONDS', default=25)
+AI_REQUEST_TIMEOUT_SECONDS = env.int('AI_REQUEST_TIMEOUT_SECONDS', default=45)
+GEMINI_TIMEOUT_SECONDS = env.int('GEMINI_TIMEOUT_SECONDS', default=AI_REQUEST_TIMEOUT_SECONDS)
 
 # OpenAI configuration
 OPENAI_API_KEY = env('OPENAI_API_KEY', default='')

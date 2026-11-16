@@ -89,3 +89,6 @@ app.*.map.json
 .kotlin/
 .gradle/
 local.properties
+
+venv/
+backend/venv/

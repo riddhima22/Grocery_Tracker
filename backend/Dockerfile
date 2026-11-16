@@ -31,4 +31,4 @@ RUN mkdir -p /app/staticfiles /app/media
 
 EXPOSE 8000
 
-CMD ["gunicorn", "--config", "gunicorn.conf.py", "config.wsgi:application"]
+CMD ["gunicorn", "-c", "gunicorn.conf.py", "config.wsgi:application"]

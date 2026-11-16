@@ -122,8 +122,12 @@ class GeminiClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
             'GEMINI_FALLBACK_MODELS',
             ['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.8-flash']
         )
-        self.timeout_seconds = getattr(settings, 'GEMINI_TIMEOUT_SECONDS', 45)
-        self.timeout_ms = getattr(settings, 'GEMINI_TIMEOUT_MS', 45000)
+        # Configurable timeout via AI_REQUEST_TIMEOUT_SECONDS (default 45s / 45000ms)
+        timeout_env = getattr(settings, 'AI_REQUEST_TIMEOUT_SECONDS', None)
+        if timeout_env is None:
+            timeout_env = getattr(settings, 'GEMINI_TIMEOUT_SECONDS', 45)
+        self.timeout_seconds = int(timeout_env)
+        self.timeout_ms = self.timeout_seconds * 1000
 
         self.client = None
         if self.enabled:
@@ -148,7 +152,7 @@ class GeminiClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
 
     def _get_http_options(self):
         """
-        Builds explicit HttpOptions with timeout (default 45000ms) and limited SDK retries
+        Builds explicit HttpOptions with timeout (default 45000ms) and limited SDK retries (attempts=2)
         so that slow or hung calls fail fast, allowing AIService to fall back to OpenAI.
         """
         if types and hasattr(types, 'HttpOptions'):
