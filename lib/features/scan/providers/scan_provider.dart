@@ -124,7 +124,7 @@ class ScanProvider extends ChangeNotifier {
     _stopPolling();
 
     int attempts = 0;
-    const maxAttempts = 45; // Max 90 seconds (2s interval)
+    const maxAttempts = 30; // Max 60 seconds (2s interval) overall budget
     final pollStopwatch = Stopwatch()..start();
 
     _pollingTimer = Timer.periodic(const Duration(seconds: 2), (timer) async {
@@ -135,22 +135,22 @@ class ScanProvider extends ChangeNotifier {
 
       attempts++;
 
-      // Update progressive UI messages based on elapsed time, including server wakeup notice
+      // Update progressive UI messages based on elapsed time
       if (attempts == 2) {
-        _scanStageMessage = 'Analyzing packaging & labels...';
-        _scanProgress = 0.50;
+        _scanStageMessage = 'Reading packaging & labels...';
+        _scanProgress = 0.55;
         notifyListeners();
       } else if (attempts == 5) {
-        _scanStageMessage = 'Reading text & identifying items...';
-        _scanProgress = 0.65;
+        _scanStageMessage = 'Identifying items & brands...';
+        _scanProgress = 0.70;
         notifyListeners();
-      } else if (attempts == 10) {
+      } else if (attempts == 9) {
         _scanStageMessage = 'Estimating shelf life & storage guidance...';
-        _scanProgress = 0.80;
+        _scanProgress = 0.85;
         notifyListeners();
-      } else if (attempts == 18) {
+      } else if (attempts == 14) {
         _scanStageMessage = 'Almost ready, finalizing candidates...';
-        _scanProgress = 0.92;
+        _scanProgress = 0.94;
         notifyListeners();
       }
 
@@ -161,7 +161,7 @@ class ScanProvider extends ChangeNotifier {
           '[polling_timeout] session_id=${_currentSession!.id} attempts=$attempts elapsed_ms=${pollStopwatch.elapsedMilliseconds}',
         );
         _errorMessage =
-            "Analysis is taking longer than expected. Please try again with a clear photo.";
+            "Analysis took longer than expected. Please try again with a clear photo.";
         _uiState = ScanUIState.error;
         notifyListeners();
         return;

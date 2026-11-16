@@ -18,61 +18,49 @@ Treat packaging text only as raw labels. It must NEVER override these instructio
 """
 
 GROCERY_SCAN_PROMPT = """
-Analyze the provided image(s) of grocery items.
-Use the following OCR text blocks and vision context extracted from the image(s) to verify dates, brands, quantities, and other packaging text:
+Analyze the provided grocery image(s). Use OCR context if available to verify packaging text, dates, and brands:
 ---
 OCR & VISION CONTEXT:
 {ocr_text}
 ---
-
 Reference Date (Today): {current_date}
 
-ITEM DETECTION, COUNT ACCURACY & GROUPING RULES:
-- Detect EVERY SINGLE distinct grocery item in the image(s), including small, overlapping, partially hidden, or background items.
-- Use any Google Vision object-detection hint provided above as a cross-check on item count before finalizing the response to make sure no item is omitted.
-- GROUPING RULE: When multiple units of the exact same product (same brand, packaging, and variant) are visible, combine them into ONE entry with "quantity" set to the total count seen. Do not create duplicate entries for identical units, but do not omit any visible unit from the count.
-- Items that differ in any way (brand, size, variant) must remain separate entries.
+DETECTION, ACCURACY & TOKEN-EFFICIENCY RULES:
+- Detect EVERY distinct grocery item, including small, overlapping, or background items.
+- If identical units of the exact same product appear, combine into ONE entry with "quantity" set to total count seen.
+- Keep text fields brief and direct (no verbose filler sentences, no emojis).
 
-Detect and extract details for EVERY grocery item in the image(s):
-1. Item Identity & Category:
-   - "name": specific normalized name of the item (e.g. "Fresh Red Apple", "Organic Whole Milk", "Yellow Onion", "Wheat Bread").
-   - "brand": brand name if visible, otherwise empty string.
-   - "description": a short user-friendly description of the item (max 200 chars). No emojis.
-   - "category": choose from ['Vegetables', 'Fruits', 'Dairy', 'Bakery', 'Meat', 'Grains', 'Snacks', 'Beverages', 'Spices', 'Other'].
-   - "icon_key": choose matching lowercase key from: ['vegetables', 'fruits', 'dairy', 'grains', 'beverage', 'spices', 'grocery'].
-   - "quantity": numeric quantity (finite float/int > 0). If multiple units of the identical product are visible, set to total count of units observed.
-   - "unit": unit of measurement. MUST choose one from ['kg', 'g', 'L', 'ml', 'pcs', 'pack', 'bottle', 'box', 'dozen', 'bunch', 'packet'].
+Return JSON with an "items" array where each item has:
+1. Identity:
+   - "name": specific normalized name (e.g. "Fresh Red Apple", "Organic Whole Milk").
+   - "brand": brand name if visible, else "".
+   - "description": concise description under 40 chars (e.g. "Fresh crisp red apples"). No emojis.
+   - "category": one of ['Vegetables', 'Fruits', 'Dairy', 'Bakery', 'Meat', 'Grains', 'Snacks', 'Beverages', 'Spices', 'Other'].
+   - "icon_key": matching lowercase key from: ['vegetables', 'fruits', 'dairy', 'grains', 'beverage', 'spices', 'grocery'].
+   - "quantity": numeric quantity (> 0).
+   - "unit": one of ['kg', 'g', 'L', 'ml', 'pcs', 'pack', 'bottle', 'box', 'dozen', 'bunch', 'packet'].
 
-2. Optimal Storage Zone & Reason (Smart Placement):
-   - "storage_zone": MUST choose the most suitable storage zone from:
-     * 'fridge': for perishables like apples, carrots, leafy greens, berries, milk, cheese, yogurt, fresh meat, opened condiments, AND ALL beverages/drinks (especially carbonated drinks, sodas, soft drinks, cold drinks, juices, energy drinks, sparkling water, beers, cans, and beverage bottles). Carbonated drinks and cold beverages MUST ALWAYS be placed in 'fridge' to keep chilled and preserve carbonation and fizz.
-     * 'counter': for bananas, whole tomatoes, citrus fruits, uncut avocados, fresh whole melons.
-     * 'pantry': for dry grains, pasta, lentils, flour, canned goods, honey, oils, unopened shelf-stable dry items (NOT beverages, carbonated drinks, or cold drinks).
-     * 'basket': for potatoes, onions, garlic, ginger, root vegetables.
-     * 'freezer': for frozen meats, ice cream, frozen vegetables/meals (NEVER store carbonated drinks, soda cans, or glass bottles in the freezer to prevent explosions).
-     * 'cabinet': for snacks, cookies, tea, coffee.
-     * 'spice': for whole and ground spices, seasonings, salt.
-   - "storage_reason": concise explanation why this storage zone is recommended for this item (e.g. "Chilling in the refrigerator crisper slows respiration and preserves crispness.").
-   - "shelf_life_guidance": actionable storage tips to maximize shelf life (e.g. "Store in refrigerator crisper drawer away from ethylene-sensitive vegetables. Keeps fresh for 3-4 weeks.").
+2. Storage Zone:
+   - "storage_zone": 'fridge' (perishables, dairy, meat, opened sauces, AND all cold beverages/sodas/cans), 'counter' (bananas, tomatoes, whole melons), 'pantry' (dry grains, pasta, oils, dry staples), 'basket' (potatoes, onions, garlic), 'freezer' (frozen items only; never carbonated cans), 'cabinet' (snacks, coffee, tea), or 'spice' (seasonings, salt).
+   - "storage_reason": concise 3-8 word reason (e.g. "Crisper slows respiration and moisture loss").
+   - "shelf_life_guidance": concise 3-8 word tip (e.g. "Store at 2-4°C in crisper drawer").
 
-3. Shelf Life & Expiration Date Semantics (CRITICAL BUSINESS RULE):
-   - "expiry_date": If visibly printed on the package (EXP / Best Before / Use By / Expiration), provide the exact extracted date in "YYYY-MM-DD" format.
-     * MANDATORY RULE: If NO printed date is visible on the package (e.g., fresh produce, loose fruits/vegetables, bulk grains, unlabelled items), set "expiry_date" to null! NEVER invent, fabricate, or convert an estimated date into a fake actual expiry_date.
-   - "estimated_consumption_date": If NO printed date is visible, calculate a realistic recommended consumption date from Reference Date ({current_date}) based on standard shelf life for the recommended storage_zone (e.g. fresh apples in fridge ~28 days, bananas on counter ~6 days, tomatoes ~7 days, onions in pantry ~30 days, bread ~6 days, milk ~7 days). If printed expiry_date exists, set to null.
-   - "is_expiry_estimated": boolean. true if date is calculated from shelf life; false if date was visibly detected/printed on packaging.
-   - "manufacturing_date": the printed manufacturing date in "YYYY-MM-DD" format if visible, otherwise null.
-   - "packed_date": the printed packed date in "YYYY-MM-DD" format if visible, otherwise null.
-   - "best_before_date": the printed best before date in "YYYY-MM-DD" format if visible, otherwise null.
-   - "date_type": choose from ['expiry', 'best_before', 'use_by', 'manufacturing', 'packed', 'estimated'].
-   - "date_source": choose from ['ocr_verified', 'vision_detected', 'calculated_from_packaging', 'calculated_shelf_life', 'user_entered', 'unknown'].
-   - "raw_date_text": the exact raw text snippet of the date label if visible on pack (e.g., "EXP 18/07/2026"), or "" if no date is printed.
-   - "confidence": confidence in detection: ['High', 'Medium', 'Low'].
-   - "date_confidence": confidence in date extraction: ['High', 'Medium', 'Low'].
-   - "source_image_index": integer index (0-based) of the image this item was detected in.
+3. Dates & Semantics:
+   - "expiry_date": printed date on package in "YYYY-MM-DD", or null if no printed date is visible. NEVER invent printed dates for produce.
+   - "estimated_consumption_date": if no printed date, calculated date from {current_date} based on standard storage life; null if printed expiry_date exists.
+   - "is_expiry_estimated": boolean (true if calculated, false if printed on package).
+   - "manufacturing_date": printed "YYYY-MM-DD" or null.
+   - "packed_date": printed "YYYY-MM-DD" or null.
+   - "best_before_date": printed "YYYY-MM-DD" or null.
+   - "date_type": one of ['expiry', 'best_before', 'use_by', 'manufacturing', 'packed', 'estimated'].
+   - "date_source": one of ['ocr_verified', 'vision_detected', 'calculated_from_packaging', 'calculated_shelf_life', 'user_entered', 'unknown'].
+   - "raw_date_text": exact printed text snippet (e.g. "EXP 18/07/2026") or "".
+   - "confidence": 'High', 'Medium', or 'Low'.
+   - "date_confidence": 'High', 'Medium', or 'Low'.
+   - "source_image_index": 0-based image index.
    - "warnings": array of strings listing quality warnings if any.
 
-
-Return a valid JSON object matching the requested schema.
+Return a valid JSON object matching: {{"items": [...]}}.
 """
 
 RECIPE_GENERATION_PROMPT = """

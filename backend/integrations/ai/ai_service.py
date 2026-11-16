@@ -62,7 +62,8 @@ class AIService(GroceryVisionService, RecipeGenerationService, MealInferenceServ
 
         return providers
 
-    def analyze_grocery_images(self, image_paths: list, ocr_context: str = None) -> dict:
+    def analyze_grocery_images(self, image_paths: list, ocr_context: str = None, correlation_id: str = None) -> dict:
+        import time
         providers = self._get_providers()
         if not providers:
             logger.error("No active AI providers available for image analysis.")
@@ -73,25 +74,43 @@ class AIService(GroceryVisionService, RecipeGenerationService, MealInferenceServ
 
         errors = []
         blocked_count = 0
+        corr_tag = f"CorrelationID={correlation_id} " if correlation_id else ""
+
         for name, client in providers:
+            t_prov_start = time.time()
             try:
-                logger.info(f"Attempting grocery scan analysis with provider: {name}")
-                result = client.analyze_grocery_images(image_paths, ocr_context=ocr_context)
+                logger.info(f"[{name}_started] {corr_tag}Attempting grocery scan analysis with provider: {name}")
+                import inspect
+                sig = inspect.signature(client.analyze_grocery_images)
+                if 'correlation_id' in sig.parameters:
+                    result = client.analyze_grocery_images(image_paths, ocr_context=ocr_context, correlation_id=correlation_id)
+                else:
+                    result = client.analyze_grocery_images(image_paths, ocr_context=ocr_context)
+
+                t_prov = time.time() - t_prov_start
                 if result and isinstance(result, dict) and "items" in result:
-                    logger.info(f"Provider '{name}' successfully processed grocery scan analysis.")
+                    items = result.get('items', [])
+                    logger.info(
+                        f"[{name}_completed] {corr_tag}elapsed_ms={int(t_prov * 1000)} items={len(items)}"
+                    )
                     return result
             except AIContentBlockedError as e:
-                logger.warning(f"AI provider '{name}' content blocked during grocery scan: {e}")
+                t_prov = time.time() - t_prov_start
+                logger.warning(f"[{name}_blocked] {corr_tag}elapsed_ms={int(t_prov * 1000)} content blocked: {e}")
                 errors.append(f"{name}: {e}")
                 blocked_count += 1
                 break
             except OpenAIAuthenticationError as e:
-                logger.critical(f"AI provider '{name}' authentication/configuration failure: {e}")
+                t_prov = time.time() - t_prov_start
+                logger.critical(f"[{name}_auth_failed] {corr_tag}elapsed_ms={int(t_prov * 1000)} authentication failure: {e}")
                 errors.append(f"{name}: Configuration error - invalid/incorrect API key (401)")
                 # Authentication failures are permanent configuration errors: do not mask with secondary fallback
                 raise
             except Exception as e:
-                logger.warning(f"AI provider '{name}' failed during grocery scan: {e}. Attempting fallback...")
+                t_prov = time.time() - t_prov_start
+                logger.warning(
+                    f"[{name}_failed] {corr_tag}elapsed_ms={int(t_prov * 1000)} error={e}. Attempting immediate fallback..."
+                )
                 errors.append(f"{name}: {e}")
 
         logger.error(f"All AI providers failed for analyze_grocery_images. Errors: {errors}")

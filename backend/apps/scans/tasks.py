@@ -3,6 +3,7 @@ import logging
 
 from celery import shared_task
 from celery.exceptions import Retry, SoftTimeLimitExceeded
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
@@ -91,7 +92,7 @@ def is_transient_error(exc: Exception) -> bool:
     return False
 
 
-@shared_task(bind=True, max_retries=3, default_retry_delay=10)
+@shared_task(bind=True, max_retries=1, default_retry_delay=5)
 def process_scan_session_task(self, session_id=None, correlation_id=None, **kwargs):
     # Support both task.delay(session_id) and direct thread execution
     if session_id is None and isinstance(self, (str, int)):
@@ -147,7 +148,7 @@ def process_scan_session_task(self, session_id=None, correlation_id=None, **kwar
         # 2. Process all images through the router pipeline
         t_ai_start = time.time()
         logger.info(f"[ai_started] CorrelationID={correlation_id} session_id={session_id} image_count={len(image_paths)}")
-        result = router.process_scan(image_paths)
+        result = router.process_scan(image_paths, correlation_id=correlation_id, session_id=session_id)
         t_ai = time.time() - t_ai_start
 
         if not result.get("success"):
@@ -406,8 +407,9 @@ def process_scan_session_task(self, session_id=None, correlation_id=None, **kwar
         )
 
     except SoftTimeLimitExceeded:
-        logger.error(f"[scan_failed] CorrelationID={correlation_id} session_id={session_id} exceeded soft time limit (150s).")
-        last_error_message = "Scan processing timed out. Please try again with fewer or clearer images."
+        soft_limit = getattr(settings, 'CELERY_TASK_SOFT_TIME_LIMIT', 60)
+        logger.error(f"[scan_failed] CorrelationID={correlation_id} session_id={session_id} exceeded soft time limit ({soft_limit}s).")
+        last_error_message = "Scan processing exceeded the time limit. Please try again with a single clear photo."
         failed_count = images.update(status=ScanImage.Statuses.FAILED, error_message=last_error_message)
 
     except Exception as e:

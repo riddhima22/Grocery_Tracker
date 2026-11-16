@@ -68,11 +68,11 @@ class OpenAIClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
         self.client = None
         if self.enabled:
             try:
-                timeout_sec = getattr(settings, 'AI_REQUEST_TIMEOUT_SECONDS', 45)
+                timeout_sec = getattr(settings, 'AI_REQUEST_TIMEOUT_SECONDS', 22)
                 client_kwargs = {
                     'api_key': self.api_key,
                     'timeout': float(timeout_sec),
-                    'max_retries': 2,
+                    'max_retries': 1,
                 }
                 if self.project:
                     client_kwargs['project'] = self.project
@@ -110,10 +110,14 @@ class OpenAIClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
                 text = '\n'.join(lines[1:-1])
         return text.strip()
 
-    def analyze_grocery_images(self, image_paths: list, ocr_context: str = None) -> dict:
+    def analyze_grocery_images(self, image_paths: list, ocr_context: str = None, correlation_id: str = None) -> dict:
         if not self.enabled:
             logger.warning("OpenAI Client is disabled. Returning empty results.")
             return {"items": []}
+
+        import time
+        t_start = time.time()
+        corr_tag = f"CorrelationID={correlation_id} " if correlation_id else ""
 
         try:
             current_date_str = timezone.now().date().isoformat()
@@ -125,7 +129,6 @@ class OpenAIClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
             content = [{"type": "text", "text": prompt}]
 
             for path in image_paths:
-                logger.info(f"Encoding image for OpenAI Vision: {path}")
                 b64_img = self._encode_image_to_base64(path)
                 content.append({
                     "type": "image_url",
@@ -134,8 +137,8 @@ class OpenAIClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
                     }
                 })
 
-            logger.info(f"Calling OpenAI ({self.model_name}) for scan analysis...")
-            timeout_sec = getattr(settings, 'AI_REQUEST_TIMEOUT_SECONDS', 45)
+            timeout_sec = getattr(settings, 'AI_REQUEST_TIMEOUT_SECONDS', 22)
+            logger.info(f"[openai_started] {corr_tag}Calling OpenAI ({self.model_name}) timeout={timeout_sec}s images={len(image_paths)}")
             response = self.client.chat.completions.create(
                 model=self.model_name,
                 messages=[
@@ -143,16 +146,25 @@ class OpenAIClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
                     {"role": "user", "content": content}
                 ],
                 response_format={"type": "json_object"},
+                max_tokens=1500,
                 timeout=float(timeout_sec)
             )
 
+            t_openai = time.time() - t_start
             text_response = response.choices[0].message.content
             cleaned = self._clean_json_text(text_response)
             data = json.loads(cleaned)
-            logger.info(f"OpenAI successfully scanned and returned {len(data.get('items', []))} items.")
+            items = data.get('items', [])
+            logger.info(
+                f"[openai_completed] {corr_tag}model={self.model_name} elapsed_ms={int(t_openai * 1000)} items={len(items)}"
+            )
             return data
 
         except Exception as e:
+            t_openai = time.time() - t_start
+            logger.warning(
+                f"[openai_failed] {corr_tag}model={self.model_name} elapsed_ms={int(t_openai * 1000)} error={e}"
+            )
             if is_openai_auth_error(e):
                 self.enabled = False
                 logger.critical(

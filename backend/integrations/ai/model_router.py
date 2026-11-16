@@ -72,27 +72,20 @@ class ModelRouter:
                         errors.append(f"Image {os.path.basename(path)} resolution is too low ({width}x{height}).")
                         continue
 
-                    # Dark lighting check (PIL)
-                    stat = ImageStat.Stat(img.convert('L'))
-                    mean_brightness = stat.mean[0]
-                    if mean_brightness < 35:
-                        warnings.append(f"Lighting is too dark in {os.path.basename(path)}.")
-
-                    # Contrast check (blurriness indicator)
-                    std_dev = stat.stddev[0]
-                    if std_dev < 10:
-                        warnings.append(f"Image {os.path.basename(path)} might be too blurry or low contrast.")
-
-                    # In-memory blur detection via Laplacian variance directly from PIL grayscale
+                    # In-memory thumbnail for rapid blur and quality detection without full-res overhead
                     try:
-                        gray_thumb = img.convert('L')
-                        # Downscale large images for fast blur computation
-                        if max(width, height) > 800:
-                            scale = 800.0 / max(width, height)
-                            gray_thumb = gray_thumb.resize(
-                                (max(150, int(width * scale)), max(150, int(height * scale))),
-                                resample=Image.Resampling.BILINEAR
-                            )
+                        thumb = img.copy()
+                        thumb.thumbnail((512, 512), resample=Image.Resampling.BILINEAR)
+                        gray_thumb = thumb.convert('L')
+                        stat = ImageStat.Stat(gray_thumb)
+                        mean_brightness = stat.mean[0]
+                        if mean_brightness < 35:
+                            warnings.append(f"Lighting is too dark in {os.path.basename(path)}.")
+
+                        std_dev = stat.stddev[0]
+                        if std_dev < 10:
+                            warnings.append(f"Image {os.path.basename(path)} might be too blurry or low contrast.")
+
                         gray_arr = np.array(gray_thumb)
                         variance = cv2.Laplacian(gray_arr, cv2.CV_64F).var()
                         blur_threshold = getattr(settings, 'AI_BLUR_VARIANCE_THRESHOLD', 100.0)
@@ -114,10 +107,10 @@ class ModelRouter:
         """
         Preprocesses an image for AI consumption:
         1. Auto-orients (EXIF).
-        2. Downscales longest dimension to max 1280px (maintaining aspect ratio).
-        3. Applies light contrast/brightness normalization (CLAHE) if flagged as too dark.
-        4. Converts to JPEG quality ~80 to drastically minimize memory consumption on Render.
-        Always saves to a temporary file to keep raw upload intact and minimize in-memory buffers.
+        2. Downscales longest dimension to sensible max resolution (default 1280px) preserving label text.
+        3. Applies light contrast/brightness normalization (CLAHE) if flagged as dark.
+        4. Saves to temporary JPEG quality 82 for fast encoding and ~100-200 KB network payload.
+        Always saves to a temporary file, keeping the raw uploaded image intact.
         Returns: (file_path_to_use, is_temporary)
         """
         try:
@@ -127,10 +120,10 @@ class ModelRouter:
                 if transposed is pil_img:
                     transposed = pil_img.copy()
 
-                # 2. Downscale to max 1280px on the long side
+                # 2. Downscale to max resolution on the longest side
                 width, height = transposed.size
                 longest = max(width, height)
-                max_dim = 1280
+                max_dim = getattr(settings, 'AI_MAX_IMAGE_DIMENSION', 1280)
                 if longest > max_dim:
                     scale = max_dim / float(longest)
                     new_w = max(150, int(round(width * scale)))
@@ -149,9 +142,10 @@ class ModelRouter:
                     transposed = Image.fromarray(enhanced_rgb)
                     del np_rgb, lab, l_chan, a_chan, b_chan, l_enhanced, enhanced_lab, enhanced_rgb
 
-                # 4. Save to temporary JPEG file with quality 80
+                # 4. Save to temporary JPEG file with quality 82 (fast Huffman save)
                 tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.jpg', prefix='freshtrack_prep_')
-                transposed.convert('RGB').save(tmp.name, format='JPEG', quality=80, optimize=True)
+                quality = getattr(settings, 'AI_IMAGE_QUALITY', 82)
+                transposed.convert('RGB').save(tmp.name, format='JPEG', quality=quality)
                 tmp.close()
                 del transposed
                 import gc
@@ -163,22 +157,23 @@ class ModelRouter:
 
         return image_path, False
 
-    def process_scan(self, image_paths: list) -> dict:
+    def process_scan(self, image_paths: list, correlation_id: str = None, session_id: str = None) -> dict:
         """
         Executes the two-stage pipeline:
         1. Validates image qualities (corruption, resolution, darkness, Laplacian blur).
         2. Preprocesses valid images (EXIF auto-orientation, CLAHE darkness normalization on temp copy).
         3. Performs Google Cloud Vision OCR if enabled.
-        4. Invokes Gemini Client combining visual and OCR contexts.
+        4. Invokes AI Client combining visual and OCR contexts.
         """
         t0 = time.time()
+        corr_tag = f"CorrelationID={correlation_id} " if correlation_id else ""
 
         # 1. Run quality validations
         errors, warnings, valid_paths = self.run_image_quality_checks(image_paths)
         t_qc = time.time() - t0
 
         if errors:
-            logger.error(f"Image validation failed: {errors}")
+            logger.error(f"[image_qc_failed] {corr_tag}Image validation failed: {errors}")
             return {
                 "success": False,
                 "error": errors[0],
@@ -212,6 +207,10 @@ class ModelRouter:
                 temp_files_to_cleanup.append(prep_path)
 
         t_prep = time.time() - t_prep_start
+        logger.info(
+            f"[image_preprocessed] {corr_tag}session_id={session_id or 'unknown'} "
+            f"image_count={len(prepared_paths)} elapsed_ms={int(t_prep * 1000)}"
+        )
 
         try:
             # 3. OCR Text Extraction & Object Detection Stage
@@ -255,9 +254,13 @@ class ModelRouter:
 
             t_ocr = time.time() - t_ocr_start
 
-            # 4. Gemini Multimodal Analysis Stage
+            # 4. Multimodal AI Analysis Stage
             t_ai_start = time.time()
-            ai_result = self.ai_client.analyze_grocery_images(prepared_paths, ocr_context=ocr_context)
+            ai_result = self.ai_client.analyze_grocery_images(
+                prepared_paths,
+                ocr_context=ocr_context,
+                correlation_id=correlation_id
+            )
             items = ai_result.get("items", [])
             t_ai = time.time() - t_ai_start
 
@@ -268,7 +271,7 @@ class ModelRouter:
 
             t_total = time.time() - t0
             logger.info(
-                f"ModelRouter scan pipeline completed in {t_total:.2f}s: "
+                f"[model_router_completed] {corr_tag}pipeline completed in {t_total:.2f}s: "
                 f"QC={t_qc:.2f}s, Prep={t_prep:.2f}s, OCR={t_ocr:.2f}s, AI={t_ai:.2f}s, Align={t_align:.2f}s "
                 f"(identified {len(items)} items)."
             )

@@ -158,7 +158,7 @@ class GeminiClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
         if types and hasattr(types, 'HttpOptions'):
             http_kwargs = {'timeout': self.timeout_ms}
             if hasattr(types, 'HttpRetryOptions'):
-                http_kwargs['retry_options'] = types.HttpRetryOptions(attempts=2)
+                http_kwargs['retry_options'] = types.HttpRetryOptions(attempts=1)
             return types.HttpOptions(**http_kwargs)
         return None
 
@@ -262,11 +262,12 @@ class GeminiClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
                 models.append(m)
         return models
 
-    def analyze_grocery_images(self, image_paths: list, ocr_context: str = None) -> dict:
+    def analyze_grocery_images(self, image_paths: list, ocr_context: str = None, correlation_id: str = None) -> dict:
         if not self.enabled:
             logger.warning("Gemini Client is disabled. Returning empty results.")
             return {"items": []}
 
+        corr_tag = f"CorrelationID={correlation_id} " if correlation_id else ""
         images = []
         for path in image_paths:
             size_kb = (os.path.getsize(path) / 1024) if os.path.exists(path) else 0
@@ -287,7 +288,7 @@ class GeminiClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
 
         for model_name in candidate_models:
             attempt_start = time.time()
-            logger.info(f"AI analysis started with Gemini model '{model_name}'...")
+            logger.info(f"[gemini_started] {corr_tag}model={model_name} images={len(image_paths)}")
             try:
                 if self.client:
                     config_kwargs = {
@@ -326,8 +327,8 @@ class GeminiClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
                 attempt_elapsed = time.time() - attempt_start
                 total_elapsed = time.time() - overall_start
                 logger.info(
-                    f"AI analysis completed with model '{model_name}' in {attempt_elapsed:.2f}s "
-                    f"(total elapsed: {total_elapsed:.2f}s). Detected {len(items)} items."
+                    f"[gemini_completed] {corr_tag}model={model_name} elapsed_ms={int(attempt_elapsed * 1000)} "
+                    f"total_elapsed_ms={int(total_elapsed * 1000)} items={len(items)}"
                 )
                 return data
 
@@ -338,6 +339,9 @@ class GeminiClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
                 attempt_elapsed = time.time() - attempt_start
                 last_exception = e
                 err_msg = str(e).lower()
+                logger.warning(
+                    f"[gemini_failed] {corr_tag}model={model_name} elapsed_ms={int(attempt_elapsed * 1000)} error={e}"
+                )
 
                 # Quota exhaustion detection:
                 # If Gemini returns 429 ResourceExhausted (rate limit / quota exceeded),

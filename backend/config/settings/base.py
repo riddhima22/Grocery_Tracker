@@ -256,9 +256,9 @@ CELERY_TASK_TRACK_STARTED = True
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 CELERY_WORKER_MAX_TASKS_PER_CHILD = env.int('CELERY_WORKER_MAX_TASKS_PER_CHILD', default=50)
 
-# Task execution time limits (180s hard limit, 150s soft limit)
-CELERY_TASK_TIME_LIMIT = env.int('CELERY_TASK_TIME_LIMIT', default=180)
-CELERY_TASK_SOFT_TIME_LIMIT = env.int('CELERY_TASK_SOFT_TIME_LIMIT', default=150)
+# Task execution time limits (75s hard limit, 60s soft limit for responsive scans)
+CELERY_TASK_TIME_LIMIT = env.int('CELERY_TASK_TIME_LIMIT', default=75)
+CELERY_TASK_SOFT_TIME_LIMIT = env.int('CELERY_TASK_SOFT_TIME_LIMIT', default=60)
 
 CELERY_BROKER_TRANSPORT_OPTIONS = {
     'visibility_timeout': 3600,
@@ -297,8 +297,10 @@ GEMINI_FALLBACK_MODELS = env.list(
     'GEMINI_FALLBACK_MODELS',
     default=['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.8-flash']
 )
-AI_REQUEST_TIMEOUT_SECONDS = env.int('AI_REQUEST_TIMEOUT_SECONDS', default=45)
+AI_REQUEST_TIMEOUT_SECONDS = env.int('AI_REQUEST_TIMEOUT_SECONDS', default=22)
 GEMINI_TIMEOUT_SECONDS = env.int('GEMINI_TIMEOUT_SECONDS', default=AI_REQUEST_TIMEOUT_SECONDS)
+AI_MAX_IMAGE_DIMENSION = env.int('AI_MAX_IMAGE_DIMENSION', default=1280)
+AI_IMAGE_QUALITY = env.int('AI_IMAGE_QUALITY', default=82)
 
 # OpenAI configuration
 _raw_openai_key = env('OPENAI_API_KEY', default='')

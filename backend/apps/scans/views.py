@@ -25,6 +25,8 @@ class ScanSessionViewSet(viewsets.ReadOnlyModelViewSet):
         return ScanSession.objects.filter(user=self.request.user)
 
     def create(self, request, *args, **kwargs):
+        import time
+        t_upload_start = time.time()
         images_files = request.FILES.getlist('images')
 
         if not images_files:
@@ -110,8 +112,14 @@ class ScanSessionViewSet(viewsets.ReadOnlyModelViewSet):
             f"[session_created] CorrelationID={correlation_id} session_id={session.id} image_count={len(images_files)}"
         )
 
+        upload_duration = time.time() - t_upload_start
+        logger.info(
+            f"[upload_received] CorrelationID={correlation_id} session_id={session.id} "
+            f"image_count={len(images_files)} size_kb={total_size / 1024:.1f} upload_duration_ms={int(upload_duration * 1000)}"
+        )
+
         try:
-            task = process_scan_session_task.delay(str(session.id))
+            task = process_scan_session_task.delay(str(session.id), correlation_id=correlation_id)
             task_id = getattr(task, 'id', str(uuid.uuid4()))
             logger.info(
                 f"[celery_task_dispatched] CorrelationID={correlation_id} session_id={session.id} task_id={task_id} mode=celery"

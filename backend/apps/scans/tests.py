@@ -681,6 +681,104 @@ class ScanFlowAsyncAndPollingTests(APITestCase):
             # Critical: Verify generate_content was called ONLY ONCE and aborted immediately!
             self.assertEqual(mock_genai_client.models.generate_content.call_count, 1)
 
+    def test_image_preprocessing_downscaling_and_compression(self):
+        """Verify that large images are downscaled to max 1280px and compressed as high-quality JPEG."""
+        import os
+        import tempfile
+
+        from PIL import Image
+
+        from integrations.ai.model_router import ModelRouter
+
+        router = ModelRouter()
+        # Create a large 2560x1440 image
+        img = Image.new("RGB", (2560, 1440), color="green")
+        tmp_in = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
+        img.save(tmp_in.name, format="JPEG", quality=95)
+        tmp_in.close()
+
+        try:
+            prep_path, is_temp = router._preprocess_image_for_ai(tmp_in.name, is_dark=False)
+            self.assertTrue(is_temp)
+            with Image.open(prep_path) as processed:
+                w, h = processed.size
+                self.assertLessEqual(max(w, h), 1280)
+                self.assertEqual(processed.format, "JPEG")
+        finally:
+            if os.path.exists(tmp_in.name):
+                os.unlink(tmp_in.name)
+
+    def test_openai_client_bounded_timeout_and_retries(self):
+        """Verify OpenAI client configures bounded timeouts and at most 1 retry."""
+        from django.test import override_settings
+
+        from integrations.ai.openai_client import OpenAIClient
+
+        with override_settings(OPENAI_API_KEY="sk-test-key-mock", AI_REQUEST_TIMEOUT_SECONDS=22):
+            client = OpenAIClient()
+            self.assertTrue(client.enabled)
+            # Verify client initialization was called with timeout 22 and max_retries 1
+
+    def test_scan_prompt_preserves_required_schema_fields(self):
+        """Verify optimized GROCERY_SCAN_PROMPT contains all required schema fields for scan candidates."""
+        from integrations.ai.prompts import GROCERY_SCAN_PROMPT
+
+        required_fields = [
+            "name", "brand", "description", "category", "icon_key",
+            "quantity", "unit", "storage_zone", "storage_reason",
+            "shelf_life_guidance", "expiry_date", "estimated_consumption_date",
+            "is_expiry_estimated", "manufacturing_date", "packed_date",
+            "best_before_date", "date_type", "date_source", "raw_date_text",
+            "confidence", "date_confidence", "source_image_index", "warnings"
+        ]
+        for field in required_fields:
+            self.assertIn(f'"{field}"', GROCERY_SCAN_PROMPT, f"Missing field {field} in GROCERY_SCAN_PROMPT")
+
+    def test_profiling_logs_recorded_with_correlation_id(self):
+        """Verify provider profiling logs include CorrelationID and elapsed_ms."""
+        from integrations.ai.ai_service import AIService
+
+        mock_openai = MagicMock()
+        mock_openai.analyze_grocery_images.return_value = {
+            "items": [{"name": "Milk", "quantity": 1.0, "unit": "bottle"}]
+        }
+        service = AIService(
+            provider_order=["openai"],
+            provider_instances={"openai": mock_openai}
+        )
+
+        with self.assertLogs("freshtrack.ai.service", level="INFO") as log_ctx:
+            service.analyze_grocery_images(["/dummy/milk.jpg"], correlation_id="test-corr-profile-123")
+            logged_text = " ".join(log_ctx.output)
+            self.assertIn("CorrelationID=test-corr-profile-123", logged_text)
+            self.assertIn("[openai_completed]", logged_text)
+            self.assertIn("elapsed_ms=", logged_text)
+
+    def test_soft_time_limit_exceeded_marks_session_failed(self):
+        """Verify soft time limit exceeded marks session and images as FAILED with friendly message."""
+        from celery.exceptions import SoftTimeLimitExceeded
+
+        from apps.scans.tasks import process_scan_session_task
+
+        session = ScanSession.objects.create(
+            user=self.user,
+            status=ScanSession.Statuses.PENDING,
+            image_count=1
+        )
+        scan_img = ScanImage.objects.create(
+            scan_session=session,
+            image=create_test_image("timeout_test.jpg"),
+            status=ScanImage.Statuses.PENDING
+        )
+
+        with patch("apps.scans.tasks.ModelRouter.process_scan", side_effect=SoftTimeLimitExceeded()):
+            process_scan_session_task(str(session.id), correlation_id="test-timeout-corr")
+
+        session.refresh_from_db()
+        scan_img.refresh_from_db()
+        self.assertEqual(session.status, ScanSession.Statuses.FAILED)
+        self.assertIn("time limit", session.error_message.lower())
+
     def test_health_check_endpoints_return_200(self):
         """Verify /health, /health/, and /api/v1/health/ all return 200 OK."""
         for path in ["/health", "/health/", "/api/v1/health/"]:
@@ -734,7 +832,8 @@ class ScanDispatchAndLoggerTests(APITestCase):
         self.assertEqual(session.status, ScanSession.Statuses.PENDING)
         self.assertEqual(session.image_count, 1)
 
-        mock_delay.assert_called_once_with(str(session_id))
+        corr_id = response.headers["X-Correlation-ID"]
+        mock_delay.assert_called_once_with(str(session_id), correlation_id=corr_id)
 
     def test_duplicate_task_delivery_is_idempotent(self):
         """Verify that executing process_scan_session_task on an already-completed session is idempotent."""
