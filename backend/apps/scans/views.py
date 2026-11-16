@@ -1,9 +1,7 @@
 import logging
 import os
-import threading
 import uuid
 
-from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import status, viewsets
@@ -12,7 +10,6 @@ from rest_framework.response import Response
 
 from apps.groceries.models import GroceryActivity, GroceryItem
 from apps.groceries.serializers import GroceryItemSerializer
-from common.exceptions import ForbiddenException, ResourceNotFoundException
 
 from .models import ScanCandidate, ScanImage, ScanSession
 from .serializers import ScanCandidateSerializer, ScanSessionSerializer

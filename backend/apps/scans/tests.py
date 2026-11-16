@@ -1,13 +1,20 @@
 import datetime
+import io
+import logging
+from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.utils import timezone
+from kombu.exceptions import OperationalError
+from PIL import Image
 from rest_framework.test import APITestCase
 
 from apps.groceries.models import GroceryItem
 from apps.groceries.serializers import GroceryItemSerializer
-from apps.scans.models import ScanCandidate, ScanSession
+from apps.scans import views as scan_views
+from apps.scans.models import ScanCandidate, ScanImage, ScanSession
 from integrations.ai.model_router import ModelRouter
 from integrations.ocr.text_parser import OCRDateParser, parse_absolute_date
 
@@ -311,7 +318,7 @@ class ScanCandidateExpirySemanticsTests(TestCase):
 
     def test_tasks_processing_with_red_onion_item_data(self):
         """Simulate task processing loop with the exact AI dictionary for Red Onion."""
-        from unittest.mock import MagicMock, patch
+        from unittest.mock import patch
 
         from apps.scans.tasks import process_scan_session_task
 
@@ -436,7 +443,7 @@ class ScanFlowAsyncAndPollingTests(APITestCase):
         When the AI/OCR pipeline encounters an unrecoverable failure,
         the task sets session status='failed' and records error_message.
         """
-        from unittest.mock import MagicMock, patch
+        from unittest.mock import patch
 
         from apps.scans.models import ScanImage
         from apps.scans.tasks import process_scan_session_task
@@ -522,14 +529,7 @@ class ScanFlowAsyncAndPollingTests(APITestCase):
 
 
 
-import io
-import logging
-from PIL import Image
-from unittest.mock import patch, MagicMock
-from kombu.exceptions import OperationalError
-from django.core.files.uploadedfile import SimpleUploadedFile
-from apps.scans import views as scan_views
-from apps.scans.models import ScanImage, ScanSession
+
 
 
 def create_test_image(filename="scan_test.jpg"):
@@ -623,8 +623,8 @@ class ScanDispatchAndLoggerTests(APITestCase):
 class CeleryBrokerConfigRegistrationTests(TestCase):
     def test_task_registered_in_celery_registry(self):
         """Task 5: Ensure process_scan_session_task is registered in Celery app registry."""
-        from config.celery import app as celery_app
         import apps.scans.tasks  # noqa: F401
+        from config.celery import app as celery_app
 
         task_name = "apps.scans.tasks.process_scan_session_task"
         self.assertIn(task_name, celery_app.tasks)
