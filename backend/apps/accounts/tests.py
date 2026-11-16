@@ -286,3 +286,71 @@ class SecurityAuthTests(APITestCase):
         res = self.client.delete(self.profile_account_url)
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertFalse(User.objects.filter(email='delete_profile@example.com').exists())
+
+
+class JWTTokenLifecycleTests(APITestCase):
+    def setUp(self):
+        self.login_url = reverse('token_obtain_pair')
+        self.refresh_url = reverse('token_refresh')
+        self.logout_url = reverse('token_blacklist')
+        self.me_url = reverse('user_profile')
+        self.user = User.objects.create_user(
+            email='jwt_user@example.com',
+            password='Password123!',
+            display_name='JWT User'
+        )
+
+    def test_complete_jwt_lifecycle_rotation_and_expiry(self):
+        """Verify complete token lifecycle: obtain, valid access, expired access, rotation, blacklist."""
+        from rest_framework_simplejwt.tokens import AccessToken
+
+        # 1. Obtain token pair via login
+        login_res = self.client.post(self.login_url, {
+            'email': 'jwt_user@example.com',
+            'password': 'Password123!'
+        }, format='json')
+        self.assertEqual(login_res.status_code, status.HTTP_200_OK)
+        access_token_1 = login_res.data['access']
+        refresh_token_1 = login_res.data['refresh']
+
+        # 2. Access protected endpoint with valid access token
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {access_token_1}')
+        profile_res = self.client.get(self.me_url)
+        self.assertEqual(profile_res.status_code, status.HTTP_200_OK)
+
+        # 3. Access with expired access token is rejected with 401
+        expired_access = AccessToken.for_user(self.user)
+        expired_access.set_exp(lifetime=-timedelta(minutes=10))
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {expired_access}')
+        expired_res = self.client.get(self.me_url)
+        self.assertEqual(expired_res.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertIn('token_not_valid', str(expired_res.data))
+
+        # 4. Refresh token rotates and issues new access token + new refresh token
+        self.client.credentials()  # Clear auth header for refresh endpoint
+        refresh_res = self.client.post(self.refresh_url, {'refresh': refresh_token_1}, format='json')
+        self.assertEqual(refresh_res.status_code, status.HTTP_200_OK)
+        refresh_data = refresh_res.data.get('data', refresh_res.data)
+        access_token_2 = refresh_data['access']
+        refresh_token_2 = refresh_data['refresh']
+        self.assertNotEqual(access_token_1, access_token_2)
+        self.assertNotEqual(refresh_token_1, refresh_token_2)
+
+        # 5. Old refresh token is blacklisted and cannot be reused
+        reuse_res = self.client.post(self.refresh_url, {'refresh': refresh_token_1}, format='json')
+        self.assertEqual(reuse_res.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        # 6. New access token succeeds on protected endpoint
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {access_token_2}')
+        profile_res_2 = self.client.get(self.me_url)
+        self.assertEqual(profile_res_2.status_code, status.HTTP_200_OK)
+
+        # 7. Logout blacklists active refresh token
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {access_token_2}')
+        logout_res = self.client.post(self.logout_url, {'refresh': refresh_token_2}, format='json')
+        self.assertEqual(logout_res.status_code, status.HTTP_200_OK)
+
+        # 8. Refreshing with blacklisted token fails
+        self.client.credentials()
+        blacklisted_refresh_res = self.client.post(self.refresh_url, {'refresh': refresh_token_2}, format='json')
+        self.assertEqual(blacklisted_refresh_res.status_code, status.HTTP_401_UNAUTHORIZED)

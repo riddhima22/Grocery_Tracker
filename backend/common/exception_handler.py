@@ -14,6 +14,7 @@ from django.db import IntegrityError
 from django.http import Http404
 from rest_framework import status
 from rest_framework.exceptions import (
+    AuthenticationFailed,
     NotAuthenticated,
     Throttled,
 )
@@ -114,9 +115,19 @@ def custom_exception_handler(exc, context):
         elif isinstance(exc, Throttled):
             error_code = "RATE_LIMIT_EXCEEDED"
             error_message = f"Too many requests. Please retry in {exc.wait} seconds."
-        elif isinstance(exc, NotAuthenticated):
+        elif isinstance(exc, (NotAuthenticated, AuthenticationFailed)):
             error_code = "UNAUTHORIZED"
             error_message = "Authentication credentials were not provided or are invalid."
+            if hasattr(exc, 'detail'):
+                if isinstance(exc.detail, dict):
+                    if 'code' in exc.detail:
+                        error_code = str(exc.detail['code']).upper()
+                    if 'detail' in exc.detail:
+                        error_message = str(exc.detail['detail'])
+                    if 'messages' in exc.detail:
+                        fields = {'messages': exc.detail['messages']}
+                elif isinstance(exc.detail, str):
+                    error_message = exc.detail
         elif isinstance(exc, DRFPermissionDenied):
             error_code = "FORBIDDEN"
             error_message = "You do not have permission to perform this action."

@@ -82,8 +82,17 @@ class ApiClient {
     onRequest: (options, handler) async {
       // Do NOT attach Authorization header to unauthenticated/public auth endpoints
       if (!_isPublicEndpoint(options.path)) {
+        // If a centralized token refresh is currently running, wait for it to complete
+        // so this request departs with the fresh access token rather than a doomed expired one.
+        if (TokenRefreshManager().isRefreshing) {
+          AppLogger.info(
+            'Request to ${options.path} paused awaiting active token refresh...',
+          );
+          await TokenRefreshManager().waitForRefresh();
+        }
+
         final token = await _secureStorage.getAccessToken();
-        if (token != null && !options.headers.containsKey('Authorization')) {
+        if (token != null) {
           options.headers['Authorization'] = 'Bearer $token';
         }
       }
@@ -114,6 +123,9 @@ class ApiClient {
         try {
           if (options.data is FormData) {
             options.data = (options.data as FormData).clone();
+            options.headers.remove(Headers.contentTypeHeader);
+            options.headers.remove('content-type');
+            options.headers.remove('Content-Type');
           }
           final response = await _dio.fetch(options);
           return handler.resolve(response);
@@ -128,20 +140,27 @@ class ApiClient {
       if (err.response?.statusCode == 401 &&
           !_isPublicEndpoint(path) &&
           options.extra['isRetry'] != true) {
+        options.extra['isRetry'] = true;
         AppLogger.warning(
           'Received 401 Unauthorized on $path. Attempting token refresh...',
         );
-        options.extra['isRetry'] = true;
+
+        final authHeader = options.headers['Authorization'] as String?;
+        final failedToken = authHeader?.replaceFirst('Bearer ', '').trim();
 
         try {
           final newAccessToken = await TokenRefreshManager()
-              .refreshAccessToken();
+              .refreshAccessToken(failedToken: failedToken);
           if (newAccessToken != null) {
             // Update Authorization header with the new token
             options.headers['Authorization'] = 'Bearer $newAccessToken';
+
             // Re-clone FormData if necessary to avoid finalized stream error
             if (options.data is FormData) {
               options.data = (options.data as FormData).clone();
+              options.headers.remove(Headers.contentTypeHeader);
+              options.headers.remove('content-type');
+              options.headers.remove('Content-Type');
             }
             // Clone and retry request
             final response = await _dio.fetch(options);
@@ -227,6 +246,9 @@ class ApiClient {
     );
   }
 
+  /// Exposes log sanitization for verification and testing
+  static dynamic sanitizeLogData(dynamic data) => _sanitizeLogData(data);
+
   static dynamic _sanitizeLogData(dynamic data) {
     if (data == null) return 'null';
     if (data is FormData) {
@@ -234,7 +256,9 @@ class ApiClient {
         final keyLower = f.key.toLowerCase();
         if (keyLower.contains('password') ||
             keyLower.contains('token') ||
-            keyLower.contains('secret')) {
+            keyLower.contains('secret') ||
+            keyLower.contains('credential') ||
+            keyLower.contains('authorization')) {
           return '${f.key}: [REDACTED]';
         }
         return '${f.key}: ${f.value}';
@@ -244,19 +268,45 @@ class ApiClient {
           .toList();
       return 'FormData(fields: $fields, files: $files)';
     }
+
+    if (data is Map) {
+      final sanitized = <String, dynamic>{};
+      for (final entry in data.entries) {
+        final keyLower = entry.key.toString().toLowerCase();
+        if (keyLower.contains('password') ||
+            keyLower.contains('token') ||
+            keyLower.contains('refresh') ||
+            keyLower.contains('access') ||
+            keyLower.contains('secret') ||
+            keyLower.contains('credential') ||
+            keyLower.contains('authorization')) {
+          sanitized[entry.key.toString()] = '[REDACTED]';
+        } else if (entry.value is Map || entry.value is List) {
+          sanitized[entry.key.toString()] = _sanitizeLogData(entry.value);
+        } else {
+          sanitized[entry.key.toString()] = entry.value;
+        }
+      }
+      return sanitized;
+    }
+
+    if (data is List) {
+      return data.map((item) => _sanitizeLogData(item)).toList();
+    }
+
     String str = data.toString();
-    // Redact Bearer tokens
+    // Redact Bearer tokens in headers or text
     str = str.replaceAll(
       RegExp(r'Bearer\s+[a-zA-Z0-9_\-\.]+'),
       'Bearer [REDACTED]',
     );
-    // Redact passwords, tokens, credentials
+    // Redact passwords, tokens, credentials in JSON or Dart toString formats
     str = str.replaceAll(
       RegExp(
-        r'"(password|token|refresh|access|id_token|secret)":\s*"[^"]*"',
+        r'("?(?:password|token|refresh|access|id_token|secret)"?\s*[:=]\s*)"?[^",}\s]+"?',
         caseSensitive: false,
       ),
-      r'"$1": "[REDACTED]"',
+      r'$1"[REDACTED]"',
     );
     // Truncate large HTML error payloads cleanly to prevent log bloat
     if (str.length > 500 &&
