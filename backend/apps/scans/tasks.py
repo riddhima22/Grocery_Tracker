@@ -2,7 +2,7 @@ import datetime
 import logging
 
 from celery import shared_task
-from celery.exceptions import Retry
+from celery.exceptions import Retry, SoftTimeLimitExceeded
 from django.db import transaction
 from django.utils import timezone
 
@@ -132,6 +132,7 @@ def process_scan_session_task(self, session_id=None):
         items = result.get("items", [])
 
         # 3. Create ScanCandidate objects inside a transaction
+        db_start = time.time()
         with transaction.atomic():
             def safe_str(val, default=''):
                 if val is None:
@@ -156,6 +157,15 @@ def process_scan_session_task(self, session_id=None):
             # Map items to source images. The AI may return a 'source_image_index'
             # field per item. If not present, distribute items evenly across images.
             image_list = list(images)  # Materialize queryset for index access
+            existing_candidates_map = {
+                (
+                    c.name.strip().lower(),
+                    (c.brand or '').strip().lower(),
+                    (c.unit or '').strip().lower(),
+                ): c
+                for c in session.candidates.all()
+            }
+            new_candidates = []
             for idx, item_data in enumerate(items):
                 # Use AI-provided source_image_index if available, else distribute evenly
                 source_idx = item_data.get('source_image_index')
@@ -301,13 +311,13 @@ def process_scan_session_task(self, session_id=None):
 
                 is_estimated = bool(is_estimated)
 
-                # Deduplication: Avoid creating duplicate entries when the same product is scanned repeatedly
-                existing = ScanCandidate.objects.filter(
-                    scan_session=session,
-                    name__iexact=item_name,
-                    brand__iexact=safe_str(item_data.get('brand'), '')[:100],
-                    unit__iexact=final_unit
-                ).first()
+                # In-memory candidate lookup and deduplication
+                lookup_key = (
+                    item_name.strip().lower(),
+                    safe_str(item_data.get('brand'), '')[:100].strip().lower(),
+                    final_unit.strip().lower(),
+                )
+                existing = existing_candidates_map.get(lookup_key)
 
                 if existing:
                     existing.quantity = float(existing.quantity) + float(quantity)
@@ -315,7 +325,7 @@ def process_scan_session_task(self, session_id=None):
                         existing.package_count += final_package_count
                     existing.save(update_fields=['quantity', 'package_count'])
                 else:
-                    ScanCandidate.objects.create(
+                    new_cand = ScanCandidate(
                         scan_session=session,
                         source_image=source_image,
                         name=item_name,
@@ -353,14 +363,26 @@ def process_scan_session_task(self, session_id=None):
                         ),
                         confidence=safe_str(item_data.get('confidence'), 'High')[:20],
                     )
+                    new_candidates.append(new_cand)
+                    existing_candidates_map[lookup_key] = new_cand
                     candidate_count += 1
 
+            if new_candidates:
+                ScanCandidate.objects.bulk_create(new_candidates)
 
-            # Mark all processed images as completed
-            for scan_image in images:
-                scan_image.status = ScanImage.Statuses.COMPLETED
-                scan_image.save(update_fields=['status'])
-                successful_count += 1
+            # Mark all processed images as completed in a single query
+            successful_count = images.update(status=ScanImage.Statuses.COMPLETED)
+
+        db_duration = time.time() - db_start
+        logger.info(
+            f"Scan session {session_id} database operations completed in {db_duration:.2f}s "
+            f"({candidate_count} candidates created, {len(existing_candidates_map) - candidate_count} deduplicated)."
+        )
+
+    except SoftTimeLimitExceeded:
+        logger.error(f"Task for scan session {session_id} exceeded soft time limit (150s).")
+        last_error_message = "Scan processing timed out. Please try again with fewer or clearer images."
+        failed_count = images.update(status=ScanImage.Statuses.FAILED, error_message=last_error_message)
 
     except Exception as e:
         retries = getattr(getattr(self, 'request', None), 'retries', 0)
@@ -376,12 +398,7 @@ def process_scan_session_task(self, session_id=None):
 
         logger.error(f"Permanent error or max retries exceeded for session {session_id}: {e!s}", exc_info=True)
         last_error_message = str(e)
-        # Directly mark images failed and record error message
-        for scan_image in images:
-            scan_image.status = ScanImage.Statuses.FAILED
-            scan_image.error_message = str(e)
-            scan_image.save(update_fields=['status', 'error_message'])
-            failed_count += 1
+        failed_count = images.update(status=ScanImage.Statuses.FAILED, error_message=str(e)[:500])
 
     finally:
         # If task is retrying, don't finalize the session as failed

@@ -88,6 +88,10 @@ class ScanProvider extends ChangeNotifier {
 
   Future<void> startAnalysis() async {
     if (_selectedImages.isEmpty) return;
+    if (_uiState == ScanUIState.uploading || _uiState == ScanUIState.analyzing) {
+      AppLogger.warning('Scan analysis already in progress, ignoring duplicate submission.');
+      return;
+    }
 
     _stopPolling();
     _uiState = ScanUIState.uploading;

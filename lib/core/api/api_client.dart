@@ -112,6 +112,9 @@ class ApiClient {
         );
         await Future.delayed(const Duration(seconds: 2));
         try {
+          if (options.data is FormData) {
+            options.data = (options.data as FormData).clone();
+          }
           final response = await _dio.fetch(options);
           return handler.resolve(response);
         } catch (retryErr) {
@@ -136,6 +139,10 @@ class ApiClient {
           if (newAccessToken != null) {
             // Update Authorization header with the new token
             options.headers['Authorization'] = 'Bearer $newAccessToken';
+            // Re-clone FormData if necessary to avoid finalized stream error
+            if (options.data is FormData) {
+              options.data = (options.data as FormData).clone();
+            }
             // Clone and retry request
             final response = await _dio.fetch(options);
             return handler.resolve(response);

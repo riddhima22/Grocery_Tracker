@@ -244,6 +244,19 @@ CELERY_TASK_ALWAYS_EAGER = env.bool('CELERY_TASK_ALWAYS_EAGER', default=True)
 CELERY_TASK_EAGER_PROPAGATES = True
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 
+# Celery Reliability & Task Execution Safeguards
+CELERY_TASK_ACKS_LATE = True
+CELERY_TASK_REJECT_ON_WORKER_LOST = True
+CELERY_TASK_TRACK_STARTED = True
+
+# Worker Optimization for Render 512MB RAM constraints
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+CELERY_WORKER_MAX_TASKS_PER_CHILD = env.int('CELERY_WORKER_MAX_TASKS_PER_CHILD', default=50)
+
+# Task execution time limits (180s hard limit, 150s soft limit)
+CELERY_TASK_TIME_LIMIT = env.int('CELERY_TASK_TIME_LIMIT', default=180)
+CELERY_TASK_SOFT_TIME_LIMIT = env.int('CELERY_TASK_SOFT_TIME_LIMIT', default=150)
+
 CELERY_BROKER_TRANSPORT_OPTIONS = {
     'visibility_timeout': 3600,
     'socket_timeout': env.float('REDIS_SOCKET_TIMEOUT', default=15.0),

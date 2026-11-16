@@ -302,7 +302,10 @@ class _ScanViewState extends State<ScanView>
                 ] else ...[
                   AppButton(
                     text: 'Analyze ${scan.selectedImages.length} Image(s)',
-                    onPressed: () => scan.startAnalysis(),
+                    onPressed: (scan.uiState == ScanUIState.uploading ||
+                            scan.uiState == ScanUIState.analyzing)
+                        ? null
+                        : () => scan.startAnalysis(),
                   ),
                   AppGap.xs(context),
                   AppButton(

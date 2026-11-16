@@ -2,6 +2,7 @@ import hashlib
 import logging
 import os
 import tempfile
+import time
 
 import cv2
 import numpy as np
@@ -82,19 +83,25 @@ class ModelRouter:
                     if std_dev < 10:
                         warnings.append(f"Image {os.path.basename(path)} might be too blurry or low contrast.")
 
-                # OpenCV blur detection via Laplacian variance
-                try:
-                    cv_img = cv2.imread(path)
-                    if cv_img is not None:
-                        gray = cv2.cvtColor(cv_img, cv2.COLOR_BGR2GRAY)
-                        variance = cv2.Laplacian(gray, cv2.CV_64F).var()
+                    # In-memory blur detection via Laplacian variance directly from PIL grayscale
+                    try:
+                        gray_thumb = img.convert('L')
+                        # Downscale large images for fast blur computation
+                        if max(width, height) > 800:
+                            scale = 800.0 / max(width, height)
+                            gray_thumb = gray_thumb.resize(
+                                (max(150, int(width * scale)), max(150, int(height * scale))),
+                                resample=Image.Resampling.BILINEAR
+                            )
+                        gray_arr = np.array(gray_thumb)
+                        variance = cv2.Laplacian(gray_arr, cv2.CV_64F).var()
                         blur_threshold = getattr(settings, 'AI_BLUR_VARIANCE_THRESHOLD', 100.0)
                         if variance < blur_threshold:
                             warnings.append(
                                 f"Image {os.path.basename(path)} might be blurry or out of focus (Laplacian variance: {variance:.1f})."
                             )
-                except Exception as cv_e:
-                    logger.warning(f"OpenCV blur detection failed on {os.path.basename(path)}: {cv_e}")
+                    except Exception as cv_e:
+                        logger.warning(f"Laplacian blur detection failed on {os.path.basename(path)}: {cv_e}")
 
                 unique_paths.append(path)
 
@@ -128,7 +135,7 @@ class ModelRouter:
                     scale = max_dim / float(longest)
                     new_w = max(150, int(round(width * scale)))
                     new_h = max(150, int(round(height * scale)))
-                    transposed = transposed.resize((new_w, new_h), resample=Image.LANCZOS)
+                    transposed = transposed.resize((new_w, new_h), resample=Image.Resampling.BILINEAR)
 
                 # 3. Contrast/brightness normalization ONLY if flagged as too dark
                 if is_dark:
@@ -159,13 +166,17 @@ class ModelRouter:
     def process_scan(self, image_paths: list) -> dict:
         """
         Executes the two-stage pipeline:
-        1. Validates image qualities (corruption, resolution, darkness, OpenCV Laplacian blur).
+        1. Validates image qualities (corruption, resolution, darkness, Laplacian blur).
         2. Preprocesses valid images (EXIF auto-orientation, CLAHE darkness normalization on temp copy).
         3. Performs Google Cloud Vision OCR if enabled.
         4. Invokes Gemini Client combining visual and OCR contexts.
         """
+        t0 = time.time()
+
         # 1. Run quality validations
         errors, warnings, valid_paths = self.run_image_quality_checks(image_paths)
+        t_qc = time.time() - t0
+
         if errors:
             logger.error(f"Image validation failed: {errors}")
             return {
@@ -184,6 +195,7 @@ class ModelRouter:
             }
 
         # 2. Preprocess images for AI (EXIF auto-orientation, CLAHE for dark images)
+        t_prep_start = time.time()
         dark_warning_filenames = {
             os.path.basename(path) for path in valid_paths
             if any(f"Lighting is too dark in {os.path.basename(path)}" in w for w in warnings)
@@ -199,8 +211,11 @@ class ModelRouter:
             if is_temp:
                 temp_files_to_cleanup.append(prep_path)
 
+        t_prep = time.time() - t_prep_start
+
         try:
             # 3. OCR Text Extraction & Object Detection Stage
+            t_ocr_start = time.time()
             ocr_text = ""
             ocr_context = ""
             ocr_dates = {}
@@ -238,19 +253,38 @@ class ModelRouter:
 
                 ocr_context = "\n\n".join(context_sections) if context_sections else ""
 
+            t_ocr = time.time() - t_ocr_start
+
             # 4. Gemini Multimodal Analysis Stage
+            t_ai_start = time.time()
             ai_result = self.ai_client.analyze_grocery_images(prepared_paths, ocr_context=ocr_context)
             items = ai_result.get("items", [])
+            t_ai = time.time() - t_ai_start
 
             # 5. Accuracy Alignment: Resolve date conflicts & append warnings
+            t_align_start = time.time()
             items = self.align_item_dates(items, ocr_dates=ocr_dates, warnings=warnings)
+            t_align = time.time() - t_align_start
 
-
+            t_total = time.time() - t0
+            logger.info(
+                f"ModelRouter scan pipeline completed in {t_total:.2f}s: "
+                f"QC={t_qc:.2f}s, Prep={t_prep:.2f}s, OCR={t_ocr:.2f}s, AI={t_ai:.2f}s, Align={t_align:.2f}s "
+                f"(identified {len(items)} items)."
+            )
 
             return {
                 "success": True,
                 "items": items,
-                "warnings": warnings
+                "warnings": warnings,
+                "timings": {
+                    "quality_check_s": round(t_qc, 2),
+                    "prep_s": round(t_prep, 2),
+                    "ocr_s": round(t_ocr, 2),
+                    "ai_s": round(t_ai, 2),
+                    "align_s": round(t_align, 2),
+                    "total_s": round(t_total, 2),
+                }
             }
 
         except AIContentBlockedError as e:
