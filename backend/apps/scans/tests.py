@@ -601,7 +601,7 @@ class ScanDispatchAndLoggerTests(APITestCase):
 
     @patch("apps.scans.views.process_scan_session_task.delay")
     def test_successful_scan_upload_dispatches_async_task(self, mock_delay):
-        """Task 5 & 8: Verify successful scan upload queues process_scan_session_task asynchronously."""
+        """Task 5 & 8: Verify successful scan upload queues process_scan_session_task asynchronously and returns 202."""
         img = create_test_image("produce.jpg")
         response = self.client.post(
             "/api/v1/scans/sessions/",
@@ -609,8 +609,9 @@ class ScanDispatchAndLoggerTests(APITestCase):
             format="multipart"
         )
 
-        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.status_code, 202)
         self.assertTrue(response.data["success"])
+        self.assertIn("X-Correlation-ID", response.headers)
         session_id = response.data["data"]["id"]
 
         session = ScanSession.objects.get(id=session_id)
@@ -618,6 +619,27 @@ class ScanDispatchAndLoggerTests(APITestCase):
         self.assertEqual(session.image_count, 1)
 
         mock_delay.assert_called_once_with(str(session_id))
+
+    def test_duplicate_task_delivery_is_idempotent(self):
+        """Verify that executing process_scan_session_task on an already-completed session is idempotent."""
+        from apps.scans.tasks import process_scan_session_task
+
+        session = ScanSession.objects.create(
+            user=self.user,
+            status=ScanSession.Statuses.COMPLETED,
+            image_count=1,
+            successful_image_count=1,
+            candidate_count=2,
+            completed_at=timezone.now()
+        )
+
+        # Executing the task again should skip processing and return True without modifying status
+        res = process_scan_session_task(str(session.id), correlation_id="test-corr-id")
+        self.assertTrue(res)
+
+        session.refresh_from_db()
+        self.assertEqual(session.status, ScanSession.Statuses.COMPLETED)
+        self.assertEqual(session.candidate_count, 2)
 
     @patch("apps.scans.views.process_scan_session_task.apply")
     @patch("apps.scans.views.process_scan_session_task.delay")

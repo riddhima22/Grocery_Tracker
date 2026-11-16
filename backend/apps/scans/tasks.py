@@ -92,10 +92,16 @@ def is_transient_error(exc: Exception) -> bool:
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=10)
-def process_scan_session_task(self, session_id=None):
+def process_scan_session_task(self, session_id=None, correlation_id=None, **kwargs):
     # Support both task.delay(session_id) and direct thread execution
     if session_id is None and isinstance(self, (str, int)):
-        session_id = self
+        session_id = str(self)
+
+    import uuid
+    if not correlation_id:
+        correlation_id = kwargs.get('correlation_id') or str(uuid.uuid4())
+
+    task_id = getattr(getattr(self, 'request', None), 'id', 'direct_thread')
 
     import time
 
@@ -105,23 +111,28 @@ def process_scan_session_task(self, session_id=None):
     connection.close_if_unusable_or_obsolete()
 
     start_time = time.time()
-    logger.info(f"Starting scan processing task for session {session_id}")
+    logger.info(
+        f"[celery_task_started] CorrelationID={correlation_id} session_id={session_id} task_id={task_id}"
+    )
     try:
         session = ScanSession.objects.get(id=session_id)
     except ScanSession.DoesNotExist:
-        logger.error(f"Scan session {session_id} does not exist.")
+        logger.error(f"[scan_failed] CorrelationID={correlation_id} Scan session {session_id} does not exist.")
         return False
-
-    session.status = ScanSession.Statuses.PROCESSING
-    session.save(update_fields=['status'])
 
     images = session.images.filter(status=ScanImage.Statuses.PENDING)
     if not images.exists():
-        logger.info("No pending images found for session.")
-        session.status = ScanSession.Statuses.COMPLETED
-        session.completed_at = timezone.now()
-        session.save(update_fields=['status', 'completed_at'])
+        logger.info(
+            f"[idempotency_skip] CorrelationID={correlation_id} session_id={session_id} has no pending images. Skipping duplicate execution."
+        )
+        if session.status != ScanSession.Statuses.COMPLETED:
+            session.status = ScanSession.Statuses.COMPLETED
+            session.completed_at = timezone.now()
+            session.save(update_fields=['status', 'completed_at'])
         return True
+
+    session.status = ScanSession.Statuses.PROCESSING
+    session.save(update_fields=['status'])
 
     # 1. Instantiate the AI / OCR pipeline orchestrator
     router = ModelRouter()
@@ -134,12 +145,16 @@ def process_scan_session_task(self, session_id=None):
 
     try:
         # 2. Process all images through the router pipeline
+        t_ai_start = time.time()
+        logger.info(f"[ai_started] CorrelationID={correlation_id} session_id={session_id} image_count={len(image_paths)}")
         result = router.process_scan(image_paths)
+        t_ai = time.time() - t_ai_start
 
         if not result.get("success"):
             raise Exception(result.get("error", "Scan processing failed."))
 
         items = result.get("items", [])
+        logger.info(f"[ai_completed] CorrelationID={correlation_id} session_id={session_id} elapsed_ms={int(t_ai * 1000)} items={len(items)}")
 
         # 3. Create ScanCandidate objects inside a transaction
         db_start = time.time()
@@ -385,12 +400,13 @@ def process_scan_session_task(self, session_id=None):
 
         db_duration = time.time() - db_start
         logger.info(
-            f"Scan session {session_id} database operations completed in {db_duration:.2f}s "
-            f"({candidate_count} candidates created, {len(existing_candidates_map) - candidate_count} deduplicated)."
+            f"[scan_result_saved] CorrelationID={correlation_id} session_id={session_id} "
+            f"candidates={candidate_count} deduplicated={len(existing_candidates_map) - candidate_count} "
+            f"db_elapsed_ms={int(db_duration * 1000)}"
         )
 
     except SoftTimeLimitExceeded:
-        logger.error(f"Task for scan session {session_id} exceeded soft time limit (150s).")
+        logger.error(f"[scan_failed] CorrelationID={correlation_id} session_id={session_id} exceeded soft time limit (150s).")
         last_error_message = "Scan processing timed out. Please try again with fewer or clearer images."
         failed_count = images.update(status=ScanImage.Statuses.FAILED, error_message=last_error_message)
 
@@ -400,13 +416,16 @@ def process_scan_session_task(self, session_id=None):
         if is_transient_error(e) and retries < max_retries and hasattr(self, 'retry'):
             countdown = (2 ** retries) * 10
             logger.warning(
-                f"Transient error for scan session {session_id} (attempt {retries + 1}/{max_retries}): {e}. "
+                f"[transient_retry] CorrelationID={correlation_id} session_id={session_id} (attempt {retries + 1}/{max_retries}): {e}. "
                 f"Retrying in {countdown}s with exponential backoff..."
             )
             connection.close_if_unusable_or_obsolete()
             raise self.retry(exc=e, countdown=countdown)
 
-        logger.error(f"Permanent error or max retries exceeded for session {session_id}: {e!s}", exc_info=True)
+        logger.error(
+            f"[scan_failed] CorrelationID={correlation_id} Permanent error or max retries exceeded for session {session_id}: {e!s}",
+            exc_info=True
+        )
         last_error_message = str(e)
         failed_count = images.update(status=ScanImage.Statuses.FAILED, error_message=str(e)[:500])
 
@@ -437,10 +456,16 @@ def process_scan_session_task(self, session_id=None):
             session.save(update_fields=['status', 'error_message', 'successful_image_count', 'failed_image_count', 'candidate_count', 'completed_at'])
 
             elapsed = time.time() - start_time
-            logger.info(
-                f"Completed scan processing task for session {session_id} in {elapsed:.2f}s: "
-                f"status={session.status}, candidates={candidate_count}, failed_images={failed_count}"
-            )
+            if session.status in (ScanSession.Statuses.COMPLETED, ScanSession.Statuses.PARTIAL):
+                logger.info(
+                    f"[scan_completed] CorrelationID={correlation_id} session_id={session_id} elapsed_ms={int(elapsed * 1000)} "
+                    f"status={session.status} candidates={candidate_count} failed_images={failed_count}"
+                )
+            else:
+                logger.error(
+                    f"[scan_failed] CorrelationID={correlation_id} session_id={session_id} elapsed_ms={int(elapsed * 1000)} "
+                    f"status={session.status} error={session.error_message}"
+                )
             connection.close_if_unusable_or_obsolete()
 
     return True

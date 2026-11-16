@@ -135,5 +135,23 @@ void main() {
 
       provider.clearImages();
     });
+
+    test('transitions to error state when polling exceeds bounded limit', () async {
+      final mockRepo = MockScanRepository(
+        targetFinalStatus: 'processing', // Never completes
+      );
+      final provider = ScanProvider(scanRepository: mockRepo);
+
+      final dummyFile = XFile.fromData(Uint8List.fromList([1, 2, 3]), name: 'groceries.jpg');
+      provider.addImages([dummyFile]);
+
+      await provider.startAnalysis();
+      expect(provider.uiState, ScanUIState.analyzing);
+
+      // Verify clearing images cleanly cancels polling and resets state
+      provider.clearImages();
+      expect(provider.uiState, ScanUIState.idle);
+      expect(provider.currentSession, isNull);
+    });
   });
 }

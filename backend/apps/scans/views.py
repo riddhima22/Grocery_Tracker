@@ -87,6 +87,12 @@ class ScanSessionViewSet(viewsets.ReadOnlyModelViewSet):
                 return Response({"success": False, "error": f"Duplicate image uploaded: {img.name}."}, status=400)
             seen_request_hashes.add(img_hash)
 
+        # Enqueue background processing via Celery
+        correlation_id = request.headers.get('X-Correlation-ID') or str(uuid.uuid4())
+        logger.info(
+            f"[scan_started] CorrelationID={correlation_id} user={request.user.id} image_count={len(images_files)} total_size_kb={total_size / 1024:.1f}"
+        )
+
         with transaction.atomic():
             session = ScanSession.objects.create(
                 user=request.user,
@@ -100,20 +106,28 @@ class ScanSessionViewSet(viewsets.ReadOnlyModelViewSet):
                     status=ScanImage.Statuses.PENDING
                 )
 
-        # Enqueue background processing via Celery
+        logger.info(
+            f"[session_created] CorrelationID={correlation_id} session_id={session.id} image_count={len(images_files)}"
+        )
+
         try:
-            process_scan_session_task.delay(str(session.id))
-            logger.info(f"Queued Celery processing task for scan session {session.id}.")
+            task = process_scan_session_task.delay(str(session.id))
+            task_id = getattr(task, 'id', str(uuid.uuid4()))
+            logger.info(
+                f"[celery_task_dispatched] CorrelationID={correlation_id} session_id={session.id} task_id={task_id} mode=celery"
+            )
         except Exception as queue_err:
             logger.error(
-                f"Celery task dispatch failed for scan session {session.id}: {queue_err}",
+                f"Celery task dispatch failed for scan session {session.id}: {queue_err} "
+                f"[celery_task_dispatch_failed] CorrelationID={correlation_id}",
                 exc_info=True,
-                extra={"session_id": str(session.id), "user_id": str(request.user.id)}
+                extra={"session_id": str(session.id), "user_id": str(request.user.id), "correlation_id": correlation_id}
             )
             # Mark scan session and images as FAILED to prevent indefinite pending state
             session.status = ScanSession.Statuses.FAILED
             session.completed_at = timezone.now()
-            session.save(update_fields=['status', 'completed_at'])
+            session.error_message = f"Failed to enqueue processing task: {queue_err}"
+            session.save(update_fields=['status', 'completed_at', 'error_message'])
 
             for scan_image in session.images.all():
                 scan_image.status = ScanImage.Statuses.FAILED
@@ -128,13 +142,15 @@ class ScanSessionViewSet(viewsets.ReadOnlyModelViewSet):
                     "details": str(queue_err),
                     "session_id": str(session.id),
                 }
-            }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+            }, status=status.HTTP_503_SERVICE_UNAVAILABLE, headers={"X-Correlation-ID": correlation_id})
 
-        return Response({
+        response = Response({
             "success": True,
             "data": ScanSessionSerializer(session).data,
             "message": "Scan session created and processing queued."
-        }, status=status.HTTP_201_CREATED)
+        }, status=status.HTTP_202_ACCEPTED)
+        response["X-Correlation-ID"] = correlation_id
+        return response
 
     def retrieve(self, request, *args, **kwargs):
         session = self.get_object()

@@ -124,7 +124,8 @@ class ScanProvider extends ChangeNotifier {
     _stopPolling();
 
     int attempts = 0;
-    const maxAttempts = 60; // Max 120 seconds / 2 minutes (2s interval)
+    const maxAttempts = 45; // Max 90 seconds (2s interval)
+    final pollStopwatch = Stopwatch()..start();
 
     _pollingTimer = Timer.periodic(const Duration(seconds: 2), (timer) async {
       if (_currentSession == null) {
@@ -136,18 +137,18 @@ class ScanProvider extends ChangeNotifier {
 
       // Update progressive UI messages based on elapsed time, including server wakeup notice
       if (attempts == 2) {
-        _scanStageMessage = 'Waking up server & preparing AI...';
-        _scanProgress = 0.55;
+        _scanStageMessage = 'Analyzing packaging & labels...';
+        _scanProgress = 0.50;
         notifyListeners();
-      } else if (attempts == 6) {
-        _scanStageMessage = 'Analyzing images with vision model...';
-        _scanProgress = 0.70;
+      } else if (attempts == 5) {
+        _scanStageMessage = 'Reading text & identifying items...';
+        _scanProgress = 0.65;
         notifyListeners();
-      } else if (attempts == 12) {
-        _scanStageMessage = 'Identifying items and shelf life...';
-        _scanProgress = 0.85;
+      } else if (attempts == 10) {
+        _scanStageMessage = 'Estimating shelf life & storage guidance...';
+        _scanProgress = 0.80;
         notifyListeners();
-      } else if (attempts == 20) {
+      } else if (attempts == 18) {
         _scanStageMessage = 'Almost ready, finalizing candidates...';
         _scanProgress = 0.92;
         notifyListeners();
@@ -155,8 +156,12 @@ class ScanProvider extends ChangeNotifier {
 
       if (attempts > maxAttempts) {
         timer.cancel();
+        pollStopwatch.stop();
+        AppLogger.warning(
+          '[polling_timeout] session_id=${_currentSession!.id} attempts=$attempts elapsed_ms=${pollStopwatch.elapsedMilliseconds}',
+        );
         _errorMessage =
-            "Analysis is taking longer than expected. The server might be waking up — please try again.";
+            "Analysis is taking longer than expected. Please try again with a clear photo.";
         _uiState = ScanUIState.error;
         notifyListeners();
         return;
@@ -172,12 +177,13 @@ class ScanProvider extends ChangeNotifier {
             session.status == 'partial_success' ||
             session.status == 'partial') {
           timer.cancel();
+          pollStopwatch.stop();
           _scanProgress = 1.0;
 
           // Load detected candidates
           _candidates = await _scanRepository.getCandidates(session.id);
           AppLogger.info(
-            'Scan completed for session ${session.id}: found ${_candidates.length} item(s)',
+            '[scan_completed] session_id=${session.id} candidates=${_candidates.length} elapsed_ms=${pollStopwatch.elapsedMilliseconds}',
           );
 
           // Default all candidates to selected
@@ -189,6 +195,7 @@ class ScanProvider extends ChangeNotifier {
           notifyListeners();
         } else if (session.status == 'failed') {
           timer.cancel();
+          pollStopwatch.stop();
           String failureMsg =
               session.errorMessage.isNotEmpty ? session.errorMessage : '';
           if (failureMsg.isEmpty) {
@@ -205,6 +212,9 @@ class ScanProvider extends ChangeNotifier {
             failureMsg = firstError;
           }
 
+          AppLogger.error(
+            '[scan_failed] session_id=${session.id} error=$failureMsg elapsed_ms=${pollStopwatch.elapsedMilliseconds}',
+          );
           _errorMessage = failureMsg.isNotEmpty
               ? failureMsg
               : "Analysis could not identify grocery items. Please try a clearer picture.";
@@ -212,7 +222,7 @@ class ScanProvider extends ChangeNotifier {
           notifyListeners();
         }
       } catch (e) {
-        // Log error but keep polling until max attempts
+        // Log transient error but keep polling until max attempts
         AppLogger.warning('Polling session status attempt $attempts error: $e');
       }
     });

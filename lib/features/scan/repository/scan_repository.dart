@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:uuid/uuid.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/api/api_endpoints.dart';
 import '../model/scan_session_model.dart';
@@ -12,6 +13,7 @@ class ScanRepository {
 
   Future<ScanSessionModel> createScanSession(List<XFile> images) async {
     final stopwatch = Stopwatch()..start();
+    final correlationId = const Uuid().v4();
     final List<MultipartFile> multipartFiles = [];
     int totalBytes = 0;
 
@@ -25,7 +27,10 @@ class ScanRepository {
     }
 
     AppLogger.info(
-      'Starting upload of ${images.length} image(s) (${(totalBytes / 1024).toStringAsFixed(1)} KB total) to ${ApiEndpoints.scanSessions}...',
+      '[scan_started] CorrelationID=$correlationId images=${images.length} total_size_kb=${(totalBytes / 1024).toStringAsFixed(1)}',
+    );
+    AppLogger.info(
+      '[upload_started] CorrelationID=$correlationId endpoint=${ApiEndpoints.scanSessions}',
     );
 
     final formData = FormData.fromMap({'images': multipartFiles});
@@ -34,16 +39,21 @@ class ScanRepository {
       ApiEndpoints.scanSessions,
       data: formData,
       options: Options(
-        sendTimeout: const Duration(seconds: 90),
-        receiveTimeout: const Duration(seconds: 90),
+        headers: {
+          'X-Correlation-ID': correlationId,
+        },
+        sendTimeout: const Duration(seconds: 45),
+        receiveTimeout: const Duration(seconds: 45),
       ),
     );
 
     stopwatch.stop();
     final sessionData = response.data['data'];
     final sessionId = sessionData != null ? sessionData['id'] : 'unknown';
+    final statusCode = response.statusCode ?? 202;
+
     AppLogger.info(
-      'Image upload completed in ${stopwatch.elapsedMilliseconds}ms. Created scan session: $sessionId',
+      '[upload_completed] CorrelationID=$correlationId session_id=$sessionId status=$statusCode elapsed_ms=${stopwatch.elapsedMilliseconds}',
     );
 
     return ScanSessionModel.fromJson(response.data['data']);
