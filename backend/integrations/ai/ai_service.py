@@ -5,7 +5,7 @@ from django.conf import settings
 
 from .base import GroceryVisionService, MealInferenceService, RecipeGenerationService
 from .gemini_client import AIContentBlockedError, GeminiClient
-from .openai_client import OpenAIAuthenticationError, OpenAIClient
+from .openai_client import OpenAIAuthenticationError, OpenAIClient, OpenAIModelAccessError
 
 logger = logging.getLogger('freshtrack.ai.service')
 
@@ -100,6 +100,14 @@ class AIService(GroceryVisionService, RecipeGenerationService, MealInferenceServ
                 errors.append(f"{name}: {e}")
                 blocked_count += 1
                 break
+            except OpenAIModelAccessError as e:
+                t_prov = time.time() - t_prov_start
+                logger.warning(
+                    f"[{name}_model_access_denied] {corr_tag}elapsed_ms={int(t_prov * 1000)} "
+                    f"OpenAI 403: {e}. Switching to secondary provider immediately..."
+                )
+                errors.append(f"{name}: Permanent configuration error - model access denied (403: {e})")
+                continue
             except OpenAIAuthenticationError as e:
                 t_prov = time.time() - t_prov_start
                 logger.critical(f"[{name}_auth_failed] {corr_tag}elapsed_ms={int(t_prov * 1000)} authentication failure: {e}")
@@ -137,6 +145,12 @@ class AIService(GroceryVisionService, RecipeGenerationService, MealInferenceServ
                 logger.warning(f"AI provider '{name}' content blocked during recipe generation: {e}")
                 errors.append(f"{name}: {e}")
                 blocked_count += 1
+            except OpenAIModelAccessError as e:
+                logger.warning(
+                    f"[{name}_model_access_denied] OpenAI 403: {e}. Switching to secondary provider immediately..."
+                )
+                errors.append(f"{name}: Permanent configuration error - model access denied (403: {e})")
+                continue
             except OpenAIAuthenticationError as e:
                 logger.critical(f"AI provider '{name}' authentication/configuration failure: {e}")
                 errors.append(f"{name}: Configuration error - invalid/incorrect API key (401)")
@@ -168,6 +182,12 @@ class AIService(GroceryVisionService, RecipeGenerationService, MealInferenceServ
                 logger.warning(f"AI provider '{name}' content blocked during meal ingredient inference: {e}")
                 errors.append(f"{name}: {e}")
                 blocked_count += 1
+            except OpenAIModelAccessError as e:
+                logger.warning(
+                    f"[{name}_model_access_denied] OpenAI 403: {e}. Switching to secondary provider immediately..."
+                )
+                errors.append(f"{name}: Permanent configuration error - model access denied (403: {e})")
+                continue
             except OpenAIAuthenticationError as e:
                 logger.critical(f"AI provider '{name}' authentication/configuration failure: {e}")
                 errors.append(f"{name}: Configuration error - invalid/incorrect API key (401)")

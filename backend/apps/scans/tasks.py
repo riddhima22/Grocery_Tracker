@@ -9,7 +9,7 @@ from django.utils import timezone
 
 from integrations.ai.gemini_client import AIContentBlockedError
 from integrations.ai.model_router import ModelRouter
-from integrations.ai.openai_client import OpenAIAuthenticationError
+from integrations.ai.openai_client import OpenAIAuthenticationError, OpenAIModelAccessError
 
 from .models import ScanCandidate, ScanImage, ScanSession
 
@@ -22,7 +22,7 @@ def is_transient_error(exc: Exception) -> bool:
     retryable google.api_core exceptions) from permanent errors (bad image, schema violation,
     safety block, authentication/configuration failure).
     """
-    if isinstance(exc, (AIContentBlockedError, OpenAIAuthenticationError)):
+    if isinstance(exc, (AIContentBlockedError, OpenAIAuthenticationError, OpenAIModelAccessError)):
         return False
 
     # Check for google-api-core retryable exceptions
@@ -63,9 +63,10 @@ def is_transient_error(exc: Exception) -> bool:
 
     # Permanent authentication & configuration failures (never retry)
     auth_config_indicators = [
-        'authenticationerror', 'openaiauthenticationerror', 'incorrect api key',
+        'authenticationerror', 'openaiauthenticationerror', 'openaimodelaccesserror',
+        'does not have access to model', 'model_not_found', 'incorrect api key',
         'invalid api key', 'api_key_invalid', 'unauthenticated', 'invalid_api_key',
-        'unauthorized', 'permissiondenied', 'configuration error', '401'
+        'unauthorized', 'permissiondenied', 'configuration error', '401', '403'
     ]
     if any(ind in msg for ind in auth_config_indicators):
         return False

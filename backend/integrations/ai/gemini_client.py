@@ -283,10 +283,21 @@ class GeminiClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
 
         candidate_models = self._get_candidate_models(self.scan_model_name)
         overall_start = time.time()
+        time_budget_sec = getattr(settings, 'AI_REQUEST_TIMEOUT_SECONDS', 22)
+        service_unavailable_count = 0
         last_exception = None
         raw_text = None
 
         for model_name in candidate_models:
+            # Check strict overall time budget
+            elapsed_so_far = time.time() - overall_start
+            if elapsed_so_far >= time_budget_sec:
+                logger.warning(
+                    f"Gemini scan model loop reached time budget ({time_budget_sec}s) "
+                    f"after {elapsed_so_far:.2f}s. Aborting further model attempts."
+                )
+                break
+
             attempt_start = time.time()
             logger.info(f"[gemini_started] {corr_tag}model={model_name} images={len(image_paths)}")
             try:
@@ -362,11 +373,30 @@ class GeminiClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
                     )
                     break
 
-                if any(k in err_msg for k in ['503', '504', 'service unavailable', 'deadline exceeded', 'timed out', 'timeout']):
+                is_503_or_unavailable = any(
+                    k in err_msg for k in ['503', '504', 'service unavailable', 'deadline exceeded', 'timed out', 'timeout']
+                )
+                if is_503_or_unavailable:
+                    service_unavailable_count += 1
                     logger.warning(
-                        f"Gemini model '{model_name}' encountered 503/504/timeout after {attempt_elapsed:.2f}s: {e}. "
-                        f"Attempting fallback model or downstream AI provider..."
+                        f"Gemini model '{model_name}' encountered 503/service unavailable after {attempt_elapsed:.2f}s "
+                        f"(count {service_unavailable_count}): {e}."
                     )
+                    # Allow at most ONE bounded fallback model on 503; if the second attempt also encounters 503,
+                    # abort immediately rather than burning time looping through 4 models.
+                    if service_unavailable_count > 1:
+                        logger.warning(
+                            f"Gemini encountered consecutive 503 Service Unavailable errors ({service_unavailable_count}). "
+                            f"Aborting further Gemini model fallback attempts to avoid long scan delays."
+                        )
+                        break
+                    # Also check remaining time budget before attempting fallback
+                    if (time.time() - overall_start) >= (time_budget_sec - 5):
+                        logger.warning(
+                            f"Insufficient time budget remaining ({time_budget_sec - (time.time() - overall_start):.1f}s) "
+                            f"for another Gemini model. Aborting model fallback loop."
+                        )
+                        break
                 else:
                     logger.warning(
                         f"Gemini model '{model_name}' failed after {attempt_elapsed:.2f}s: {e}. "

@@ -681,6 +681,138 @@ class ScanFlowAsyncAndPollingTests(APITestCase):
             # Critical: Verify generate_content was called ONLY ONCE and aborted immediately!
             self.assertEqual(mock_genai_client.models.generate_content.call_count, 1)
 
+    def test_openai_403_model_access_denied_switches_immediately_to_gemini(self):
+        """Verify that when OpenAI fails with 403 (model access denied), it switches to Gemini immediately."""
+        from integrations.ai.ai_service import AIService
+        from integrations.ai.openai_client import OpenAIModelAccessError
+
+        mock_openai = MagicMock()
+        mock_openai.analyze_grocery_images.side_effect = OpenAIModelAccessError(
+            "Project does not have access to model gpt-4o-mini"
+        )
+
+        mock_gemini = MagicMock()
+        mock_gemini.analyze_grocery_images.return_value = {
+            "items": [{"name": "Organic Milk", "quantity": 1.0, "unit": "bottle"}]
+        }
+
+        service = AIService(
+            provider_order=["openai", "gemini"],
+            provider_instances={
+                "openai": mock_openai,
+                "gemini": mock_gemini,
+            }
+        )
+
+        res = service.analyze_grocery_images(["/dummy/milk.jpg"])
+        self.assertIn("items", res)
+        self.assertEqual(res["items"][0]["name"], "Organic Milk")
+        mock_openai.analyze_grocery_images.assert_called_once()
+        mock_gemini.analyze_grocery_images.assert_called_once()
+
+    def test_openai_client_model_access_error_marks_model_inaccessible(self):
+        """Verify OpenAI 403 adds model to _inaccessible_models and disables client on next attempt."""
+        from integrations.ai.openai_client import OpenAIClient, OpenAIModelAccessError
+
+        # Clear set for test isolation
+        OpenAIClient._inaccessible_models.clear()
+
+        client = OpenAIClient(api_key="sk-test-key")
+        client.model_name = "test-inaccessible-model"
+        client.enabled = True
+
+        mock_api = MagicMock()
+        mock_api.chat.completions.create.side_effect = Exception("403 Project does not have access to model")
+        client.client = mock_api
+
+        with patch.object(client, '_encode_image_to_base64', return_value="mock_b64"):
+            with self.assertRaises(OpenAIModelAccessError):
+                client.analyze_grocery_images(["/dummy/img.jpg"])
+
+        self.assertIn("test-inaccessible-model", OpenAIClient._inaccessible_models)
+        self.assertFalse(client.enabled)
+
+        # Subsequent instance with same model is immediately disabled without calling OpenAI
+        next_client = OpenAIClient(api_key="sk-test-key")
+        next_client.model_name = "test-inaccessible-model"
+        if next_client.model_name in OpenAIClient._inaccessible_models:
+            next_client.enabled = False
+        self.assertFalse(next_client.enabled)
+
+        # Clean up
+        OpenAIClient._inaccessible_models.clear()
+
+    def test_openai_model_environment_variable_selection(self):
+        """Verify OPENAI_MODEL environment variable configures model selection with gpt-4.1-mini as default."""
+        import os
+
+        from django.test import override_settings
+
+        from integrations.ai.openai_client import OpenAIClient
+
+        # Default is gpt-4.1-mini
+        with patch.dict(os.environ, {}, clear=True):
+            with override_settings(OPENAI_MODEL=None, OPENAI_MODEL_NAME=None):
+                client = OpenAIClient()
+                self.assertEqual(client.model_name, "gpt-4.1-mini")
+
+        # Configurable via OPENAI_MODEL
+        with patch.dict(os.environ, {"OPENAI_MODEL": "gpt-4o"}):
+            client = OpenAIClient()
+            self.assertEqual(client.model_name, "gpt-4o")
+
+    def test_gemini_503_bounded_fallback_attempts_max_two_models(self):
+        """Verify that on 503 Service Unavailable, Gemini attempts at most one fallback model (total max 2 attempts)."""
+        from integrations.ai.gemini_client import GeminiClient
+
+        client = GeminiClient()
+        client.enabled = True
+        client.fallback_models = ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.8-flash"]
+
+        mock_genai_client = MagicMock()
+        # Both model 1 and model 2 return 503
+        mock_genai_client.models.generate_content.side_effect = RuntimeError(
+            "503 The model is overloaded. Please try again later."
+        )
+        client.client = mock_genai_client
+
+        with patch.object(client, '_prepare_image', return_value=MagicMock()):
+            with self.assertRaises(RuntimeError) as ctx:
+                client.analyze_grocery_images(["/dummy/test.jpg"])
+
+            self.assertIn("couldn't reach", str(ctx.exception).lower())
+            # Critical: Verify generate_content was called at most 2 times, NOT 4 times!
+            self.assertEqual(mock_genai_client.models.generate_content.call_count, 2)
+
+    def test_gemini_time_budget_aborts_model_fallback_loop(self):
+        """Verify that when the overall time budget is reached, Gemini aborts without attempting remaining models."""
+        import time
+
+        from django.test import override_settings
+
+        from integrations.ai.gemini_client import GeminiClient
+
+        client = GeminiClient()
+        client.enabled = True
+        client.fallback_models = ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.8-flash"]
+
+        mock_genai_client = MagicMock()
+
+        def slow_call(*args, **kwargs):
+            time.sleep(0.06)
+            raise RuntimeError("503 Overloaded")
+
+        mock_genai_client.models.generate_content.side_effect = slow_call
+        client.client = mock_genai_client
+
+        with override_settings(AI_REQUEST_TIMEOUT_SECONDS=0.04):
+            with patch.object(client, '_prepare_image', return_value=MagicMock()):
+                with self.assertRaises(RuntimeError):
+                    client.analyze_grocery_images(["/dummy/test.jpg"])
+
+                # Model 1 took 0.06s which exceeds 0.04s budget, so model 2 was never attempted
+                self.assertEqual(mock_genai_client.models.generate_content.call_count, 1)
+
     def test_image_preprocessing_downscaling_and_compression(self):
         """Verify that large images are downscaled to max 1280px and compressed as high-quality JPEG."""
         import os

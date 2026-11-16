@@ -305,8 +305,9 @@ AI_IMAGE_QUALITY = env.int('AI_IMAGE_QUALITY', default=82)
 # OpenAI configuration
 _raw_openai_key = env('OPENAI_API_KEY', default='')
 OPENAI_API_KEY = _raw_openai_key.strip().strip('\'"') if isinstance(_raw_openai_key, str) else ''
-_raw_openai_model = env('OPENAI_MODEL_NAME', default='gpt-4o-mini')
-OPENAI_MODEL_NAME = _raw_openai_model.strip().strip('\'"') if isinstance(_raw_openai_model, str) else 'gpt-4o-mini'
+_raw_openai_model = env('OPENAI_MODEL', default=env('OPENAI_MODEL_NAME', default='gpt-4.1-mini'))
+OPENAI_MODEL = _raw_openai_model.strip().strip('\'"') if isinstance(_raw_openai_model, str) else 'gpt-4.1-mini'
+OPENAI_MODEL_NAME = OPENAI_MODEL
 _raw_openai_project = env('OPENAI_PROJECT_ID', default='')
 OPENAI_PROJECT_ID = _raw_openai_project.strip().strip('\'"') if isinstance(_raw_openai_project, str) and _raw_openai_project.strip() else None
 _raw_openai_org = env('OPENAI_ORG_ID', default='')

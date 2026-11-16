@@ -7,11 +7,12 @@ from django.conf import settings
 from django.utils import timezone
 
 try:
-    from openai import AuthenticationError, OpenAI
+    from openai import AuthenticationError, OpenAI, PermissionDeniedError
     OPENAI_AVAILABLE = True
 except ImportError:
     OpenAI = None
     AuthenticationError = None
+    PermissionDeniedError = None
     OPENAI_AVAILABLE = False
 
 from .base import GroceryVisionService, MealInferenceService, RecipeGenerationService
@@ -34,6 +35,15 @@ class OpenAIAuthenticationError(Exception):
     is_configuration_error = True
 
 
+class OpenAIModelAccessError(Exception):
+    """
+    Raised when the OpenAI project/API key does not have access to the requested model (HTTP 403).
+    Classified as a permanent configuration failure.
+    """
+    status_code = 403
+    is_configuration_error = True
+
+
 def is_openai_auth_error(exc: Exception) -> bool:
     """Detects whether an exception is an OpenAI 401 authentication/key error."""
     if AuthenticationError and isinstance(exc, AuthenticationError):
@@ -44,7 +54,25 @@ def is_openai_auth_error(exc: Exception) -> bool:
     return '401' in msg and ('api key' in msg or 'authentication' in msg or 'unauthorized' in msg or 'incorrect' in msg)
 
 
+def is_openai_model_access_error(exc: Exception) -> bool:
+    """Detects whether an exception is an OpenAI 403 PermissionDeniedError / model access error."""
+    if PermissionDeniedError and isinstance(exc, PermissionDeniedError):
+        return True
+    if getattr(exc, 'status_code', None) == 403 or getattr(exc, 'code', None) == 403:
+        return True
+    msg = str(exc).lower()
+    return (
+        '403' in msg or
+        'permission denied' in msg or
+        'permissiondenied' in msg or
+        'does not have access to model' in msg or
+        'model_not_found' in msg
+    )
+
+
 class OpenAIClient(GroceryVisionService, RecipeGenerationService, MealInferenceService):
+    _inaccessible_models = set()
+
     def __init__(self, api_key: str = None):
         # Prefer direct argument or fresh os.environ over cached settings
         raw_key = api_key if api_key is not None else (
@@ -53,8 +81,20 @@ class OpenAIClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
         self.api_key = raw_key.strip().strip('\'"') if isinstance(raw_key, str) else ''
         self.enabled = bool(self.api_key and OPENAI_AVAILABLE)
 
-        raw_model = getattr(settings, 'OPENAI_MODEL_NAME', 'gpt-4o-mini')
-        self.model_name = raw_model.strip().strip('\'"') if isinstance(raw_model, str) else 'gpt-4o-mini'
+        raw_model = (
+            os.environ.get('OPENAI_MODEL') or
+            os.environ.get('OPENAI_MODEL_NAME') or
+            getattr(settings, 'OPENAI_MODEL', None) or
+            getattr(settings, 'OPENAI_MODEL_NAME', 'gpt-4.1-mini')
+        )
+        self.model_name = raw_model.strip().strip('\'"') if isinstance(raw_model, str) and raw_model.strip() else 'gpt-4.1-mini'
+
+        if self.model_name in self._inaccessible_models:
+            logger.warning(
+                f"OpenAI model '{self.model_name}' was previously identified as inaccessible (403). "
+                f"Disabling OpenAI client to avoid repeated failures. Update OPENAI_MODEL to a supported model."
+            )
+            self.enabled = False
 
         raw_project = os.environ.get('OPENAI_PROJECT_ID') or getattr(settings, 'OPENAI_PROJECT_ID', None)
         self.project = raw_project.strip().strip('\'"') if isinstance(raw_project, str) and raw_project.strip() else None
@@ -165,6 +205,18 @@ class OpenAIClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
             logger.warning(
                 f"[openai_failed] {corr_tag}model={self.model_name} elapsed_ms={int(t_openai * 1000)} error={e}"
             )
+            if is_openai_model_access_error(e):
+                self._inaccessible_models.add(self.model_name)
+                self.enabled = False
+                logger.error(
+                    f"OpenAI API model access denied (HTTP 403: Project does not have access to model '{self.model_name}'). "
+                    f"This is a permanent configuration failure. Update OPENAI_MODEL in Render. "
+                    f"Falling back immediately to secondary provider."
+                )
+                raise OpenAIModelAccessError(
+                    f"OpenAI model access denied (403): Project does not have access to model '{self.model_name}'."
+                ) from e
+
             if is_openai_auth_error(e):
                 self.enabled = False
                 logger.critical(
@@ -214,6 +266,18 @@ class OpenAIClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
             return data
 
         except Exception as e:
+            if is_openai_model_access_error(e):
+                self._inaccessible_models.add(self.model_name)
+                self.enabled = False
+                logger.error(
+                    f"OpenAI API model access denied (HTTP 403: Project does not have access to model '{self.model_name}'). "
+                    f"This is a permanent configuration failure. Update OPENAI_MODEL in Render. "
+                    f"Falling back immediately to secondary provider."
+                )
+                raise OpenAIModelAccessError(
+                    f"OpenAI model access denied (403): Project does not have access to model '{self.model_name}'."
+                ) from e
+
             if is_openai_auth_error(e):
                 self.enabled = False
                 logger.critical(
@@ -268,6 +332,18 @@ class OpenAIClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
             return data
 
         except Exception as e:
+            if is_openai_model_access_error(e):
+                self._inaccessible_models.add(self.model_name)
+                self.enabled = False
+                logger.error(
+                    f"OpenAI API model access denied (HTTP 403: Project does not have access to model '{self.model_name}'). "
+                    f"This is a permanent configuration failure. Update OPENAI_MODEL in Render. "
+                    f"Falling back immediately to secondary provider."
+                )
+                raise OpenAIModelAccessError(
+                    f"OpenAI model access denied (403): Project does not have access to model '{self.model_name}'."
+                ) from e
+
             if is_openai_auth_error(e):
                 self.enabled = False
                 logger.critical(
