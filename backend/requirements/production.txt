@@ -1,7 +1,0 @@
--r base.txt
-
-gunicorn>=23.0.0
-dj-database-url>=2.2.0
-whitenoise>=6.7.0
-django-storages>=1.14.2
-boto3>=1.34.0
