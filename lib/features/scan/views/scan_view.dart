@@ -69,14 +69,45 @@ class _ScanViewState extends State<ScanView>
   @override
   Widget build(BuildContext context) {
     final scan = context.watch<ScanProvider>();
+    final bool canPopRoute = Navigator.of(context).canPop();
+    final bool isScanTabActive = HomeShell.activeTabNotifier.value == 2;
 
     return PopScope(
-      canPop: true,
+      canPop: canPopRoute || !isScanTabActive,
       onPopInvokedWithResult: (didPop, result) {
-        if (didPop) scan.clearImages();
+        if (!didPop && isScanTabActive) {
+          HomeShell.switchTab(0);
+        }
       },
-      child: AppScaffold(body: _buildUIStateBody(scan)),
+      child: AppScaffold(
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(
+              Icons.arrow_back_rounded,
+              color: AppColors.textPrimary,
+            ),
+            onPressed: () => _handleBackNavigation(context),
+            tooltip: 'Back',
+          ),
+          title: Text(
+            'Scan Groceries',
+            style: AppTextStyles.headingMedium(context),
+          ),
+          centerTitle: false,
+        ),
+        body: _buildUIStateBody(scan),
+      ),
     );
+  }
+
+  void _handleBackNavigation(BuildContext context) {
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    } else {
+      HomeShell.switchTab(0);
+    }
   }
 
   Widget _buildUIStateBody(ScanProvider scan) {
@@ -385,7 +416,32 @@ class _ScanViewState extends State<ScanView>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('AI Detected', style: AppTextStyles.headingLarge(context)),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Items Detected',
+                    style: AppTextStyles.headingLarge(context),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${scan.candidates.length} ${scan.candidates.length == 1 ? "item" : "items"}',
+                      style: AppTextStyles.labelMedium(context).copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
               AppGap.xxs(context),
               Text(
                 'Review and edit the details before adding them to your kitchen.',

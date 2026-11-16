@@ -19,9 +19,9 @@ class ImagePickerService {
     try {
       final file = await _picker.pickImage(
         source: ImageSource.camera,
-        maxWidth: 1440,
-        maxHeight: 1440,
-        imageQuality: 80,
+        maxWidth: 2560,
+        maxHeight: 2560,
+        imageQuality: 88,
       );
       if (file != null) {
         final bytes = await file.length();
@@ -40,9 +40,9 @@ class ImagePickerService {
     try {
       final file = await _picker.pickImage(
         source: ImageSource.gallery,
-        maxWidth: 1440,
-        maxHeight: 1440,
-        imageQuality: 80,
+        maxWidth: 2560,
+        maxHeight: 2560,
+        imageQuality: 88,
       );
       if (file != null) {
         final bytes = await file.length();
@@ -60,9 +60,9 @@ class ImagePickerService {
   Future<List<XFile>> selectMultipleImagesFromGallery() async {
     try {
       final List<XFile> images = await _picker.pickMultiImage(
-        maxWidth: 1440,
-        maxHeight: 1440,
-        imageQuality: 80,
+        maxWidth: 2560,
+        maxHeight: 2560,
+        imageQuality: 88,
       );
       for (final file in images) {
         final bytes = await file.length();

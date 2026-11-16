@@ -332,6 +332,7 @@ GOOGLE_APPLICATION_CREDENTIALS = env('GOOGLE_APPLICATION_CREDENTIALS', default='
 AI_MAX_IMAGE_SIZE_BYTES = env.int('AI_MAX_IMAGE_SIZE_BYTES', default=5 * 1024 * 1024)
 AI_MAX_IMAGES_PER_SCAN = env.int('AI_MAX_IMAGES_PER_SCAN', default=10)
 AI_BLUR_VARIANCE_THRESHOLD = env.float('AI_BLUR_VARIANCE_THRESHOLD', default=100.0)
+AI_TILING_ENABLED = env.bool('AI_TILING_ENABLED', default=True)
 
 # Open Food Facts configuration
 OPEN_FOOD_FACTS_BASE_URL = env('OPEN_FOOD_FACTS_BASE_URL', default='https://world.openfoodfacts.org')

@@ -186,7 +186,7 @@ class OpenAIClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
                     {"role": "user", "content": content}
                 ],
                 response_format={"type": "json_object"},
-                max_tokens=1500,
+                max_tokens=3000,
                 timeout=float(timeout_sec)
             )
 

@@ -846,9 +846,11 @@ class ScanFlowAsyncAndPollingTests(APITestCase):
 
         from integrations.ai.openai_client import OpenAIClient
 
-        with override_settings(OPENAI_API_KEY="sk-test-key-mock", AI_REQUEST_TIMEOUT_SECONDS=22):
-            client = OpenAIClient()
-            self.assertTrue(client.enabled)
+        with patch("integrations.ai.openai_client.OPENAI_AVAILABLE", True):
+            with patch("integrations.ai.openai_client.OpenAI", MagicMock()):
+                with override_settings(OPENAI_API_KEY="sk-test-key-mock", AI_REQUEST_TIMEOUT_SECONDS=22):
+                    client = OpenAIClient()
+                    self.assertTrue(client.enabled)
             # Verify client initialization was called with timeout 22 and max_retries 1
 
     def test_scan_prompt_preserves_required_schema_fields(self):
@@ -1057,3 +1059,188 @@ class CeleryBrokerConfigRegistrationTests(TestCase):
         from config.checks import check_packaging_installed_for_kombu
         errors = check_packaging_installed_for_kombu(None)
         self.assertEqual(errors, [])
+
+
+class MultiItemDetectionAndTilingTests(TestCase):
+    def test_large_high_resolution_image_generates_overview_and_crops(self):
+        """Verify that high-resolution images (>= 1600px) produce overview and detail crops."""
+        import os
+        import tempfile
+        from PIL import Image
+        from integrations.ai.model_router import ModelRouter
+
+        router = ModelRouter()
+        # Create a 2400x1600 high-resolution landscape image
+        img = Image.new("RGB", (2400, 1600), color=(120, 180, 200))
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
+        img.save(tmp.name, format="JPEG", quality=90)
+        tmp.close()
+
+        try:
+            crops = router._prepare_image_and_crops_for_ai(tmp.name, is_dark=False)
+            # Should produce 1 overview + 2 overlapping detail crops = 3 images
+            self.assertEqual(len(crops), 3)
+
+            for crop_path, is_temp in crops:
+                self.assertTrue(is_temp)
+                with Image.open(crop_path) as c_img:
+                    w, h = c_img.size
+                    self.assertLessEqual(max(w, h), 1280)
+                    self.assertEqual(c_img.format, "JPEG")
+        finally:
+            if os.path.exists(tmp.name):
+                os.unlink(tmp.name)
+            for crop_path, _ in crops:
+                if os.path.exists(crop_path):
+                    os.unlink(crop_path)
+
+    def test_small_single_item_image_does_not_tile(self):
+        """Verify that standard/small images (< 1600px) do not trigger unnecessary crop tiling."""
+        import os
+        import tempfile
+        from PIL import Image
+        from integrations.ai.model_router import ModelRouter
+
+        router = ModelRouter()
+        # Create an 800x600 standard image
+        img = Image.new("RGB", (800, 600), color=(200, 150, 100))
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
+        img.save(tmp.name, format="JPEG", quality=85)
+        tmp.close()
+
+        try:
+            crops = router._prepare_image_and_crops_for_ai(tmp.name, is_dark=False)
+            # Should produce exactly 1 overview image, no extra crops
+            self.assertEqual(len(crops), 1)
+        finally:
+            if os.path.exists(tmp.name):
+                os.unlink(tmp.name)
+            for crop_path, _ in crops:
+                if os.path.exists(crop_path):
+                    os.unlink(crop_path)
+
+    def test_deduplicate_items_merges_duplicate_products_without_inflating_quantity(self):
+        """Verify that items detected across overlapping crops are deduplicated without double-counting."""
+        from integrations.ai.model_router import ModelRouter
+
+        raw_items = [
+            {
+                "name": "Amul Pure Ghee 1L",
+                "brand": "Amul",
+                "description": "Pure cow ghee in tin",
+                "category": "Dairy",
+                "icon_key": "dairy",
+                "quantity": 1,
+                "unit": "L",
+                "storage_zone": "pantry",
+                "storage_reason": "Shelf stable in cool dark place",
+                "shelf_life_guidance": "Keep tightly closed",
+                "expiry_date": None,
+                "confidence": "Medium",
+                "source_image_index": 0,
+            },
+            {
+                "name": "Amul Pure Ghee 1L",
+                "brand": "Amul",
+                "description": "Pure cow ghee in tin",
+                "category": "Dairy",
+                "icon_key": "dairy",
+                "quantity": 1,
+                "unit": "L",
+                "storage_zone": "pantry",
+                "storage_reason": "Shelf stable in cool dark place",
+                "shelf_life_guidance": "Keep tightly closed",
+                "expiry_date": "2026-12-31",
+                "confidence": "High",
+                "source_image_index": 1,
+            },
+        ]
+
+        deduped = ModelRouter.deduplicate_items(raw_items)
+        self.assertEqual(len(deduped), 1)
+        merged = deduped[0]
+        # Quantity should be max(1, 1) = 1, NOT 1 + 1 = 2!
+        self.assertEqual(merged["quantity"], 1)
+        # Should keep the higher confidence and printed expiry date
+        self.assertEqual(merged["confidence"], "High")
+        self.assertEqual(merged["expiry_date"], "2026-12-31")
+
+    def test_deduplicate_items_preserves_distinct_items_in_same_category(self):
+        """Verify that separate distinct products in the same category are NOT accidentally merged."""
+        from integrations.ai.model_router import ModelRouter
+
+        raw_items = [
+            {"name": "Red Onions", "category": "Vegetables", "quantity": 1, "unit": "kg"},
+            {"name": "Yellow Potatoes", "category": "Vegetables", "quantity": 2, "unit": "kg"},
+            {"name": "Fresh Garlic", "category": "Vegetables", "quantity": 1, "unit": "pack"},
+            {"name": "Ginger Root", "category": "Vegetables", "quantity": 250, "unit": "g"},
+        ]
+
+        deduped = ModelRouter.deduplicate_items(raw_items)
+        self.assertEqual(len(deduped), 4)
+        names = {item["name"] for item in deduped}
+        self.assertEqual(names, {"Red Onions", "Yellow Potatoes", "Fresh Garlic", "Ginger Root"})
+
+    def test_deduplicate_items_preserves_all_23_candidate_fields(self):
+        """Verify that deduplication preserves all 23 grocery candidate schema fields."""
+        from integrations.ai.model_router import ModelRouter
+
+        candidate_item = {
+            "name": "Tata Salt",
+            "brand": "Tata",
+            "description": "Vacuum evaporated iodized salt",
+            "category": "Spices",
+            "icon_key": "spices",
+            "quantity": 1,
+            "unit": "kg",
+            "storage_zone": "spice",
+            "storage_reason": "Keep dry to prevent caking",
+            "shelf_life_guidance": "Store in airtight jar",
+            "expiry_date": "2027-05-15",
+            "estimated_consumption_date": None,
+            "is_expiry_estimated": False,
+            "manufacturing_date": "2025-05-15",
+            "packed_date": "2025-05-16",
+            "best_before_date": "2027-05-15",
+            "date_type": "expiry",
+            "date_source": "ocr_verified",
+            "raw_date_text": "EXP 15/05/2027",
+            "confidence": "High",
+            "date_confidence": "High",
+            "source_image_index": 0,
+            "warnings": [],
+        }
+
+        deduped = ModelRouter.deduplicate_items([candidate_item])
+        self.assertEqual(len(deduped), 1)
+        result = deduped[0]
+        for field, value in candidate_item.items():
+            self.assertIn(field, result)
+            self.assertEqual(result[field], value)
+
+    def test_empty_or_corrupted_image_handling(self):
+        """Verify image quality checker properly detects 0-byte or corrupted files."""
+        import os
+        import tempfile
+        from integrations.ai.model_router import ModelRouter
+
+        router = ModelRouter()
+        # Create a 0-byte empty file
+        empty_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
+        empty_tmp.close()
+
+        # Create a corrupted file with random bytes
+        corrupt_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
+        corrupt_tmp.write(b"NOT_A_VALID_JPEG_HEADER_RANDOM_DATA")
+        corrupt_tmp.close()
+
+        try:
+            errors, warnings, unique = router.run_image_quality_checks([empty_tmp.name, corrupt_tmp.name])
+            self.assertEqual(len(unique), 0)
+            self.assertGreaterEqual(len(errors), 2)
+            self.assertTrue(any("corrupted or unreadable" in err for err in errors))
+        finally:
+            if os.path.exists(empty_tmp.name):
+                os.unlink(empty_tmp.name)
+            if os.path.exists(corrupt_tmp.name):
+                os.unlink(corrupt_tmp.name)

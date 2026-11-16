@@ -103,9 +103,106 @@ class ModelRouter:
 
         return errors, warnings, unique_paths
 
+    def _save_temp_jpeg(self, img: Image.Image, quality: int = 82) -> str:
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.jpg', prefix='freshtrack_prep_')
+        img.convert('RGB').save(tmp.name, format='JPEG', quality=quality)
+        tmp.close()
+        return tmp.name
+
+    def _apply_dark_enhancement(self, img: Image.Image) -> Image.Image:
+        np_rgb = np.array(img.convert('RGB'))
+        lab = cv2.cvtColor(np_rgb, cv2.COLOR_RGB2LAB)
+        l_chan, a_chan, b_chan = cv2.split(lab)
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        l_enhanced = clahe.apply(l_chan)
+        enhanced_lab = cv2.merge([l_enhanced, a_chan, b_chan])
+        enhanced_rgb = cv2.cvtColor(enhanced_lab, cv2.COLOR_LAB2RGB)
+        return Image.fromarray(enhanced_rgb)
+
+    def _prepare_image_and_crops_for_ai(self, image_path: str, is_dark: bool) -> list:
+        """
+        Preprocesses an image and generates intelligent high-res crops for large/crowded images:
+        1. Auto-orients (EXIF).
+        2. Produces a full-scene overview (scaled to max 1280px).
+        3. For large images (longest side >= 1600px or area >= 1.8MP), extracts two overlapping
+           high-detail crops (left/right for landscape, top/bottom for portrait) scaled to max 1280px,
+           ensuring small packaging text and labels remain readable without blur.
+        4. Applies CLAHE contrast enhancement if dark.
+        Returns list of (temp_file_path, is_temp) tuples.
+        """
+        results = []
+        try:
+            with Image.open(image_path) as pil_img:
+                transposed = ImageOps.exif_transpose(pil_img)
+                if transposed is pil_img:
+                    transposed = pil_img.copy()
+
+                width, height = transposed.size
+                longest = max(width, height)
+                max_dim = getattr(settings, 'AI_MAX_IMAGE_DIMENSION', 1280)
+                quality = getattr(settings, 'AI_IMAGE_QUALITY', 82)
+
+                # 1. Full-scene overview
+                overview = transposed.copy()
+                if longest > max_dim:
+                    scale = max_dim / float(longest)
+                    new_w = max(150, int(round(width * scale)))
+                    new_h = max(150, int(round(height * scale)))
+                    overview = overview.resize((new_w, new_h), resample=Image.Resampling.BILINEAR)
+
+                if is_dark:
+                    overview = self._apply_dark_enhancement(overview)
+
+                overview_tmp = self._save_temp_jpeg(overview, quality)
+                results.append((overview_tmp, True))
+
+                # 2. Large/high-res image tiling check
+                # For images >= 1600px on the longest dimension or >= 1.8 megapixels, extract 2 overlapping crops
+                tiling_enabled = getattr(settings, 'AI_TILING_ENABLED', True)
+                if tiling_enabled and (longest >= 1600 or (width * height >= 1800000)):
+                    crops = []
+                    if width >= height:
+                        # Landscape: Left crop (0-58%) & Right crop (42-100%)
+                        left_box = (0, 0, int(round(width * 0.58)), height)
+                        right_box = (int(round(width * 0.42)), 0, width, height)
+                        crops.append(transposed.crop(left_box))
+                        crops.append(transposed.crop(right_box))
+                    else:
+                        # Portrait: Top crop (0-58%) & Bottom crop (42-100%)
+                        top_box = (0, 0, width, int(round(height * 0.58)))
+                        bottom_box = (0, int(round(height * 0.42)), width, height)
+                        crops.append(transposed.crop(top_box))
+                        crops.append(transposed.crop(bottom_box))
+
+                    for crop_img in crops:
+                        c_w, c_h = crop_img.size
+                        c_longest = max(c_w, c_h)
+                        if c_longest > max_dim:
+                            c_scale = max_dim / float(c_longest)
+                            c_new_w = max(150, int(round(c_w * c_scale)))
+                            c_new_h = max(150, int(round(c_h * c_scale)))
+                            crop_img = crop_img.resize((c_new_w, c_new_h), resample=Image.Resampling.BILINEAR)
+
+                        if is_dark:
+                            crop_img = self._apply_dark_enhancement(crop_img)
+
+                        crop_tmp = self._save_temp_jpeg(crop_img, quality)
+                        results.append((crop_tmp, True))
+
+                del transposed
+                import gc
+                gc.collect()
+                return results
+
+        except Exception as e:
+            logger.warning(f"High-res preprocessing and crop generation failed for {image_path}: {e}")
+            if results:
+                return results
+            return [(image_path, False)]
+
     def _preprocess_image_for_ai(self, image_path: str, is_dark: bool) -> tuple:
         """
-        Preprocesses an image for AI consumption:
+        Preprocesses a single image for AI consumption:
         1. Auto-orients (EXIF).
         2. Downscales longest dimension to sensible max resolution (default 1280px) preserving label text.
         3. Applies light contrast/brightness normalization (CLAHE) if flagged as dark.
@@ -115,12 +212,10 @@ class ModelRouter:
         """
         try:
             with Image.open(image_path) as pil_img:
-                # 1. EXIF orientation correction
                 transposed = ImageOps.exif_transpose(pil_img)
                 if transposed is pil_img:
                     transposed = pil_img.copy()
 
-                # 2. Downscale to max resolution on the longest side
                 width, height = transposed.size
                 longest = max(width, height)
                 max_dim = getattr(settings, 'AI_MAX_IMAGE_DIMENSION', 1280)
@@ -130,27 +225,14 @@ class ModelRouter:
                     new_h = max(150, int(round(height * scale)))
                     transposed = transposed.resize((new_w, new_h), resample=Image.Resampling.BILINEAR)
 
-                # 3. Contrast/brightness normalization ONLY if flagged as too dark
                 if is_dark:
-                    np_rgb = np.array(transposed.convert('RGB'))
-                    lab = cv2.cvtColor(np_rgb, cv2.COLOR_RGB2LAB)
-                    l_chan, a_chan, b_chan = cv2.split(lab)
-                    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-                    l_enhanced = clahe.apply(l_chan)
-                    enhanced_lab = cv2.merge([l_enhanced, a_chan, b_chan])
-                    enhanced_rgb = cv2.cvtColor(enhanced_lab, cv2.COLOR_LAB2RGB)
-                    transposed = Image.fromarray(enhanced_rgb)
-                    del np_rgb, lab, l_chan, a_chan, b_chan, l_enhanced, enhanced_lab, enhanced_rgb
+                    transposed = self._apply_dark_enhancement(transposed)
 
-                # 4. Save to temporary JPEG file with quality 82 (fast Huffman save)
-                tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.jpg', prefix='freshtrack_prep_')
-                quality = getattr(settings, 'AI_IMAGE_QUALITY', 82)
-                transposed.convert('RGB').save(tmp.name, format='JPEG', quality=quality)
-                tmp.close()
+                tmp_name = self._save_temp_jpeg(transposed, getattr(settings, 'AI_IMAGE_QUALITY', 82))
                 del transposed
                 import gc
                 gc.collect()
-                return tmp.name, True
+                return tmp_name, True
 
         except Exception as e:
             logger.warning(f"Image preprocessing failed for {image_path}: {e}")
@@ -201,15 +283,16 @@ class ModelRouter:
 
         for path in valid_paths:
             is_dark = os.path.basename(path) in dark_warning_filenames
-            prep_path, is_temp = self._preprocess_image_for_ai(path, is_dark=is_dark)
-            prepared_paths.append(prep_path)
-            if is_temp:
-                temp_files_to_cleanup.append(prep_path)
+            prep_results = self._prepare_image_and_crops_for_ai(path, is_dark=is_dark)
+            for prep_path, is_temp in prep_results:
+                prepared_paths.append(prep_path)
+                if is_temp:
+                    temp_files_to_cleanup.append(prep_path)
 
         t_prep = time.time() - t_prep_start
         logger.info(
             f"[image_preprocessed] {corr_tag}session_id={session_id or 'unknown'} "
-            f"image_count={len(prepared_paths)} elapsed_ms={int(t_prep * 1000)}"
+            f"input_images={len(valid_paths)} total_views_and_crops={len(prepared_paths)} elapsed_ms={int(t_prep * 1000)}"
         )
 
         try:
@@ -261,10 +344,15 @@ class ModelRouter:
                 ocr_context=ocr_context,
                 correlation_id=correlation_id
             )
-            items = ai_result.get("items", [])
+            raw_items = ai_result.get("items", [])
             t_ai = time.time() - t_ai_start
 
-            # 5. Accuracy Alignment: Resolve date conflicts & append warnings
+            # 5. Candidate Deduplication across multi-region crops and overlapping tiles
+            t_dedup_start = time.time()
+            items = self.deduplicate_items(raw_items)
+            t_dedup = time.time() - t_dedup_start
+
+            # 6. Accuracy Alignment: Resolve date conflicts & append warnings
             t_align_start = time.time()
             items = self.align_item_dates(items, ocr_dates=ocr_dates, warnings=warnings)
             t_align = time.time() - t_align_start
@@ -272,8 +360,8 @@ class ModelRouter:
             t_total = time.time() - t0
             logger.info(
                 f"[model_router_completed] {corr_tag}pipeline completed in {t_total:.2f}s: "
-                f"QC={t_qc:.2f}s, Prep={t_prep:.2f}s, OCR={t_ocr:.2f}s, AI={t_ai:.2f}s, Align={t_align:.2f}s "
-                f"(identified {len(items)} items)."
+                f"QC={t_qc:.2f}s, Prep={t_prep:.2f}s, OCR={t_ocr:.2f}s, AI={t_ai:.2f}s, Dedup={t_dedup:.2f}s, Align={t_align:.2f}s "
+                f"(raw={len(raw_items)}, deduplicated={len(items)} items)."
             )
 
             return {
@@ -285,6 +373,7 @@ class ModelRouter:
                     "prep_s": round(t_prep, 2),
                     "ocr_s": round(t_ocr, 2),
                     "ai_s": round(t_ai, 2),
+                    "dedup_s": round(t_dedup, 2),
                     "align_s": round(t_align, 2),
                     "total_s": round(t_total, 2),
                 }
@@ -403,10 +492,109 @@ class ModelRouter:
 
         return items
 
+    @staticmethod
+    def deduplicate_items(items: list) -> list:
+        """
+        Deduplicates candidate grocery items identified across multi-region crops,
+        high-resolution tiles, or multiple views of the same scene.
+        - Preserves all 23 grocery fields.
+        - Merges identical products without inflating quantities: if the same physical item
+          was detected in both overview and detail crops or overlapping tiles, quantity is set to max(q1, q2).
+        - Keeps higher confidence and more complete metadata (printed expiry dates, verified brand, storage advice).
+        - Distinguishes separate items even in the same category (e.g. Red Onions vs White Onions vs Garlic).
+        """
+        if not items:
+            return []
+
+        import re
+
+        def normalize_key(item):
+            name = str(item.get("name") or "").strip().lower()
+            clean_name = re.sub(r'[^a-z0-9]', '', name)
+            brand = re.sub(r'[^a-z0-9]', '', str(item.get("brand") or "").strip().lower())
+            category = str(item.get("category") or "").strip().lower()
+            unit = str(item.get("unit") or "").strip().lower()
+            return clean_name, brand, category, unit
+
+        confidence_rank = {"high": 3, "medium": 2, "low": 1}
+
+        merged_items = []
+        seen_map = {}
+
+        for item in items:
+            clean_name, brand, category, unit = normalize_key(item)
+            if not clean_name:
+                continue
+
+            key = (clean_name, brand, category, unit)
+            fallback_key = (clean_name, category) if not brand else None
+
+            matched_idx = seen_map.get(key)
+            if matched_idx is None and fallback_key:
+                matched_idx = seen_map.get(fallback_key)
+
+            if matched_idx is not None:
+                target = merged_items[matched_idx]
+
+                # 1. Quantity: take max(q1, q2) to prevent double counting across overlapping crops
+                try:
+                    q_existing = float(target.get("quantity") or 1.0)
+                    q_new = float(item.get("quantity") or 1.0)
+                    target["quantity"] = max(q_existing, q_new)
+                except (ValueError, TypeError):
+                    pass
+
+                # 2. Confidence: retain higher confidence level
+                c_existing = confidence_rank.get(str(target.get("confidence") or "").lower(), 1)
+                c_new = confidence_rank.get(str(item.get("confidence") or "").lower(), 1)
+                if c_new > c_existing:
+                    target["confidence"] = item.get("confidence")
+
+                # 3. Name & Brand & Description: keep more descriptive
+                if len(str(item.get("name") or "")) > len(str(target.get("name") or "")):
+                    target["name"] = item.get("name")
+                if not target.get("brand") and item.get("brand"):
+                    target["brand"] = item.get("brand")
+                if not target.get("description") and item.get("description"):
+                    target["description"] = item.get("description")
+
+                # 4. Storage guidance
+                if not target.get("storage_reason") and item.get("storage_reason"):
+                    target["storage_reason"] = item.get("storage_reason")
+                if not target.get("shelf_life_guidance") and item.get("shelf_life_guidance"):
+                    target["shelf_life_guidance"] = item.get("shelf_life_guidance")
+
+                # 5. Expiry Dates: prefer printed/verified over estimated/None
+                if not target.get("expiry_date") and item.get("expiry_date"):
+                    target["expiry_date"] = item.get("expiry_date")
+                    target["is_expiry_estimated"] = item.get("is_expiry_estimated", False)
+                    target["date_source"] = item.get("date_source")
+                    target["raw_date_text"] = item.get("raw_date_text", "")
+                    target["date_type"] = item.get("date_type")
+                    target["date_confidence"] = item.get("date_confidence", "High")
+
+                # 6. Warnings: merge without duplicate strings
+                existing_warnings = set(target.get("warnings") or [])
+                new_warnings = set(item.get("warnings") or [])
+                target["warnings"] = list(existing_warnings.union(new_warnings))
+
+            else:
+                new_item = dict(item)
+                if not isinstance(new_item.get("warnings"), list):
+                    new_item["warnings"] = []
+                idx = len(merged_items)
+                merged_items.append(new_item)
+                seen_map[key] = idx
+                if fallback_key:
+                    seen_map[fallback_key] = idx
+
+        return merged_items
+
     def parse_grocery_response(self, json_data: dict, ocr_dates: dict = None, warnings: list = None) -> dict:
-        """Parses and aligns grocery items from a JSON dictionary."""
+        """Parses, deduplicates, and aligns grocery items from a JSON dictionary."""
         items = json_data.get("items", [])
-        aligned_items = self.align_item_dates(items, ocr_dates=ocr_dates, warnings=warnings)
+        deduped = self.deduplicate_items(items)
+        aligned_items = self.align_item_dates(deduped, ocr_dates=ocr_dates, warnings=warnings)
         return {
             "success": True,
             "items": aligned_items,

@@ -386,4 +386,18 @@ class ScanProvider extends ChangeNotifier {
     _stopPolling();
     super.dispose();
   }
+
+  void setCandidatesForTesting(List<ScanCandidateModel> list) {
+    _candidates = List.from(list);
+    _candidateSelection.clear();
+    for (var c in _candidates) {
+      _candidateSelection[c.id] = c.selected;
+    }
+    notifyListeners();
+  }
+
+  void setUIStateForTesting(ScanUIState state) {
+    _uiState = state;
+    notifyListeners();
+  }
 }
