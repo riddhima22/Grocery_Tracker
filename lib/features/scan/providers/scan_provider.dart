@@ -22,7 +22,10 @@ enum ScanUIState {
 }
 
 class ScanProvider extends ChangeNotifier {
-  final ScanRepository _scanRepository = ScanRepository();
+  final ScanRepository _scanRepository;
+
+  ScanProvider({ScanRepository? scanRepository})
+      : _scanRepository = scanRepository ?? ScanRepository();
 
   final List<XFile> _selectedImages = [];
   ScanUIState _uiState = ScanUIState.idle;
@@ -117,7 +120,7 @@ class ScanProvider extends ChangeNotifier {
     _stopPolling();
 
     int attempts = 0;
-    const maxAttempts = 45; // Max 90 seconds (2s interval)
+    const maxAttempts = 60; // Max 120 seconds / 2 minutes (2s interval)
 
     _pollingTimer = Timer.periodic(const Duration(seconds: 2), (timer) async {
       if (_currentSession == null) {
@@ -127,21 +130,29 @@ class ScanProvider extends ChangeNotifier {
 
       attempts++;
 
-      // Update progressive UI messages based on elapsed time
-      if (attempts == 3) {
-        _scanStageMessage = 'Identifying items...';
+      // Update progressive UI messages based on elapsed time, including server wakeup notice
+      if (attempts == 2) {
+        _scanStageMessage = 'Waking up server & preparing AI...';
+        _scanProgress = 0.55;
+        notifyListeners();
+      } else if (attempts == 6) {
+        _scanStageMessage = 'Analyzing images with vision model...';
         _scanProgress = 0.70;
         notifyListeners();
-      } else if (attempts == 7) {
-        _scanStageMessage = 'Almost done...';
-        _scanProgress = 0.88;
+      } else if (attempts == 12) {
+        _scanStageMessage = 'Identifying items and shelf life...';
+        _scanProgress = 0.85;
+        notifyListeners();
+      } else if (attempts == 20) {
+        _scanStageMessage = 'Almost ready, finalizing candidates...';
+        _scanProgress = 0.92;
         notifyListeners();
       }
 
       if (attempts > maxAttempts) {
         timer.cancel();
         _errorMessage =
-            "Analysis is taking longer than expected. Please try again.";
+            "Analysis is taking longer than expected. The server might be waking up — please try again.";
         _uiState = ScanUIState.error;
         notifyListeners();
         return;
@@ -174,16 +185,24 @@ class ScanProvider extends ChangeNotifier {
           notifyListeners();
         } else if (session.status == 'failed') {
           timer.cancel();
-          final firstError = session.images
-              .firstWhere(
-                (img) => img.errorMessage.isNotEmpty,
-                orElse: () =>
-                    const ScanImageModel(id: '', status: '', errorMessage: ''),
-              )
-              .errorMessage;
+          String failureMsg =
+              session.errorMessage.isNotEmpty ? session.errorMessage : '';
+          if (failureMsg.isEmpty) {
+            final firstError = session.images
+                .firstWhere(
+                  (img) => img.errorMessage.isNotEmpty,
+                  orElse: () => const ScanImageModel(
+                    id: '',
+                    status: '',
+                    errorMessage: '',
+                  ),
+                )
+                .errorMessage;
+            failureMsg = firstError;
+          }
 
-          _errorMessage = firstError.isNotEmpty
-              ? firstError
+          _errorMessage = failureMsg.isNotEmpty
+              ? failureMsg
               : "Analysis could not identify grocery items. Please try a clearer picture.";
           _uiState = ScanUIState.error;
           notifyListeners();
