@@ -384,17 +384,16 @@ class ScanFlowAsyncAndPollingTests(APITestCase):
         buf.seek(0)
         return SimpleUploadedFile(filename, buf.read(), content_type="image/jpeg")
 
-    def test_post_scan_session_returns_202_accepted_and_processing_status(self):
+    def test_post_scan_session_returns_201_or_202_and_queued_status(self):
         """
-        POST /api/v1/scans/sessions/ must return HTTP 202 Accepted immediately
-        with status 'processing' and the session ID, without blocking the web worker.
+        POST /api/v1/scans/sessions/ returns HTTP 201/202 immediately
+        with session ID and queued status, without blocking the web worker.
         """
         from unittest.mock import patch
 
         image_file = self._create_dummy_image_file()
 
-        with patch("apps.scans.views.threading.Thread"), \
-             patch("apps.scans.tasks.process_scan_session_task.delay") as mock_delay:
+        with patch("apps.scans.views.process_scan_session_task.delay") as mock_delay:
             mock_delay.return_value = None
             response = self.client.post(
                 "/api/v1/scans/sessions/",
@@ -402,16 +401,16 @@ class ScanFlowAsyncAndPollingTests(APITestCase):
                 format="multipart"
             )
 
-        self.assertEqual(response.status_code, 202)
+        self.assertIn(response.status_code, [201, 202])
         self.assertTrue(response.data.get("success"))
         data = response.data.get("data", {})
         session_id = data.get("id")
         self.assertIsNotNone(session_id)
-        self.assertEqual(data.get("status"), "processing")
+        self.assertIn(data.get("status"), ["pending", "processing"])
 
-        # Verify session in database is in processing status
+        # Verify session in database is in pending/processing status
         session = ScanSession.objects.get(id=session_id)
-        self.assertEqual(session.status, ScanSession.Statuses.PROCESSING)
+        self.assertIn(session.status, [ScanSession.Statuses.PENDING, ScanSession.Statuses.PROCESSING])
         self.assertEqual(session.image_count, 1)
 
     def test_polling_get_scan_session_endpoint(self):
@@ -523,4 +522,109 @@ class ScanFlowAsyncAndPollingTests(APITestCase):
 
 
 
+import io
+import logging
+from PIL import Image
+from unittest.mock import patch, MagicMock
+from kombu.exceptions import OperationalError
+from django.core.files.uploadedfile import SimpleUploadedFile
+from apps.scans import views as scan_views
+from apps.scans.models import ScanImage, ScanSession
 
+
+def create_test_image(filename="scan_test.jpg"):
+    buf = io.BytesIO()
+    img = Image.new("RGB", (50, 50), color="blue")
+    img.save(buf, format="JPEG")
+    return SimpleUploadedFile(filename, buf.getvalue(), content_type="image/jpeg")
+
+
+class ScanDispatchAndLoggerTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="celery_test_user@example.com",
+            password="StrongPassword123!",
+            display_name="Celery Tester"
+        )
+        self.client.force_authenticate(user=self.user)
+
+    def test_logger_is_initialized_in_views(self):
+        """Task 1: Verify logger is correctly initialized at module level in scans/views.py."""
+        self.assertTrue(hasattr(scan_views, 'logger'))
+        self.assertIsInstance(scan_views.logger, logging.Logger)
+        self.assertEqual(scan_views.logger.name, 'freshtrack.scans.views')
+
+    @patch("apps.scans.views.process_scan_session_task.delay")
+    def test_successful_scan_upload_dispatches_async_task(self, mock_delay):
+        """Task 5 & 8: Verify successful scan upload queues process_scan_session_task asynchronously."""
+        img = create_test_image("produce.jpg")
+        response = self.client.post(
+            "/api/v1/scans/sessions/",
+            {"images": [img]},
+            format="multipart"
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(response.data["success"])
+        session_id = response.data["data"]["id"]
+
+        session = ScanSession.objects.get(id=session_id)
+        self.assertEqual(session.status, ScanSession.Statuses.PENDING)
+        self.assertEqual(session.image_count, 1)
+
+        mock_delay.assert_called_once_with(str(session_id))
+
+    @patch("apps.scans.views.process_scan_session_task.apply")
+    @patch("apps.scans.views.process_scan_session_task.delay")
+    def test_celery_broker_failure_marks_session_failed_and_does_not_run_sync(self, mock_delay, mock_apply):
+        """
+        Tasks 6, 7 & 9:
+        When Celery fails to queue (e.g. Kombu broker OperationalError),
+        the session and images MUST be marked as FAILED (not permanently stuck in PENDING),
+        synchronous apply() MUST NOT be called, and an HTTP 503 error is returned.
+        """
+        broker_err = OperationalError("Error 111 connecting to redis:6379. Connection refused.")
+        mock_delay.side_effect = broker_err
+
+        with self.assertLogs(scan_views.logger, level="ERROR") as log_capture:
+            img = create_test_image("receipt.jpg")
+            response = self.client.post(
+                "/api/v1/scans/sessions/",
+                {"images": [img]},
+                format="multipart"
+            )
+
+        # 1. API returns 503 Service Unavailable
+        self.assertEqual(response.status_code, 503)
+        self.assertFalse(response.data["success"])
+        self.assertEqual(response.data["error"]["code"], "TASK_DISPATCH_FAILED")
+        self.assertIn("Connection refused", response.data["error"]["details"])
+
+        session_id = response.data["error"]["session_id"]
+        session = ScanSession.objects.get(id=session_id)
+
+        # 2. Session is NOT stuck in PENDING
+        self.assertEqual(session.status, ScanSession.Statuses.FAILED)
+        self.assertIsNotNone(session.completed_at)
+
+        # 3. ScanImage records are marked FAILED
+        scan_image = session.images.first()
+        self.assertIsNotNone(scan_image)
+        self.assertEqual(scan_image.status, ScanImage.Statuses.FAILED)
+        self.assertIn("Failed to enqueue", scan_image.error_message)
+
+        # 4. Synchronous fallback (apply) was NEVER called
+        mock_apply.assert_not_called()
+
+        # 5. Error was logged with exception details
+        self.assertTrue(any("Celery task dispatch failed" in msg for msg in log_capture.output))
+
+
+class CeleryBrokerConfigRegistrationTests(TestCase):
+    def test_task_registered_in_celery_registry(self):
+        """Task 5: Ensure process_scan_session_task is registered in Celery app registry."""
+        from config.celery import app as celery_app
+        import apps.scans.tasks  # noqa: F401
+
+        task_name = "apps.scans.tasks.process_scan_session_task"
+        self.assertIn(task_name, celery_app.tasks)
