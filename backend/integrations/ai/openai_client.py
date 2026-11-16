@@ -1,15 +1,17 @@
 import base64
 import json
 import logging
+import os
 
 from django.conf import settings
 from django.utils import timezone
 
 try:
-    from openai import OpenAI
+    from openai import AuthenticationError, OpenAI
     OPENAI_AVAILABLE = True
 except ImportError:
     OpenAI = None
+    AuthenticationError = None
     OPENAI_AVAILABLE = False
 
 from .base import GroceryVisionService, MealInferenceService, RecipeGenerationService
@@ -22,21 +24,74 @@ from .prompts import (
 
 logger = logging.getLogger('freshtrack.ai.openai')
 
+
+class OpenAIAuthenticationError(Exception):
+    """
+    Raised when the OpenAI API rejects credentials (HTTP 401).
+    Classified as a permanent configuration failure, not a transient error.
+    """
+    status_code = 401
+    is_configuration_error = True
+
+
+def is_openai_auth_error(exc: Exception) -> bool:
+    """Detects whether an exception is an OpenAI 401 authentication/key error."""
+    if AuthenticationError and isinstance(exc, AuthenticationError):
+        return True
+    if getattr(exc, 'status_code', None) == 401 or getattr(exc, 'code', None) == 401:
+        return True
+    msg = str(exc).lower()
+    return '401' in msg and ('api key' in msg or 'authentication' in msg or 'unauthorized' in msg or 'incorrect' in msg)
+
+
 class OpenAIClient(GroceryVisionService, RecipeGenerationService, MealInferenceService):
-    def __init__(self):
-        self.api_key = getattr(settings, 'OPENAI_API_KEY', '')
+    def __init__(self, api_key: str = None):
+        # Prefer direct argument or fresh os.environ over cached settings
+        raw_key = api_key if api_key is not None else (
+            os.environ.get('OPENAI_API_KEY') or getattr(settings, 'OPENAI_API_KEY', '')
+        )
+        self.api_key = raw_key.strip().strip('\'"') if isinstance(raw_key, str) else ''
         self.enabled = bool(self.api_key and OPENAI_AVAILABLE)
-        self.model_name = getattr(settings, 'OPENAI_MODEL_NAME', 'gpt-4o-mini')
+
+        raw_model = getattr(settings, 'OPENAI_MODEL_NAME', 'gpt-4o-mini')
+        self.model_name = raw_model.strip().strip('\'"') if isinstance(raw_model, str) else 'gpt-4o-mini'
+
+        raw_project = os.environ.get('OPENAI_PROJECT_ID') or getattr(settings, 'OPENAI_PROJECT_ID', None)
+        self.project = raw_project.strip().strip('\'"') if isinstance(raw_project, str) and raw_project.strip() else None
+
+        raw_org = os.environ.get('OPENAI_ORG_ID') or getattr(settings, 'OPENAI_ORG_ID', None)
+        self.organization = raw_org.strip().strip('\'"') if isinstance(raw_org, str) and raw_org.strip() else None
+
+        raw_base_url = os.environ.get('OPENAI_BASE_URL') or getattr(settings, 'OPENAI_BASE_URL', None)
+        self.base_url = raw_base_url.strip().strip('\'"') if isinstance(raw_base_url, str) and raw_base_url.strip() else None
 
         self.client = None
         if self.enabled:
             try:
-                self.client = OpenAI(api_key=self.api_key)
+                client_kwargs = {'api_key': self.api_key}
+                if self.project:
+                    client_kwargs['project'] = self.project
+                if self.organization:
+                    client_kwargs['organization'] = self.organization
+                if self.base_url:
+                    client_kwargs['base_url'] = self.base_url
+                self.client = OpenAI(**client_kwargs)
+                logger.info(
+                    "OpenAI client initialized safely. "
+                    "Key configured: True, Model: %s, Project: %s, Org: %s",
+                    self.model_name,
+                    "configured" if self.project else "default",
+                    "configured" if self.organization else "default",
+                )
             except Exception as e:
                 logger.warning(f"Failed to initialize OpenAI client: {e}")
                 self.enabled = False
         else:
-            logger.warning("OPENAI_API_KEY is missing or openai package not available. OpenAI client disabled.")
+            logger.info(
+                "OpenAI client is disabled. Key configured: %s, OpenAI SDK available: %s",
+                bool(self.api_key),
+                OPENAI_AVAILABLE,
+            )
 
     def _encode_image_to_base64(self, image_path: str) -> str:
         with open(image_path, "rb") as img_file:
@@ -91,6 +146,17 @@ class OpenAIClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
             return data
 
         except Exception as e:
+            if is_openai_auth_error(e):
+                self.enabled = False
+                logger.critical(
+                    "OpenAI API authentication failed (HTTP 401: Incorrect API key provided). "
+                    "This is a permanent configuration failure. Please verify the OPENAI_API_KEY "
+                    "environment variable in your Render Web Service and Celery Worker settings."
+                )
+                raise OpenAIAuthenticationError(
+                    "OpenAI API authentication failed (401 Incorrect API key provided). "
+                    "Please configure a valid OPENAI_API_KEY in Render."
+                ) from e
             logger.error(f"OpenAI scan analysis failed: {e}", exc_info=True)
             raise e
 
@@ -129,6 +195,17 @@ class OpenAIClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
             return data
 
         except Exception as e:
+            if is_openai_auth_error(e):
+                self.enabled = False
+                logger.critical(
+                    "OpenAI API authentication failed (HTTP 401: Incorrect API key provided). "
+                    "This is a permanent configuration failure. Please verify the OPENAI_API_KEY "
+                    "environment variable in your Render Web Service and Celery Worker settings."
+                )
+                raise OpenAIAuthenticationError(
+                    "OpenAI API authentication failed (401 Incorrect API key provided). "
+                    "Please configure a valid OPENAI_API_KEY in Render."
+                ) from e
             logger.error(f"OpenAI recipe generation failed: {e}", exc_info=True)
             raise e
 
@@ -172,5 +249,16 @@ class OpenAIClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
             return data
 
         except Exception as e:
+            if is_openai_auth_error(e):
+                self.enabled = False
+                logger.critical(
+                    "OpenAI API authentication failed (HTTP 401: Incorrect API key provided). "
+                    "This is a permanent configuration failure. Please verify the OPENAI_API_KEY "
+                    "environment variable in your Render Web Service and Celery Worker settings."
+                )
+                raise OpenAIAuthenticationError(
+                    "OpenAI API authentication failed (401 Incorrect API key provided). "
+                    "Please configure a valid OPENAI_API_KEY in Render."
+                ) from e
             logger.error(f"OpenAI meal inference failed: {e}", exc_info=True)
             raise e

@@ -53,3 +53,44 @@ def check_packaging_installed_for_kombu(app_configs, **kwargs):
             )
         )
     return errors
+
+
+@register(Tags.compatibility)
+def check_openai_configuration(app_configs, **kwargs):
+    """
+    Safe startup configuration check for OpenAI API credentials.
+    Reports whether the key is configured without ever logging, printing,
+    or exposing any part or character of the key.
+    """
+    messages = []
+    import os
+    raw_key = os.environ.get('OPENAI_API_KEY') or getattr(settings, 'OPENAI_API_KEY', '')
+    is_key_present = bool(isinstance(raw_key, str) and raw_key.strip().strip('\'"'))
+
+    provider_order = [p.lower().strip() for p in getattr(settings, 'AI_PROVIDER_ORDER', ['gemini', 'openai'])]
+
+    if 'openai' in provider_order:
+        try:
+            import openai  # noqa: F401
+        except ImportError:
+            messages.append(
+                Warning(
+                    'The "openai" package is not installed, but "openai" is listed in AI_PROVIDER_ORDER.',
+                    hint='Ensure openai>=1.0.0 is installed in your environment.',
+                    id='freshtrack.W002',
+                )
+            )
+
+        if not is_key_present:
+            messages.append(
+                Warning(
+                    'OPENAI_API_KEY is not configured or is empty.',
+                    hint=(
+                        'Set OPENAI_API_KEY in Render environment variables for both the '
+                        'Web Service and the Celery Background Worker to enable OpenAI fallback.'
+                    ),
+                    id='freshtrack.W003',
+                )
+            )
+
+    return messages

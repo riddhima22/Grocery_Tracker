@@ -4,7 +4,7 @@ from django.conf import settings
 
 from .base import GroceryVisionService, MealInferenceService, RecipeGenerationService
 from .gemini_client import AIContentBlockedError, GeminiClient
-from .openai_client import OpenAIClient
+from .openai_client import OpenAIAuthenticationError, OpenAIClient
 
 logger = logging.getLogger('freshtrack.ai.service')
 
@@ -56,8 +56,11 @@ class AIService(GroceryVisionService, RecipeGenerationService, MealInferenceServ
                 logger.warning(f"AI provider '{name}' content blocked during grocery scan: {e}")
                 errors.append(f"{name}: {e}")
                 blocked_count += 1
+            except OpenAIAuthenticationError as e:
+                logger.critical(f"AI provider '{name}' authentication/configuration failure: {e}")
+                errors.append(f"{name}: Configuration error - invalid/incorrect API key (401)")
             except Exception as e:
-                logger.warning(f"AI provider '{name}' failed during grocery scan: {e}")
+                logger.warning(f"AI provider '{name}' failed during grocery scan: {e}. Attempting fallback...")
                 errors.append(f"{name}: {e}")
 
         logger.error(f"All AI providers failed for analyze_grocery_images. Errors: {errors}")
@@ -84,8 +87,11 @@ class AIService(GroceryVisionService, RecipeGenerationService, MealInferenceServ
                 logger.warning(f"AI provider '{name}' content blocked during recipe generation: {e}")
                 errors.append(f"{name}: {e}")
                 blocked_count += 1
+            except OpenAIAuthenticationError as e:
+                logger.critical(f"AI provider '{name}' authentication/configuration failure: {e}")
+                errors.append(f"{name}: Configuration error - invalid/incorrect API key (401)")
             except Exception as e:
-                logger.warning(f"AI provider '{name}' failed during recipe generation: {e}")
+                logger.warning(f"AI provider '{name}' failed during recipe generation: {e}. Attempting fallback...")
                 errors.append(f"{name}: {e}")
 
         logger.error(f"All AI providers failed for generate_recipes. Errors: {errors}")
@@ -112,8 +118,11 @@ class AIService(GroceryVisionService, RecipeGenerationService, MealInferenceServ
                 logger.warning(f"AI provider '{name}' content blocked during meal ingredient inference: {e}")
                 errors.append(f"{name}: {e}")
                 blocked_count += 1
+            except OpenAIAuthenticationError as e:
+                logger.critical(f"AI provider '{name}' authentication/configuration failure: {e}")
+                errors.append(f"{name}: Configuration error - invalid/incorrect API key (401)")
             except Exception as e:
-                logger.warning(f"AI provider '{name}' failed during meal ingredient inference: {e}")
+                logger.warning(f"AI provider '{name}' failed during meal ingredient inference: {e}. Attempting fallback...")
                 errors.append(f"{name}: {e}")
 
         logger.error(f"All AI providers failed for infer_meal_ingredients. Errors: {errors}")

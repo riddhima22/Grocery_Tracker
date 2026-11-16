@@ -520,6 +520,51 @@ class ScanFlowAsyncAndPollingTests(APITestCase):
         self.assertIn("items", res)
         self.assertEqual(res["items"][0]["name"], "Organic Whole Milk")
 
+    def test_gemini_503_falls_back_to_openai(self):
+        """When Gemini returns 503 Service Unavailable, AIService falls back to OpenAI."""
+        from integrations.ai.ai_service import AIService
+
+        class ServiceUnavailableGeminiProvider:
+            def analyze_grocery_images(self, *args, **kwargs):
+                raise RuntimeError("Couldn't reach the AI service. 503 Service Unavailable.")
+
+        class SuccessfulOpenAIProvider:
+            def analyze_grocery_images(self, *args, **kwargs):
+                return {
+                    "items": [
+                        {
+                            "name": "Fresh Apples",
+                            "quantity": 3.0,
+                            "unit": "pcs",
+                            "confidence": "High",
+                            "storage_zone": "fridge",
+                        }
+                    ]
+                }
+
+        service = AIService(
+            provider_order=["gemini", "openai"],
+            provider_instances={
+                "gemini": ServiceUnavailableGeminiProvider(),
+                "openai": SuccessfulOpenAIProvider(),
+            }
+        )
+
+        res = service.analyze_grocery_images(["/dummy/path.jpg"])
+        self.assertIn("items", res)
+        self.assertEqual(res["items"][0]["name"], "Fresh Apples")
+
+    def test_openai_401_error_is_classified_as_permanent_in_tasks(self):
+        """Verify that OpenAIAuthenticationError and 401 errors are NOT transient (no Celery retries)."""
+        from apps.scans.tasks import is_transient_error
+        from integrations.ai.openai_client import OpenAIAuthenticationError
+
+        auth_err = OpenAIAuthenticationError("401 Incorrect API key provided")
+        self.assertFalse(is_transient_error(auth_err))
+
+        wrapped_err = Exception("All AI providers failed: openai: Configuration error - invalid/incorrect API key (401)")
+        self.assertFalse(is_transient_error(wrapped_err))
+
     def test_health_check_endpoints_return_200(self):
         """Verify /health, /health/, and /api/v1/health/ all return 200 OK."""
         for path in ["/health", "/health/", "/api/v1/health/"]:

@@ -353,7 +353,7 @@ class GoogleVisionAndPromptTests(TestCase):
             self.assertIsNone(ocr.client)
 
     def test_object_localization(self):
-        import io
+        from unittest.mock import mock_open
 
         from integrations.ocr.google_vision_client import GoogleCloudVisionOCR
 
@@ -374,7 +374,7 @@ class GoogleVisionAndPromptTests(TestCase):
         ocr.enabled = True
         ocr.client = mock_annotator
 
-        with patch("io.open", return_value=io.BytesIO(b"fake_image_bytes")):
+        with patch("builtins.open", mock_open(read_data=b"fake_image_bytes")):
             results = ocr.object_localization("/fake/image.jpg")
             self.assertEqual(len(results), 2)
             self.assertEqual(results[0]["name"], "Milk")
@@ -398,6 +398,137 @@ class GoogleVisionAndPromptTests(TestCase):
         self.assertIn("grouping rule", GROCERY_SCAN_PROMPT.lower())
         self.assertIn("combine them into one", SYSTEM_INSTRUCTION.lower())
         self.assertIn("combine them into one", GROCERY_SCAN_PROMPT.lower())
+
+
+class OpenAIClientMockTests(TestCase):
+    def test_openai_client_key_sanitization(self):
+        from integrations.ai.openai_client import OpenAIClient
+        client = OpenAIClient(api_key='  "sk-test-mocked-key"  ')
+        self.assertEqual(client.api_key, "sk-test-mocked-key")
+
+    @patch("integrations.ai.openai_client.OpenAI")
+    def test_openai_client_scan_success(self, MockOpenAI):
+        import json
+        import os
+        import tempfile
+
+        from integrations.ai.openai_client import OpenAIClient
+
+        mock_instance = MockOpenAI.return_value
+        mock_choice = MagicMock()
+        mock_choice.message.content = json.dumps({
+            "items": [
+                {
+                    "name": "OpenAI Sourdough Bread",
+                    "category": "Bakery",
+                    "quantity": 1,
+                    "unit": "loaf",
+                    "confidence": "High"
+                }
+            ]
+        })
+        mock_response = MagicMock()
+        mock_response.choices = [mock_choice]
+        mock_instance.chat.completions.create.return_value = mock_response
+
+        client = OpenAIClient(api_key="sk-valid-key")
+        client.client = mock_instance
+        client.enabled = True
+
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f:
+            f.write(b"fake_jpeg_content")
+            temp_path = f.name
+
+        try:
+            result = client.analyze_grocery_images([temp_path])
+            self.assertIn("items", result)
+            self.assertEqual(result["items"][0]["name"], "OpenAI Sourdough Bread")
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+
+    @patch("integrations.ai.openai_client.OpenAI")
+    def test_openai_client_401_authentication_error(self, MockOpenAI):
+        import os
+        import tempfile
+
+        import httpx
+        from openai import AuthenticationError
+
+        from integrations.ai.openai_client import OpenAIAuthenticationError, OpenAIClient
+
+        mock_instance = MockOpenAI.return_value
+        mock_response = httpx.Response(
+            status_code=401,
+            request=httpx.Request("POST", "https://api.openai.com/v1/chat/completions")
+        )
+        auth_err = AuthenticationError("401 Incorrect API key provided", response=mock_response, body=None)
+        mock_instance.chat.completions.create.side_effect = auth_err
+
+        client = OpenAIClient(api_key="sk-bad-key")
+        client.client = mock_instance
+        client.enabled = True
+
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f:
+            f.write(b"fake_jpeg_content")
+            temp_path = f.name
+
+        try:
+            with self.assertRaises(OpenAIAuthenticationError) as ctx:
+                client.analyze_grocery_images([temp_path])
+            self.assertIn("401", str(ctx.exception))
+            self.assertFalse(client.enabled)
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+
+    def test_gemini_503_triggers_openai_fallback(self):
+        gemini = DummyProvider(name="gemini", fail=True)
+        openai = DummyProvider(name="openai", return_val={"items": [{"name": "Fallback Spinach"}]})
+
+        service = AIService(
+            provider_order=["gemini", "openai"],
+            provider_instances={"gemini": gemini, "openai": openai}
+        )
+
+        res = service.analyze_grocery_images(["/fake/path.jpg"])
+        self.assertEqual(res["items"][0]["name"], "Fallback Spinach")
+
+    def test_gemini_504_triggers_openai_fallback(self):
+        class Gemini504Provider(DummyProvider):
+            def analyze_grocery_images(self, *args, **kwargs):
+                raise RuntimeError("504 Gateway Timeout / Deadline Exceeded")
+
+        gemini = Gemini504Provider(name="gemini")
+        openai = DummyProvider(name="openai", return_val={"items": [{"name": "Fallback Eggs"}]})
+
+        service = AIService(
+            provider_order=["gemini", "openai"],
+            provider_instances={"gemini": gemini, "openai": openai}
+        )
+
+        res = service.analyze_grocery_images(["/fake/path.jpg"])
+        self.assertEqual(res["items"][0]["name"], "Fallback Eggs")
+
+    def test_checks_openai_reports_presence_without_exposing_key(self):
+        import os
+
+        from config.checks import check_openai_configuration
+
+        # Test when key is present
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "sk-super-secret-key-12345"}):
+            warnings = check_openai_configuration(None)
+            warning_texts = [str(w.msg) + str(w.hint) for w in warnings]
+            for text in warning_texts:
+                self.assertNotIn("secret", text.lower())
+                self.assertNotIn("12345", text)
+                self.assertNotIn("sk-", text)
+
+        # Test when key is empty
+        with patch.dict(os.environ, {"OPENAI_API_KEY": ""}):
+            with override_settings(OPENAI_API_KEY=""):
+                warnings = check_openai_configuration(None)
+                self.assertTrue(any(w.id == "freshtrack.W003" for w in warnings))
 
 
 

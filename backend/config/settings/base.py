@@ -301,8 +301,16 @@ AI_REQUEST_TIMEOUT_SECONDS = env.int('AI_REQUEST_TIMEOUT_SECONDS', default=45)
 GEMINI_TIMEOUT_SECONDS = env.int('GEMINI_TIMEOUT_SECONDS', default=AI_REQUEST_TIMEOUT_SECONDS)
 
 # OpenAI configuration
-OPENAI_API_KEY = env('OPENAI_API_KEY', default='')
-OPENAI_MODEL_NAME = env('OPENAI_MODEL_NAME', default='gpt-4o-mini')
+_raw_openai_key = env('OPENAI_API_KEY', default='')
+OPENAI_API_KEY = _raw_openai_key.strip().strip('\'"') if isinstance(_raw_openai_key, str) else ''
+_raw_openai_model = env('OPENAI_MODEL_NAME', default='gpt-4o-mini')
+OPENAI_MODEL_NAME = _raw_openai_model.strip().strip('\'"') if isinstance(_raw_openai_model, str) else 'gpt-4o-mini'
+_raw_openai_project = env('OPENAI_PROJECT_ID', default='')
+OPENAI_PROJECT_ID = _raw_openai_project.strip().strip('\'"') if isinstance(_raw_openai_project, str) and _raw_openai_project.strip() else None
+_raw_openai_org = env('OPENAI_ORG_ID', default='')
+OPENAI_ORG_ID = _raw_openai_org.strip().strip('\'"') if isinstance(_raw_openai_org, str) and _raw_openai_org.strip() else None
+_raw_openai_base_url = env('OPENAI_BASE_URL', default='')
+OPENAI_BASE_URL = _raw_openai_base_url.strip().strip('\'"') if isinstance(_raw_openai_base_url, str) and _raw_openai_base_url.strip() else None
 
 # AI Provider Fallback Order
 AI_PROVIDER_ORDER = env.list('AI_PROVIDER_ORDER', default=['gemini', 'openai'])

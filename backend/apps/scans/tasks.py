@@ -8,6 +8,7 @@ from django.utils import timezone
 
 from integrations.ai.gemini_client import AIContentBlockedError
 from integrations.ai.model_router import ModelRouter
+from integrations.ai.openai_client import OpenAIAuthenticationError
 
 from .models import ScanCandidate, ScanImage, ScanSession
 
@@ -18,9 +19,9 @@ def is_transient_error(exc: Exception) -> bool:
     """
     Distinguishes transient/retryable errors (rate limits, 429, 5xx, network timeouts,
     retryable google.api_core exceptions) from permanent errors (bad image, schema violation,
-    safety block).
+    safety block, authentication/configuration failure).
     """
-    if isinstance(exc, AIContentBlockedError):
+    if isinstance(exc, (AIContentBlockedError, OpenAIAuthenticationError)):
         return False
 
     # Check for google-api-core retryable exceptions
@@ -52,12 +53,21 @@ def is_transient_error(exc: Exception) -> bool:
         return True
 
     status_code = getattr(exc, 'status_code', None) or getattr(exc, 'code', None)
-    if status_code in (429, 500, 502, 503, 504):
-        return True
     if status_code in (400, 401, 403, 404):
         return False
+    if status_code in (429, 500, 502, 503, 504):
+        return True
 
     msg = str(exc).lower()
+
+    # Permanent authentication & configuration failures (never retry)
+    auth_config_indicators = [
+        'authenticationerror', 'openaiauthenticationerror', 'incorrect api key',
+        'invalid api key', 'api_key_invalid', 'unauthenticated', 'invalid_api_key',
+        'unauthorized', 'permissiondenied', 'configuration error', '401'
+    ]
+    if any(ind in msg for ind in auth_config_indicators):
+        return False
 
     # Permanent failure indicators (do not retry)
     permanent_indicators = [

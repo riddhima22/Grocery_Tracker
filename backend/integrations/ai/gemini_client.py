@@ -337,10 +337,17 @@ class GeminiClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
             except Exception as e:
                 attempt_elapsed = time.time() - attempt_start
                 last_exception = e
-                logger.warning(
-                    f"Gemini model '{model_name}' failed after {attempt_elapsed:.2f}s: {e}. "
-                    f"Attempting fallback model..."
-                )
+                err_msg = str(e).lower()
+                if any(k in err_msg for k in ['503', '504', 'service unavailable', 'deadline exceeded', 'timed out', 'timeout']):
+                    logger.warning(
+                        f"Gemini model '{model_name}' encountered 503/504/timeout after {attempt_elapsed:.2f}s: {e}. "
+                        f"Attempting fallback model or downstream AI provider..."
+                    )
+                else:
+                    logger.warning(
+                        f"Gemini model '{model_name}' failed after {attempt_elapsed:.2f}s: {e}. "
+                        f"Attempting fallback model..."
+                    )
 
         total_elapsed = time.time() - overall_start
         msg = translate_gemini_error(last_exception, raw_text=raw_text, stage_name="scan analysis")
