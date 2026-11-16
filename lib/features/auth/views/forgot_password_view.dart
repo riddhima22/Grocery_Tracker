@@ -34,7 +34,7 @@ class _ForgotPasswordViewState extends State<ForgotPasswordView> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    
+
     final auth = context.read<AuthProvider>();
     final success = await auth.requestPasswordReset(_emailController.text);
     if (success) {
@@ -57,7 +57,9 @@ class _ForgotPasswordViewState extends State<ForgotPasswordView> {
             horizontal: AppSpacing.pageHorizontal(context),
             vertical: AppSpacing.pageVertical(context),
           ),
-          child: _sentSuccessfully ? _buildSuccessState() : _buildFormState(auth),
+          child: _sentSuccessfully
+              ? _buildSuccessState()
+              : _buildFormState(auth),
         ),
       ),
     );
@@ -70,17 +72,16 @@ class _ForgotPasswordViewState extends State<ForgotPasswordView> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           AppGap.md(context),
-          Text(
-            'Reset Password',
-            style: AppTextStyles.displayMedium(context),
-          ),
+          Text('Reset Password', style: AppTextStyles.displayMedium(context)),
           AppGap.sm(context),
           Text(
             'Enter the email address associated with your account and we\'ll send you a password reset link.',
-            style: AppTextStyles.bodyLarge(context).copyWith(color: AppColors.textSecondary),
+            style: AppTextStyles.bodyLarge(
+              context,
+            ).copyWith(color: AppColors.textSecondary),
           ),
           AppGap.lg(context),
-          
+
           AppErrorBanner(
             errorMessage: auth.errorMessage,
             onClose: () {
@@ -88,7 +89,7 @@ class _ForgotPasswordViewState extends State<ForgotPasswordView> {
             },
           ),
           AppGap.sm(context),
-          
+
           AppTextField(
             controller: _emailController,
             label: 'Email Address',
@@ -99,13 +100,10 @@ class _ForgotPasswordViewState extends State<ForgotPasswordView> {
             onFieldSubmitted: (_) => _submit(),
           ),
           AppGap.lg(context),
-          
-          AppButton(
-            text: 'Send Reset Link',
-            onPressed: _submit,
-          ),
+
+          AppButton(text: 'Send Reset Link', onPressed: _submit),
           const Spacer(),
-          
+
           Center(
             child: TextButton(
               onPressed: () {
@@ -113,10 +111,12 @@ class _ForgotPasswordViewState extends State<ForgotPasswordView> {
               },
               child: Text(
                 'Back to Sign In',
-                style: AppTextStyles.labelMedium(context).copyWith(color: AppColors.primary),
+                style: AppTextStyles.labelMedium(
+                  context,
+                ).copyWith(color: AppColors.primary),
               ),
             ),
-          )
+          ),
         ],
       ),
     );
@@ -137,7 +137,10 @@ class _ForgotPasswordViewState extends State<ForgotPasswordView> {
           decoration: BoxDecoration(
             color: AppColors.success.withValues(alpha: 0.12),
             shape: BoxShape.circle,
-            border: Border.all(color: AppColors.success.withValues(alpha: 0.3), width: 1.5),
+            border: Border.all(
+              color: AppColors.success.withValues(alpha: 0.3),
+              width: 1.5,
+            ),
           ),
           child: Center(
             child: Icon(
@@ -148,10 +151,7 @@ class _ForgotPasswordViewState extends State<ForgotPasswordView> {
           ),
         ),
         AppGap.md(context),
-        Text(
-          'Email Sent!',
-          style: AppTextStyles.displayMedium(context),
-        ),
+        Text('Email Sent!', style: AppTextStyles.displayMedium(context)),
         AppGap.sm(context),
         Text(
           'We have sent a secure password reset link to your email address: ${_emailController.text}. Please check your spam folder if you do not receive it shortly.',
@@ -162,7 +162,11 @@ class _ForgotPasswordViewState extends State<ForgotPasswordView> {
         AppButton(
           text: 'Back to Login',
           onPressed: () {
-            Navigator.pushNamedAndRemoveUntil(context, AppRoutes.login, (route) => false);
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              AppRoutes.login,
+              (route) => false,
+            );
           },
         ),
       ],

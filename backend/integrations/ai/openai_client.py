@@ -1,9 +1,9 @@
 import base64
 import json
 import logging
+
 from django.conf import settings
 from django.utils import timezone
-from PIL import Image
 
 try:
     from openai import OpenAI
@@ -12,8 +12,13 @@ except ImportError:
     OpenAI = None
     OPENAI_AVAILABLE = False
 
-from .base import GroceryVisionService, RecipeGenerationService, MealInferenceService
-from .prompts import SYSTEM_INSTRUCTION, GROCERY_SCAN_PROMPT, RECIPE_GENERATION_PROMPT, MEAL_INFERENCE_PROMPT
+from .base import GroceryVisionService, MealInferenceService, RecipeGenerationService
+from .prompts import (
+    GROCERY_SCAN_PROMPT,
+    MEAL_INFERENCE_PROMPT,
+    RECIPE_GENERATION_PROMPT,
+    SYSTEM_INSTRUCTION,
+)
 
 logger = logging.getLogger('freshtrack.ai.openai')
 
@@ -41,9 +46,7 @@ class OpenAIClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
         text = text.strip()
         if text.startswith('```'):
             lines = text.splitlines()
-            if lines[0].startswith('```json'):
-                text = '\n'.join(lines[1:-1])
-            elif lines[0].startswith('```'):
+            if lines[0].startswith('```json') or lines[0].startswith('```'):
                 text = '\n'.join(lines[1:-1])
         return text.strip()
 

@@ -60,10 +60,9 @@ class DashboardAnalyticsEmptyState extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             'Start scanning groceries to generate insights.',
-            style: AppTextStyles.bodyMedium(context).copyWith(
-              color: AppColors.textSecondary,
-              height: 1.35,
-            ),
+            style: AppTextStyles.bodyMedium(
+              context,
+            ).copyWith(color: AppColors.textSecondary, height: 1.35),
             textAlign: TextAlign.center,
           ),
         ],

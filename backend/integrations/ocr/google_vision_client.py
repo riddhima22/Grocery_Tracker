@@ -1,10 +1,11 @@
-import io
-import os
 import json
 import logging
+import os
+
 from django.conf import settings
 from google.cloud import vision
 from google.oauth2 import service_account
+
 from .base import OCRService
 
 logger = logging.getLogger('freshtrack.ocr.google_vision')
@@ -50,11 +51,11 @@ class GoogleCloudVisionOCR(OCRService):
 
         try:
             logger.info(f"Running Google Cloud Vision OCR on image: {image_path}")
-            with io.open(image_path, 'rb') as image_file:
+            with open(image_path, 'rb') as image_file:
                 content = image_file.read()
 
             image = vision.Image(content=content)
-            
+
             # Use DOCUMENT_TEXT_DETECTION if configured, else standard TEXT_DETECTION
             provider_mode = getattr(settings, 'OCR_PROVIDER', 'TEXT_DETECTION')
             if provider_mode == 'DOCUMENT_TEXT_DETECTION':
@@ -69,7 +70,7 @@ class GoogleCloudVisionOCR(OCRService):
 
             full_text = texts[0].description
             blocks = []
-            
+
             # The first annotation contains the entire text, subsequent ones are individual words/blocks
             for annotation in texts[1:]:
                 blocks.append({
@@ -110,7 +111,7 @@ class GoogleCloudVisionOCR(OCRService):
 
         try:
             logger.info(f"Running Google Cloud Vision object localization on image: {image_path}")
-            with io.open(image_path, 'rb') as image_file:
+            with open(image_path, 'rb') as image_file:
                 content = image_file.read()
 
             image = vision.Image(content=content)

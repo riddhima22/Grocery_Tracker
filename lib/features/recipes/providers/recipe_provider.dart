@@ -43,7 +43,9 @@ class RecipeProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final newRecipes = await _recipeRepository.generateRecipes(preferences: preferences);
+      final newRecipes = await _recipeRepository.generateRecipes(
+        preferences: preferences,
+      );
       _recipes.insertAll(0, newRecipes);
       _isLoading = false;
       notifyListeners();
@@ -71,7 +73,9 @@ class RecipeProvider extends ChangeNotifier {
     if (_filter == 'veg') {
       return _recipes.where((r) => r.dietType.toLowerCase() == 'veg').toList();
     } else if (_filter == 'non-veg') {
-      return _recipes.where((r) => r.dietType.toLowerCase() == 'non-veg').toList();
+      return _recipes
+          .where((r) => r.dietType.toLowerCase() == 'non-veg')
+          .toList();
     } else if (_filter == 'quick') {
       return _recipes.where((r) => r.prepTimeMins <= 30).toList();
     }

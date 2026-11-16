@@ -1,10 +1,11 @@
+import datetime
+from decimal import Decimal
 from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
-import datetime
-from decimal import Decimal
 
 from apps.groceries.models import GroceryItem
 from apps.recipes.models import Recipe
@@ -216,7 +217,7 @@ class RecipeAPITests(APITestCase):
     @patch('apps.recipes.views.AIService')
     def test_proactive_allergy_exclusion(self, MockAIService):
         # Create a peanut item in user's pantry
-        peanut_item = GroceryItem.objects.create(
+        GroceryItem.objects.create(
             user=self.user1,
             name='Peanut Butter',
             quantity=Decimal('1.0'),

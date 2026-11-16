@@ -19,7 +19,8 @@ class SplashView extends StatefulWidget {
   State<SplashView> createState() => _SplashViewState();
 }
 
-class _SplashViewState extends State<SplashView> with SingleTickerProviderStateMixin {
+class _SplashViewState extends State<SplashView>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _rotationAnim;
   late Animation<double> _pulseAnim;
@@ -132,9 +133,7 @@ class _SplashViewState extends State<SplashView> with SingleTickerProviderStateM
 
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: AppColors.splashGradient,
-        ),
+        decoration: const BoxDecoration(gradient: AppColors.splashGradient),
         child: Stack(
           children: [
             // Floating green particles with RepaintBoundary for isolation
@@ -145,15 +144,24 @@ class _SplashViewState extends State<SplashView> with SingleTickerProviderStateM
                     animation: _particleAnim,
                     builder: (context, child) {
                       final phase = (index * 2 * math.pi / 4);
-                      final offset = math.sin(_particleAnim.value * 2 * math.pi + phase) * 15.0;
+                      final offset =
+                          math.sin(_particleAnim.value * 2 * math.pi + phase) *
+                          15.0;
                       return Positioned(
-                        left: context.screenSize.width / 2.0 + _particlePositions[index].dx,
-                        top: context.screenSize.height / 2.0 + _particlePositions[index].dy + offset,
+                        left:
+                            context.screenSize.width / 2.0 +
+                            _particlePositions[index].dx,
+                        top:
+                            context.screenSize.height / 2.0 +
+                            _particlePositions[index].dy +
+                            offset,
                         child: Container(
                           width: 6.0 + (index % 3) * 2.0,
                           height: 6.0 + (index % 3) * 2.0,
                           decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.3 + (index % 3) * 0.15),
+                            color: AppColors.primary.withValues(
+                              alpha: 0.3 + (index % 3) * 0.15,
+                            ),
                             shape: BoxShape.circle,
                           ),
                         ),
@@ -180,14 +188,23 @@ class _SplashViewState extends State<SplashView> with SingleTickerProviderStateM
                         AnimatedBuilder(
                           animation: _pulseAnim,
                           builder: (context, child) {
-                            final pulseVal = (math.sin(_controller.value * 2 * math.pi) + 1) / 2;
+                            final pulseVal =
+                                (math.sin(_controller.value * 2 * math.pi) +
+                                    1) /
+                                2;
                             return Container(
-                              width: ringSizeBase + (pulseVal * context.scaleWidth(40.0)),
-                              height: ringSizeBase + (pulseVal * context.scaleWidth(40.0)),
+                              width:
+                                  ringSizeBase +
+                                  (pulseVal * context.scaleWidth(40.0)),
+                              height:
+                                  ringSizeBase +
+                                  (pulseVal * context.scaleWidth(40.0)),
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 border: Border.all(
-                                  color: AppColors.primary.withValues(alpha: 0.15 * (1.0 - pulseVal)),
+                                  color: AppColors.primary.withValues(
+                                    alpha: 0.15 * (1.0 - pulseVal),
+                                  ),
                                   width: 2.0,
                                 ),
                               ),
@@ -198,14 +215,23 @@ class _SplashViewState extends State<SplashView> with SingleTickerProviderStateM
                         AnimatedBuilder(
                           animation: _pulseAnim,
                           builder: (context, child) {
-                            final pulseVal = (math.sin(_controller.value * 2 * math.pi) + 1) / 2;
+                            final pulseVal =
+                                (math.sin(_controller.value * 2 * math.pi) +
+                                    1) /
+                                2;
                             return Container(
-                              width: innerRingSizeBase + (pulseVal * context.scaleWidth(25.0)),
-                              height: innerRingSizeBase + (pulseVal * context.scaleWidth(25.0)),
+                              width:
+                                  innerRingSizeBase +
+                                  (pulseVal * context.scaleWidth(25.0)),
+                              height:
+                                  innerRingSizeBase +
+                                  (pulseVal * context.scaleWidth(25.0)),
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 border: Border.all(
-                                  color: AppColors.primary.withValues(alpha: 0.3 * (1.0 - pulseVal)),
+                                  color: AppColors.primary.withValues(
+                                    alpha: 0.3 * (1.0 - pulseVal),
+                                  ),
                                   width: 1.5,
                                 ),
                               ),
@@ -216,7 +242,8 @@ class _SplashViewState extends State<SplashView> with SingleTickerProviderStateM
                         AnimatedBuilder(
                           animation: _rotationAnim,
                           builder: (context, child) {
-                            final double angle = _rotationAnim.value * 2 * math.pi;
+                            final double angle =
+                                _rotationAnim.value * 2 * math.pi;
                             return Transform(
                               alignment: Alignment.center,
                               transform: Matrix4.identity()
@@ -228,13 +255,17 @@ class _SplashViewState extends State<SplashView> with SingleTickerProviderStateM
                                 height: logoContainerSize,
                                 decoration: BoxDecoration(
                                   gradient: AppColors.primaryGradient,
-                                  borderRadius: BorderRadius.circular(AppRadius.card(context)),
+                                  borderRadius: BorderRadius.circular(
+                                    AppRadius.card(context),
+                                  ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: AppColors.primary.withValues(alpha: 0.4),
+                                      color: AppColors.primary.withValues(
+                                        alpha: 0.4,
+                                      ),
                                       blurRadius: 16,
                                       offset: const Offset(0, 8),
-                                    )
+                                    ),
                                   ],
                                 ),
                                 child: Center(
@@ -252,24 +283,28 @@ class _SplashViewState extends State<SplashView> with SingleTickerProviderStateM
                     ),
                   ),
                   AppGap.lg(context),
-                  
+
                   // Wordmark
                   RichText(
                     text: TextSpan(
                       children: [
                         TextSpan(
                           text: 'Fresh',
-                          style: AppTextStyles.displayLarge(context).copyWith(color: AppColors.white),
+                          style: AppTextStyles.displayLarge(
+                            context,
+                          ).copyWith(color: AppColors.white),
                         ),
                         TextSpan(
                           text: 'Track',
-                          style: AppTextStyles.displayLarge(context).copyWith(color: AppColors.primary),
+                          style: AppTextStyles.displayLarge(
+                            context,
+                          ).copyWith(color: AppColors.primary),
                         ),
                       ],
                     ),
                   ),
                   AppGap.xs(context),
-                  
+
                   // Subtitle
                   Text(
                     'Smart Grocery Intelligence',
@@ -299,7 +334,8 @@ class _LoadingDots extends StatefulWidget {
   State<_LoadingDots> createState() => _LoadingDotsState();
 }
 
-class _LoadingDotsState extends State<_LoadingDots> with SingleTickerProviderStateMixin {
+class _LoadingDotsState extends State<_LoadingDots>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late List<Animation<double>> _animations;
 
@@ -316,11 +352,17 @@ class _LoadingDotsState extends State<_LoadingDots> with SingleTickerProviderSta
       final end = start + 0.6;
       return TweenSequence([
         TweenSequenceItem(
-          tween: Tween<double>(begin: 0.0, end: -8.0).chain(CurveTween(curve: Curves.easeOut)),
+          tween: Tween<double>(
+            begin: 0.0,
+            end: -8.0,
+          ).chain(CurveTween(curve: Curves.easeOut)),
           weight: 50,
         ),
         TweenSequenceItem(
-          tween: Tween<double>(begin: -8.0, end: 0.0).chain(CurveTween(curve: Curves.easeIn)),
+          tween: Tween<double>(
+            begin: -8.0,
+            end: 0.0,
+          ).chain(CurveTween(curve: Curves.easeIn)),
           weight: 50,
         ),
       ]).animate(
@@ -349,7 +391,9 @@ class _LoadingDotsState extends State<_LoadingDots> with SingleTickerProviderSta
             return Transform.translate(
               offset: Offset(0, _animations[index].value),
               child: Container(
-                margin: EdgeInsets.symmetric(horizontal: AppSpacing.xxs(context)),
+                margin: EdgeInsets.symmetric(
+                  horizontal: AppSpacing.xxs(context),
+                ),
                 width: 7.0,
                 height: 7.0,
                 decoration: const BoxDecoration(

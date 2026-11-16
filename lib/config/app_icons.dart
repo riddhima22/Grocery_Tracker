@@ -9,7 +9,7 @@ class AppIconKeys {
   static const String spices = 'spices';
   static const String grocery = 'grocery';
   static const String restaurant = 'restaurant';
-  
+
   // Storage zones
   static const String fridge = 'fridge';
   static const String freezer = 'freezer';

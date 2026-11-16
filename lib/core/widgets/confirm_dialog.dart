@@ -8,7 +8,7 @@ class ConfirmDialog extends StatelessWidget {
   final String content;
   final String confirmLabel;
   final String cancelLabel;
-  final VoidCallback onConfirm;
+  final VoidCallback? onConfirm;
   final bool isDestructive;
 
   const ConfirmDialog({
@@ -17,9 +17,34 @@ class ConfirmDialog extends StatelessWidget {
     required this.content,
     required this.confirmLabel,
     required this.cancelLabel,
-    required this.onConfirm,
+    this.onConfirm,
     this.isDestructive = false,
   });
+
+  /// Displays the confirmation dialog and returns true ONLY if user confirmed.
+  /// Returns false on cancel or dismissal.
+  static Future<bool> show({
+    required BuildContext context,
+    String title = 'Delete Confirmation',
+    String content =
+        'Are you sure you want to delete this item? This action cannot be undone.',
+    String confirmLabel = 'Delete',
+    String cancelLabel = 'Cancel',
+    bool isDestructive = true,
+  }) async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => ConfirmDialog(
+        title: title,
+        content: content,
+        confirmLabel: confirmLabel,
+        cancelLabel: cancelLabel,
+        isDestructive: isDestructive,
+      ),
+    );
+    return result == true;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,20 +57,24 @@ class ConfirmDialog extends StatelessWidget {
       title: Text(title, style: AppTextStyles.headingMedium(context)),
       content: Text(
         content,
-        style: AppTextStyles.bodyMedium(context).copyWith(color: AppColors.textPrimary),
+        style: AppTextStyles.bodyMedium(
+          context,
+        ).copyWith(color: AppColors.textPrimary),
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => Navigator.pop(context, false),
           child: Text(
             cancelLabel,
-            style: AppTextStyles.labelMedium(context).copyWith(color: AppColors.textSecondary),
+            style: AppTextStyles.labelMedium(
+              context,
+            ).copyWith(color: AppColors.textSecondary),
           ),
         ),
         TextButton(
           onPressed: () {
-            Navigator.pop(context);
-            onConfirm();
+            Navigator.pop(context, true);
+            onConfirm?.call();
           },
           child: Text(
             confirmLabel,

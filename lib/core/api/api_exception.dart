@@ -12,13 +12,19 @@ class NetworkException extends ApiException {
   NetworkException(super.message);
 }
 
+class CertificateVerificationException extends ApiException {
+  final dynamic technicalDetails;
+  CertificateVerificationException(super.message, [this.technicalDetails]);
+}
+
 class TimeoutException extends ApiException {
   TimeoutException(super.message);
 }
 
 class ValidationException extends ApiException {
   final Map<String, dynamic>? fields;
-  ValidationException(String message, {this.fields, int? statusCode}) : super(message, statusCode);
+  ValidationException(String message, {this.fields, int? statusCode})
+    : super(message, statusCode);
 }
 
 class UnauthorizedException extends ApiException {
@@ -51,4 +57,8 @@ class ServerException extends ApiException {
 
 class UnknownApiException extends ApiException {
   UnknownApiException(super.message);
+}
+
+class RequestCancelledException extends ApiException {
+  RequestCancelledException([super.message = 'Request was cancelled.']);
 }

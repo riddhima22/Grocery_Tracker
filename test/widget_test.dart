@@ -3,7 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:grocery_track/core/widgets/app_button.dart';
 
 void main() {
-  testWidgets('AppButton renders text and triggers callback', (WidgetTester tester) async {
+  testWidgets('AppButton renders text and triggers callback', (
+    WidgetTester tester,
+  ) async {
     bool pressed = false;
 
     // Build the widget
@@ -32,15 +34,12 @@ void main() {
     expect(pressed, isTrue);
   });
 
-  testWidgets('AppButton shows loader when isLoading is true', (WidgetTester tester) async {
+  testWidgets('AppButton shows loader when isLoading is true', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(
       const MaterialApp(
-        home: Scaffold(
-          body: AppButton(
-            text: 'Loading Item',
-            isLoading: true,
-          ),
-        ),
+        home: Scaffold(body: AppButton(text: 'Loading Item', isLoading: true)),
       ),
     );
 

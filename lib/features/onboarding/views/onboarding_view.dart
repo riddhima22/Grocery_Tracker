@@ -28,18 +28,19 @@ class _OnboardingViewState extends State<OnboardingView> {
     {
       'icon': Icons.eco_rounded,
       'title': 'Never waste groceries again',
-      'desc': 'Track your groceries and know what to use before it expires.'
+      'desc': 'Track your groceries and know what to use before it expires.',
     },
     {
       'icon': Icons.ac_unit_rounded,
       'title': 'Smart storage guidance',
-      'desc': 'Know where every grocery item belongs and help it stay fresh longer.'
+      'desc':
+          'Know where every grocery item belongs and help it stay fresh longer.',
     },
     {
       'icon': Icons.restaurant_rounded,
       'title': 'Recipes from what you have',
-      'desc': 'Turn groceries already in your kitchen into useful meal ideas.'
-    }
+      'desc': 'Turn groceries already in your kitchen into useful meal ideas.',
+    },
   ];
 
   @override
@@ -51,7 +52,7 @@ class _OnboardingViewState extends State<OnboardingView> {
   Future<void> _onFinish() async {
     final onboarding = context.read<OnboardingProvider>();
     final auth = context.read<AuthProvider>();
-    
+
     // Request notification permission with simple explanation
     await _showNotificationExplainer();
 
@@ -76,26 +77,40 @@ class _OnboardingViewState extends State<OnboardingView> {
           side: const BorderSide(color: AppColors.cardBorder),
         ),
         title: Text(
-          'Stay Fresh Alerts', 
-          style: AppTextStyles.headingMedium(ctx).copyWith(fontWeight: FontWeight.bold),
+          'Stay Fresh Alerts',
+          style: AppTextStyles.headingMedium(
+            ctx,
+          ).copyWith(fontWeight: FontWeight.bold),
         ),
         content: Text(
           'FreshTrack needs push notifications permission to alert you before your groceries expire, helping you reduce food waste.',
-          style: AppTextStyles.bodyMedium(ctx).copyWith(color: AppColors.textPrimary),
+          style: AppTextStyles.bodyMedium(
+            ctx,
+          ).copyWith(color: AppColors.textPrimary),
         ),
         actions: [
           TextButton(
             onPressed: () {
               Navigator.pop(ctx);
             },
-            child: Text('Not Now', style: AppTextStyles.labelMedium(ctx).copyWith(color: AppColors.textSecondary)),
+            child: Text(
+              'Not Now',
+              style: AppTextStyles.labelMedium(
+                ctx,
+              ).copyWith(color: AppColors.textSecondary),
+            ),
           ),
           TextButton(
             onPressed: () async {
               Navigator.pop(ctx);
               await PermissionService().requestNotificationPermission();
             },
-            child: Text('Allow Alerts', style: AppTextStyles.labelMedium(ctx).copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
+            child: Text(
+              'Allow Alerts',
+              style: AppTextStyles.labelMedium(
+                ctx,
+              ).copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -122,12 +137,14 @@ class _OnboardingViewState extends State<OnboardingView> {
                         onPressed: _onFinish,
                         child: Text(
                           'Skip',
-                          style: AppTextStyles.labelMedium(context).copyWith(color: AppColors.textSecondary),
+                          style: AppTextStyles.labelMedium(
+                            context,
+                          ).copyWith(color: AppColors.textSecondary),
                         ),
                       ),
               ),
             ),
-            
+
             // Slider Content
             Expanded(
               child: PageView.builder(
@@ -143,7 +160,9 @@ class _OnboardingViewState extends State<OnboardingView> {
                   final IconData pageIcon = p['icon'] as IconData;
 
                   return Padding(
-                    padding: EdgeInsets.symmetric(horizontal: AppSpacing.xl(context)),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: AppSpacing.xl(context),
+                    ),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -157,10 +176,12 @@ class _OnboardingViewState extends State<OnboardingView> {
                             border: Border.all(color: AppColors.cardBorder),
                             boxShadow: [
                               BoxShadow(
-                                color: AppColors.primary.withValues(alpha: 0.08),
+                                color: AppColors.primary.withValues(
+                                  alpha: 0.08,
+                                ),
                                 blurRadius: 24,
                                 spreadRadius: 8,
-                              )
+                              ),
                             ],
                           ),
                           child: Center(
@@ -180,7 +201,9 @@ class _OnboardingViewState extends State<OnboardingView> {
                         AppGap.md(context),
                         Text(
                           p['desc'] as String,
-                          style: AppTextStyles.bodyLarge(context).copyWith(color: AppColors.textSecondary),
+                          style: AppTextStyles.bodyLarge(
+                            context,
+                          ).copyWith(color: AppColors.textSecondary),
                           textAlign: TextAlign.center,
                         ),
                       ],
@@ -189,7 +212,7 @@ class _OnboardingViewState extends State<OnboardingView> {
                 },
               ),
             ),
-            
+
             // Indicator and Buttons
             Padding(
               padding: EdgeInsets.all(AppSpacing.xl(context)),
@@ -208,7 +231,9 @@ class _OnboardingViewState extends State<OnboardingView> {
                   ),
                   AppGap.xl(context),
                   AppButton(
-                    text: _currentIndex == _pages.length - 1 ? 'Get Started' : 'Continue',
+                    text: _currentIndex == _pages.length - 1
+                        ? 'Get Started'
+                        : 'Continue',
                     onPressed: () {
                       if (_currentIndex == _pages.length - 1) {
                         _onFinish();

@@ -56,11 +56,7 @@ class AuthRepository {
   }) async {
     final response = await _apiClient.post(
       ApiEndpoints.register,
-      data: {
-        'email': email,
-        'password': password,
-        'display_name': displayName,
-      },
+      data: {'email': email, 'password': password, 'display_name': displayName},
     );
 
     return await _processAuthResponse(response.data);
@@ -72,10 +68,7 @@ class AuthRepository {
   }) async {
     final response = await _apiClient.post(
       ApiEndpoints.login,
-      data: {
-        'email': email,
-        'password': password,
-      },
+      data: {'email': email, 'password': password},
     );
 
     return await _processAuthResponse(response.data);
@@ -86,7 +79,10 @@ class AuthRepository {
     return UserModel.fromJson(response.data['data'] ?? response.data);
   }
 
-  Future<UserModel> updateProfile(Map<String, dynamic> data, {String? avatarPath}) async {
+  Future<UserModel> updateProfile(
+    Map<String, dynamic> data, {
+    String? avatarPath,
+  }) async {
     dynamic requestData;
     Options? options;
 
@@ -116,11 +112,14 @@ class AuthRepository {
     await _apiClient.post(ApiEndpoints.forgotPassword, data: {'email': email});
   }
 
-  Future<void> resetPassword({required String token, required String newPassword}) async {
-    await _apiClient.post(ApiEndpoints.resetPassword, data: {
-      'token': token,
-      'password': newPassword,
-    });
+  Future<void> resetPassword({
+    required String token,
+    required String newPassword,
+  }) async {
+    await _apiClient.post(
+      ApiEndpoints.resetPassword,
+      data: {'token': token, 'password': newPassword},
+    );
   }
 
   Future<void> verifyEmail({String? token}) async {
@@ -153,7 +152,11 @@ class AuthRepository {
     return token != null || refresh != null;
   }
 
-  Future<UserModel> loginWithGoogle({required String token, String? email, String? name}) async {
+  Future<UserModel> loginWithGoogle({
+    required String token,
+    String? email,
+    String? name,
+  }) async {
     final response = await _apiClient.post(
       ApiEndpoints.googleLogin,
       data: {
@@ -166,7 +169,11 @@ class AuthRepository {
     return await _processAuthResponse(response.data);
   }
 
-  Future<UserModel> loginWithApple({required String token, String? email, String? name}) async {
+  Future<UserModel> loginWithApple({
+    required String token,
+    String? email,
+    String? name,
+  }) async {
     final response = await _apiClient.post(
       ApiEndpoints.appleLogin,
       data: {

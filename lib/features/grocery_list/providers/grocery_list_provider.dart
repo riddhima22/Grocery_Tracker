@@ -49,10 +49,16 @@ class GroceryListProvider extends ChangeNotifier {
   Future<bool> addItem(String name, double quantity, String unit) async {
     if (_currentList == null) return false;
     try {
-      final newItem = await _repository.addListItem(_currentList!.id, name, quantity, unit);
-      
+      final newItem = await _repository.addListItem(
+        _currentList!.id,
+        name,
+        quantity,
+        unit,
+      );
+
       // Update local state list
-      final updatedItems = List<GroceryListItemModel>.from(_currentList!.items)..add(newItem);
+      final updatedItems = List<GroceryListItemModel>.from(_currentList!.items)
+        ..add(newItem);
       _currentList = GroceryListModel(
         id: _currentList!.id,
         status: _currentList!.status,
@@ -60,7 +66,7 @@ class GroceryListProvider extends ChangeNotifier {
         createdAt: _currentList!.createdAt,
         items: updatedItems,
       );
-      
+
       notifyListeners();
       return true;
     } catch (e) {
@@ -72,15 +78,15 @@ class GroceryListProvider extends ChangeNotifier {
   Future<bool> updateItemQuantity(String itemId, double newQty) async {
     if (_currentList == null) return false;
     try {
-      final updated = await _repository.editListItem(
-        _currentList!.id, 
-        itemId, 
-        {'quantity': newQty}
-      );
-      
+      final updated = await _repository.editListItem(_currentList!.id, itemId, {
+        'quantity': newQty,
+      });
+
       final index = _currentList!.items.indexWhere((i) => i.id == itemId);
       if (index != -1) {
-        final updatedItems = List<GroceryListItemModel>.from(_currentList!.items);
+        final updatedItems = List<GroceryListItemModel>.from(
+          _currentList!.items,
+        );
         updatedItems[index] = updated;
         _currentList = GroceryListModel(
           id: _currentList!.id,
@@ -102,10 +108,10 @@ class GroceryListProvider extends ChangeNotifier {
     if (_currentList == null) return false;
     try {
       await _repository.deleteListItem(_currentList!.id, itemId);
-      
+
       final updatedItems = List<GroceryListItemModel>.from(_currentList!.items)
         ..removeWhere((i) => i.id == itemId);
-      
+
       _currentList = GroceryListModel(
         id: _currentList!.id,
         status: _currentList!.status,
@@ -124,11 +130,17 @@ class GroceryListProvider extends ChangeNotifier {
   Future<bool> setItemFeedback(String itemId, String feedback) async {
     if (_currentList == null) return false;
     try {
-      final updated = await _repository.setItemFeedback(_currentList!.id, itemId, feedback);
-      
+      final updated = await _repository.setItemFeedback(
+        _currentList!.id,
+        itemId,
+        feedback,
+      );
+
       final index = _currentList!.items.indexWhere((i) => i.id == itemId);
       if (index != -1) {
-        final updatedItems = List<GroceryListItemModel>.from(_currentList!.items);
+        final updatedItems = List<GroceryListItemModel>.from(
+          _currentList!.items,
+        );
         updatedItems[index] = updated;
         _currentList = GroceryListModel(
           id: _currentList!.id,
@@ -150,11 +162,11 @@ class GroceryListProvider extends ChangeNotifier {
     if (_currentList == null) return false;
     try {
       await _repository.markPurchased(_currentList!.id, itemId);
-      
+
       // Remove item from active shopping list since it enters pantry
       final updatedItems = List<GroceryListItemModel>.from(_currentList!.items)
         ..removeWhere((i) => i.id == itemId);
-      
+
       _currentList = GroceryListModel(
         id: _currentList!.id,
         status: _currentList!.status,
@@ -162,7 +174,7 @@ class GroceryListProvider extends ChangeNotifier {
         createdAt: _currentList!.createdAt,
         items: updatedItems,
       );
-      
+
       notifyListeners();
       return true;
     } catch (e) {

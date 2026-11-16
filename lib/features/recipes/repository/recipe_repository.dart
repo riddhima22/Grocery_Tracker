@@ -11,7 +11,9 @@ class RecipeRepository {
     return list?.map((r) => RecipeModel.fromJson(r)).toList() ?? const [];
   }
 
-  Future<List<RecipeModel>> generateRecipes({Map<String, dynamic>? preferences}) async {
+  Future<List<RecipeModel>> generateRecipes({
+    Map<String, dynamic>? preferences,
+  }) async {
     final response = await _apiClient.post(
       ApiEndpoints.generateRecipes,
       data: preferences ?? {},

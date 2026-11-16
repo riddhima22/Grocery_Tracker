@@ -32,22 +32,24 @@ class AIConfidenceBadge extends StatelessWidget {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: paddingH, vertical: paddingV),
       decoration: BoxDecoration(
-        color: color.withValues(alpha :0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(AppRadius.chip(context)),
-        border: Border.all(color: color.withValues(alpha :0.3), width: 1.0),
+        border: Border.all(color: color.withValues(alpha: 0.3), width: 1.0),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.auto_awesome, size: AppIconSizes.sm(context) * 0.6, color: color),
+          Icon(
+            Icons.auto_awesome,
+            size: AppIconSizes.sm(context) * 0.6,
+            color: color,
+          ),
           const SizedBox(width: 4), // small relative spacing
           Text(
             confidence,
-            style: AppTextStyles.caption(context).copyWith(
-              color: color,
-              fontWeight: FontWeight.bold,
-              fontSize: 10,
-            ),
+            style: AppTextStyles.caption(
+              context,
+            ).copyWith(color: color, fontWeight: FontWeight.bold, fontSize: 10),
           ),
         ],
       ),

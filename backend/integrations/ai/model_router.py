@@ -1,15 +1,17 @@
-import os
 import hashlib
 import logging
+import os
 import tempfile
 
 import cv2
 import numpy as np
-from PIL import Image, ImageStat, ImageOps
 from django.conf import settings
 from django.utils import timezone
+from PIL import Image, ImageOps, ImageStat
+
 from integrations.ocr.google_vision_client import GoogleCloudVisionOCR
 from integrations.ocr.text_parser import OCRDateParser
+
 from .ai_service import AIService
 from .gemini_client import AIContentBlockedError
 
@@ -50,7 +52,7 @@ class ModelRouter:
                     buf = f.read()
                 hasher.update(buf)
                 img_hash = hasher.hexdigest()
-                
+
                 if img_hash in seen_hashes:
                     warnings.append(f"Duplicate image detected: {os.path.basename(path)}")
                     continue
@@ -63,7 +65,7 @@ class ModelRouter:
             try:
                 with Image.open(path) as img:
                     width, height = img.size
-                    
+
                     # Low resolution check
                     if width < 150 or height < 150:
                         errors.append(f"Image {os.path.basename(path)} resolution is too low ({width}x{height}).")
@@ -103,24 +105,33 @@ class ModelRouter:
 
     def _preprocess_image_for_ai(self, image_path: str, is_dark: bool) -> tuple:
         """
-        Auto-orients (EXIF) and applies light contrast/brightness normalization (CLAHE)
-        ONLY if the image was flagged as too dark.
-        Saves modified image to a new temp file so raw user upload is never overwritten.
+        Preprocesses an image for AI consumption:
+        1. Auto-orients (EXIF).
+        2. Downscales longest dimension to max 1280px (maintaining aspect ratio).
+        3. Applies light contrast/brightness normalization (CLAHE) if flagged as too dark.
+        4. Converts to JPEG quality ~80 to drastically minimize memory consumption on Render.
+        Always saves to a temporary file to keep raw upload intact and minimize in-memory buffers.
         Returns: (file_path_to_use, is_temporary)
         """
-        needs_temp = False
         try:
             with Image.open(image_path) as pil_img:
                 # 1. EXIF orientation correction
                 transposed = ImageOps.exif_transpose(pil_img)
-                if transposed is not pil_img:
-                    needs_temp = True
-                else:
+                if transposed is pil_img:
                     transposed = pil_img.copy()
 
-                # 2. Contrast/brightness normalization ONLY if flagged as too dark
+                # 2. Downscale to max 1280px on the long side
+                width, height = transposed.size
+                longest = max(width, height)
+                max_dim = 1280
+                if longest > max_dim:
+                    scale = max_dim / float(longest)
+                    new_w = max(150, int(round(width * scale)))
+                    new_h = max(150, int(round(height * scale)))
+                    transposed = transposed.resize((new_w, new_h), resample=Image.LANCZOS)
+
+                # 3. Contrast/brightness normalization ONLY if flagged as too dark
                 if is_dark:
-                    needs_temp = True
                     np_rgb = np.array(transposed.convert('RGB'))
                     lab = cv2.cvtColor(np_rgb, cv2.COLOR_RGB2LAB)
                     l_chan, a_chan, b_chan = cv2.split(lab)
@@ -129,12 +140,16 @@ class ModelRouter:
                     enhanced_lab = cv2.merge([l_enhanced, a_chan, b_chan])
                     enhanced_rgb = cv2.cvtColor(enhanced_lab, cv2.COLOR_LAB2RGB)
                     transposed = Image.fromarray(enhanced_rgb)
+                    del np_rgb, lab, l_chan, a_chan, b_chan, l_enhanced, enhanced_lab, enhanced_rgb
 
-                if needs_temp:
-                    tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.jpg', prefix='freshtrack_prep_')
-                    transposed.convert('RGB').save(tmp.name, format='JPEG', quality=95)
-                    tmp.close()
-                    return tmp.name, True
+                # 4. Save to temporary JPEG file with quality 80
+                tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.jpg', prefix='freshtrack_prep_')
+                transposed.convert('RGB').save(tmp.name, format='JPEG', quality=80, optimize=True)
+                tmp.close()
+                del transposed
+                import gc
+                gc.collect()
+                return tmp.name, True
 
         except Exception as e:
             logger.warning(f"Image preprocessing failed for {image_path}: {e}")
@@ -170,7 +185,7 @@ class ModelRouter:
 
         # 2. Preprocess images for AI (EXIF auto-orientation, CLAHE for dark images)
         dark_warning_filenames = {
-            os.path.basename(path) for path in valid_paths 
+            os.path.basename(path) for path in valid_paths
             if any(f"Lighting is too dark in {os.path.basename(path)}" in w for w in warnings)
         }
 
@@ -190,7 +205,7 @@ class ModelRouter:
             ocr_context = ""
             ocr_dates = {}
             ocr_enabled = getattr(settings, 'OCR_ENABLED', True)
-            
+
             if ocr_enabled:
                 ocr_results = []
                 detected_objects = []
@@ -205,7 +220,9 @@ class ModelRouter:
                                 name = o.get("name", "Item")
                                 score = o.get("score", 1.0)
                                 detected_objects.append(f"{name} (confidence: {score:.2f})")
-                
+                    import gc
+                    gc.collect()
+
                 context_sections = []
                 if ocr_results:
                     ocr_text = "\n---\n".join(ocr_results)
@@ -213,7 +230,7 @@ class ModelRouter:
                     # Parse expiry dates from OCR text directly
                     ocr_dates = OCRDateParser.extract_dates(ocr_text)
                     logger.info(f"OCR parsed packaging dates: {ocr_dates}")
-                
+
                 if detected_objects:
                     obj_hint_text = f"GOOGLE VISION OBJECT-DETECTION HINTS (DETECTED ITEMS COUNT: {len(detected_objects)}):\n" + "\n".join(f"- {d}" for d in detected_objects)
                     context_sections.append(obj_hint_text)
@@ -224,7 +241,7 @@ class ModelRouter:
             # 4. Gemini Multimodal Analysis Stage
             ai_result = self.ai_client.analyze_grocery_images(prepared_paths, ocr_context=ocr_context)
             items = ai_result.get("items", [])
-            
+
             # 5. Accuracy Alignment: Resolve date conflicts & append warnings
             items = self.align_item_dates(items, ocr_dates=ocr_dates, warnings=warnings)
 
@@ -327,7 +344,9 @@ class ModelRouter:
                 item["date_type"] = "estimated"
                 item["date_source"] = "calculated_shelf_life"
                 try:
-                    from apps.groceries.prediction_engine import ShelfLifePredictionEngine
+                    from apps.groceries.prediction_engine import (
+                        ShelfLifePredictionEngine,
+                    )
                     prediction = ShelfLifePredictionEngine.predict({
                         'category': item.get('category', 'default'),
                         'storage_zone': item.get('storage_zone', 'pantry'),

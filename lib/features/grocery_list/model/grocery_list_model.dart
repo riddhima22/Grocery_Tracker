@@ -5,7 +5,7 @@ class GroceryListItemModel {
   final double suggestedQuantity;
   final double quantity;
   final String unit;
-  
+
   final String reason;
   final String confidence;
   final String sourceSignal;
@@ -31,7 +31,9 @@ class GroceryListItemModel {
       id: json['id'] ?? '',
       groceryList: json['grocery_list'] ?? '',
       name: json['name'] ?? '',
-      suggestedQuantity: double.tryParse(json['suggested_quantity']?.toString() ?? '1.0') ?? 1.0,
+      suggestedQuantity:
+          double.tryParse(json['suggested_quantity']?.toString() ?? '1.0') ??
+          1.0,
       quantity: double.tryParse(json['quantity']?.toString() ?? '1.0') ?? 1.0,
       unit: json['unit'] ?? 'pcs',
       reason: json['reason'] ?? '',
@@ -63,8 +65,14 @@ class GroceryListModel {
       id: json['id'] ?? '',
       status: json['status'] ?? 'active',
       generationReason: json['generation_reason'] ?? '',
-      createdAt: json['created_at'] != null ? DateTime.parse(json['created_at']) : DateTime.now(),
-      items: (json['items'] as List?)?.map((i) => GroceryListItemModel.fromJson(i)).toList() ?? const [],
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'])
+          : DateTime.now(),
+      items:
+          (json['items'] as List?)
+              ?.map((i) => GroceryListItemModel.fromJson(i))
+              .toList() ??
+          const [],
     );
   }
 }

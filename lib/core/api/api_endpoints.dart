@@ -39,7 +39,8 @@ class ApiEndpoints {
   static String scanCandidateDetail(String sessionId, String candidateId) =>
       '/scans/sessions/$sessionId/candidates/$candidateId/';
   static String retryImage(String id) => '/scans/sessions/$id/retry-image/';
-  static String mergeCandidates(String id) => '/scans/sessions/$id/merge-candidates/';
+  static String mergeCandidates(String id) =>
+      '/scans/sessions/$id/merge-candidates/';
   static String confirmScan(String id) => '/scans/sessions/$id/confirm/';
 
   // Recipes
@@ -71,5 +72,6 @@ class ApiEndpoints {
   // Meals
   static const String meals = '/meals/';
   static String mealDetail(String id) => '/meals/$id/';
-  static String confirmMealDeduction(String id) => '/meals/$id/confirm-deduction/';
+  static String confirmMealDeduction(String id) =>
+      '/meals/$id/confirm-deduction/';
 }

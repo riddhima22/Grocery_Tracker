@@ -26,7 +26,8 @@ class MealLogModel {
       description: json['description'] ?? '',
       imageUrl: json['image'],
       status: json['status'] ?? 'pending_confirmation',
-      candidates: (json['candidates'] as List?)
+      candidates:
+          (json['candidates'] as List?)
               ?.map((c) => MealIngredientCandidateModel.fromJson(c))
               .toList() ??
           const [],

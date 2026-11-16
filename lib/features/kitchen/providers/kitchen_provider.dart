@@ -39,8 +39,10 @@ class KitchenProvider extends ChangeNotifier {
   int get expiringCount => _items.where((i) => i.status == 'expiring').length;
   int get expiredCount => _items.where((i) => i.status == 'expired').length;
 
-  List<GroceryModel> get expiringItems => _items.where((i) => i.status == 'expiring').toList();
-  List<GroceryModel> get expiredItems => _items.where((i) => i.status == 'expired').toList();
+  List<GroceryModel> get expiringItems =>
+      _items.where((i) => i.status == 'expiring').toList();
+  List<GroceryModel> get expiredItems =>
+      _items.where((i) => i.status == 'expired').toList();
 
   List<GroceryModel> get fridgeItems => _getItemsByZone('fridge');
   List<GroceryModel> get freezerItems => _getItemsByZone('freezer');
@@ -53,8 +55,13 @@ class KitchenProvider extends ChangeNotifier {
   /// Immediately injects newly confirmed groceries from scan into state and cache
   void addConfirmedGroceries(List<GroceryModel> newItems) {
     if (newItems.isEmpty) return;
-    final existingIds = _items.where((e) => e.id.isNotEmpty).map((e) => e.id).toSet();
-    final toAdd = newItems.where((e) => e.id.isEmpty || !existingIds.contains(e.id)).toList();
+    final existingIds = _items
+        .where((e) => e.id.isNotEmpty)
+        .map((e) => e.id)
+        .toSet();
+    final toAdd = newItems
+        .where((e) => e.id.isEmpty || !existingIds.contains(e.id))
+        .toList();
     if (toAdd.isNotEmpty) {
       _items.insertAll(0, toAdd);
       _cacheManager.saveGroceries(_items);
@@ -85,7 +92,9 @@ class KitchenProvider extends ChangeNotifier {
 
     // 3. Skip redundant network fetch if data is present and fresh (< 3 mins), unless forced
     if (!forceRefresh && _items.isNotEmpty) {
-      final isStale = await _cacheManager.isGroceriesCacheStale(maxAge: const Duration(minutes: 3));
+      final isStale = await _cacheManager.isGroceriesCacheStale(
+        maxAge: const Duration(minutes: 3),
+      );
       if (!isStale) {
         return;
       }
@@ -117,7 +126,9 @@ class KitchenProvider extends ChangeNotifier {
   }
 
   List<GroceryModel> _getItemsByZone(String zone) {
-    return _items.where((i) => i.storageZone.toLowerCase() == zone.toLowerCase()).toList();
+    return _items
+        .where((i) => i.storageZone.toLowerCase() == zone.toLowerCase())
+        .toList();
   }
 
   Future<bool> adjustQuantity(String id, double adjustment) async {
@@ -180,16 +191,32 @@ class KitchenProvider extends ChangeNotifier {
     }
   }
 
+  final Set<String> _deletingItemIds = {};
+  bool isItemDeleting(String id) => _deletingItemIds.contains(id);
+
   Future<bool> deleteItem(String id) async {
+    if (_deletingItemIds.contains(id)) {
+      AppLogger.warning('Delete request already in progress for item: $id');
+      return false;
+    }
+
+    _deletingItemIds.add(id);
+    _errorMessage = null;
+    notifyListeners();
+
     try {
       await _groceryRepository.deleteGrocery(id);
       _items.removeWhere((i) => i.id == id);
       _cacheManager.saveGroceries(_items);
-      notifyListeners();
+      NotificationService().scheduleExpiryAlertsForItems(_items);
       return true;
     } catch (e) {
-      AppLogger.error('Delete failed', e);
+      _errorMessage = e.toString();
+      AppLogger.error('Delete failed for item $id', e);
       return false;
+    } finally {
+      _deletingItemIds.remove(id);
+      notifyListeners();
     }
   }
 

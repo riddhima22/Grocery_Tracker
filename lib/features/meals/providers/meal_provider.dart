@@ -29,7 +29,10 @@ class MealProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final mealLog = await _mealRepository.createMealLog(image: image, description: description);
+      final mealLog = await _mealRepository.createMealLog(
+        image: image,
+        description: description,
+      );
       _currentMealLog = mealLog;
       _initEdits(mealLog);
       _uiState = MealUIState.review;
@@ -81,7 +84,10 @@ class MealProvider extends ChangeNotifier {
         });
       });
 
-      final updated = await _mealRepository.confirmDeduction(_currentMealLog!.id, payload);
+      final updated = await _mealRepository.confirmDeduction(
+        _currentMealLog!.id,
+        payload,
+      );
       _currentMealLog = updated;
       _uiState = MealUIState.success;
       await fetchRecentMeals();

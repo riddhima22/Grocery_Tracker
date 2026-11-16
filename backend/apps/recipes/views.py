@@ -1,17 +1,18 @@
-from rest_framework import viewsets, status
-from rest_framework.response import Response
-from rest_framework.decorators import action
+import logging
+
 from django.db import transaction
 from django.utils import timezone
-from .models import Recipe
-from .serializers import RecipeSerializer
+from rest_framework import viewsets
+from rest_framework.decorators import action
+from rest_framework.response import Response
+
 from apps.groceries.models import GroceryItem
 from apps.groceries.services import deduct_pantry_items_bulk
 from integrations.ai.ai_service import AIService
 from integrations.ai.gemini_client import AIContentBlockedError
-from common.exceptions import ResourceNotFoundException, ForbiddenException
-import logging
-import datetime
+
+from .models import Recipe
+from .serializers import RecipeSerializer
 
 logger = logging.getLogger('freshtrack.recipes')
 
@@ -26,7 +27,7 @@ class RecipeViewSet(viewsets.ReadOnlyModelViewSet):
     def generate(self, request):
         user = request.user
         today = timezone.localdate() if hasattr(timezone, 'localdate') else timezone.now().date()
-        
+
         # 1. Fetch available active groceries (name + expiry info)
         groceries = GroceryItem.objects.filter(user=user, quantity__gt=0).exclude(status='expired')
         grocery_data = []
@@ -42,10 +43,10 @@ class RecipeViewSet(viewsets.ReadOnlyModelViewSet):
                 "days_to_expiry": days_left if days_left is not None else 999,
                 "status": g.status
             })
-            
+
         if not grocery_data:
             return Response({
-                "success": False, 
+                "success": False,
                 "error": "You do not have any active fresh/expiring items in your kitchen to generate recipes from."
             }, status=400)
 
@@ -79,7 +80,7 @@ class RecipeViewSet(viewsets.ReadOnlyModelViewSet):
             for item in grocery_data:
                 item_name_lower = item['name'].lower()
                 is_allergic = any(
-                    kw in item_name_lower 
+                    kw in item_name_lower
                     for kw in allergen_keywords
                 )
                 if not is_allergic:
@@ -97,7 +98,7 @@ class RecipeViewSet(viewsets.ReadOnlyModelViewSet):
         if expiring_only:
             # Prioritize items expiring within 7 days or marked expiring_soon
             near_expiry_items = [
-                item for item in grocery_data 
+                item for item in grocery_data
                 if item["days_to_expiry"] <= 7 or item["status"] == 'expiring_soon'
             ]
             if near_expiry_items:
@@ -130,7 +131,7 @@ class RecipeViewSet(viewsets.ReadOnlyModelViewSet):
             logger.warning(f"Recipe generation content blocked: {e}")
             return Response({"success": False, "error": "The recipe request couldn't be processed — try adjusting your preferences or ingredients."}, status=400)
         except Exception as e:
-            logger.error(f"Recipe generation failed: {str(e)}", exc_info=True)
+            logger.error(f"Recipe generation failed: {e!s}", exc_info=True)
             return Response({"success": False, "error": "AI recipe generator is temporarily unavailable."}, status=502)
 
         # 7. Create and sanitize recipes
@@ -142,7 +143,7 @@ class RecipeViewSet(viewsets.ReadOnlyModelViewSet):
                 allergens_list = r.get('allergens', [])
                 warning = ""
                 matched_allergies = [
-                    a for a in allergens_list 
+                    a for a in allergens_list
                     if a.lower() in [ua.lower() for ua in preferences['allergies']]
                 ]
                 if matched_allergies:
@@ -152,7 +153,7 @@ class RecipeViewSet(viewsets.ReadOnlyModelViewSet):
                 other_ing = r.get('other_ingredients', [])
                 if strict_pantry_only and isinstance(other_ing, list):
                     other_ing = [
-                        ing for ing in other_ing 
+                        ing for ing in other_ing
                         if isinstance(ing, str) and any(staple in ing.lower() for staple in ALLOWED_STAPLES)
                     ]
 
@@ -187,7 +188,7 @@ class RecipeViewSet(viewsets.ReadOnlyModelViewSet):
         recipe_obj = self.get_object()
         user = request.user
         idempotency_key = request.data.get('idempotency_key') or request.headers.get('X-Idempotency-Key')
-        
+
         with transaction.atomic():
             # Row lock recipe to prevent concurrent double-cooking
             recipe = Recipe.objects.select_for_update().get(pk=recipe_obj.pk)

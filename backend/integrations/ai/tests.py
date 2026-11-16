@@ -1,9 +1,14 @@
 from unittest.mock import MagicMock, patch
+
 from django.test import TestCase
 from django.test.utils import override_settings
 
 from integrations.ai.ai_service import AIService
-from integrations.ai.base import GroceryVisionService, RecipeGenerationService, MealInferenceService
+from integrations.ai.base import (
+    GroceryVisionService,
+    MealInferenceService,
+    RecipeGenerationService,
+)
 
 
 class DummyProvider(GroceryVisionService, RecipeGenerationService, MealInferenceService):
@@ -36,7 +41,7 @@ class AIServiceFallbackTests(TestCase):
     def test_gemini_primary_success(self):
         gemini = DummyProvider(name="gemini", return_val={"items": [{"name": "Gemini Milk"}]})
         openai = DummyProvider(name="openai", return_val={"items": [{"name": "OpenAI Milk"}]})
-        
+
         service = AIService(
             provider_order=["gemini", "openai"],
             provider_instances={"gemini": gemini, "openai": openai}
@@ -108,40 +113,43 @@ class AIServiceFallbackTests(TestCase):
 class GeminiHardeningTests(TestCase):
     def test_image_downscaling_large_image(self):
         from PIL import Image
+
         from integrations.ai.gemini_client import GeminiClient
         client = GeminiClient()
 
         # Create a large 3000x1500 test image in memory
         large_img = Image.new('RGB', (3000, 1500), color='green')
         prepared = client._prepare_image(large_img, max_dim=1568)
-        
+
         self.assertEqual(prepared.size[0], 1568)
         self.assertEqual(prepared.size[1], 784)
 
     def test_image_downscaling_portrait_image(self):
         from PIL import Image
+
         from integrations.ai.gemini_client import GeminiClient
         client = GeminiClient()
 
         # Create a large 2000x4000 test image in memory
         portrait_img = Image.new('RGB', (2000, 4000), color='blue')
         prepared = client._prepare_image(portrait_img, max_dim=1568)
-        
+
         self.assertEqual(prepared.size[1], 1568)
         self.assertEqual(prepared.size[0], 784)
 
     def test_image_downscaling_small_image_untouched(self):
         from PIL import Image
+
         from integrations.ai.gemini_client import GeminiClient
         client = GeminiClient()
 
         small_img = Image.new('RGB', (800, 600), color='red')
         prepared = client._prepare_image(small_img, max_dim=1568)
-        
+
         self.assertEqual(prepared.size, (800, 600))
 
     def test_validate_response_empty_candidates_raises_blocked_error(self):
-        from integrations.ai.gemini_client import GeminiClient, AIContentBlockedError
+        from integrations.ai.gemini_client import AIContentBlockedError, GeminiClient
         client = GeminiClient()
 
         mock_resp = MagicMock()
@@ -153,7 +161,7 @@ class GeminiHardeningTests(TestCase):
         self.assertIn("empty response with no candidates", str(ctx.exception))
 
     def test_validate_response_safety_finish_reason_raises_blocked_error(self):
-        from integrations.ai.gemini_client import GeminiClient, AIContentBlockedError
+        from integrations.ai.gemini_client import AIContentBlockedError, GeminiClient
         client = GeminiClient()
 
         mock_candidate = MagicMock()
@@ -167,7 +175,7 @@ class GeminiHardeningTests(TestCase):
         self.assertIn("blocked by content filters", str(ctx.exception))
 
     def test_validate_response_recitation_finish_reason_raises_blocked_error(self):
-        from integrations.ai.gemini_client import GeminiClient, AIContentBlockedError
+        from integrations.ai.gemini_client import AIContentBlockedError, GeminiClient
         client = GeminiClient()
 
         mock_candidate = MagicMock()
@@ -181,8 +189,8 @@ class GeminiHardeningTests(TestCase):
         self.assertIn("blocked by content filters", str(ctx.exception))
 
     def test_model_router_catches_ai_content_blocked_error(self):
-        from integrations.ai.model_router import ModelRouter
         from integrations.ai.gemini_client import AIContentBlockedError
+        from integrations.ai.model_router import ModelRouter
 
         router = ModelRouter()
         with patch.object(router, 'run_image_quality_checks', return_value=([], [], ["/fake/valid.jpg"])):
@@ -213,6 +221,7 @@ class GeminiHardeningTests(TestCase):
 
     def test_translate_gemini_error_json_decode_error(self):
         import json
+
         from integrations.ai.gemini_client import translate_gemini_error
         try:
             json.loads("invalid json text here")
@@ -221,9 +230,11 @@ class GeminiHardeningTests(TestCase):
             self.assertEqual(msg, "AI service returned an unparseable response. Please try again.")
 
     def test_opencv_laplacian_blur_detection(self):
-        import tempfile
         import os
+        import tempfile
+
         from PIL import Image, ImageFilter
+
         from integrations.ai.model_router import ModelRouter
 
         router = ModelRouter()
@@ -258,9 +269,11 @@ class GeminiHardeningTests(TestCase):
                 os.remove(blurred_path)
 
     def test_dark_image_clahe_preprocessing(self):
-        import tempfile
         import os
+        import tempfile
+
         from PIL import Image
+
         from integrations.ai.model_router import ModelRouter
 
         router = ModelRouter()
@@ -276,7 +289,7 @@ class GeminiHardeningTests(TestCase):
             self.assertTrue(is_temp)
             self.assertTrue(os.path.exists(prep_path))
             self.assertNotEqual(prep_path, dark_path)
-            
+
             # Clean up temp prep file
             if os.path.exists(prep_path):
                 os.remove(prep_path)
@@ -289,6 +302,7 @@ class GoogleVisionAndPromptTests(TestCase):
     def test_init_with_credentials_json(self):
         import json
         import os
+
         from integrations.ocr.google_vision_client import GoogleCloudVisionOCR
 
         dummy_creds = {
@@ -316,6 +330,7 @@ class GoogleVisionAndPromptTests(TestCase):
 
     def test_init_fallback_to_file(self):
         import os
+
         from integrations.ocr.google_vision_client import GoogleCloudVisionOCR
 
         with patch.dict(os.environ, {"GOOGLE_APPLICATION_CREDENTIALS": "/fake/service_account.json"}, clear=False):
@@ -329,6 +344,7 @@ class GoogleVisionAndPromptTests(TestCase):
 
     def test_init_disabled_when_no_credentials(self):
         import os
+
         from integrations.ocr.google_vision_client import GoogleCloudVisionOCR
 
         with patch.dict(os.environ, {"GOOGLE_APPLICATION_CREDENTIALS_JSON": "", "GOOGLE_APPLICATION_CREDENTIALS": ""}):
@@ -338,6 +354,7 @@ class GoogleVisionAndPromptTests(TestCase):
 
     def test_object_localization(self):
         import io
+
         from integrations.ocr.google_vision_client import GoogleCloudVisionOCR
 
         mock_annotator = MagicMock()
@@ -366,12 +383,12 @@ class GoogleVisionAndPromptTests(TestCase):
             self.assertEqual(results[1]["score"], 0.88)
 
     def test_prompt_detection_and_grouping_instructions(self):
-        from integrations.ai.prompts import SYSTEM_INSTRUCTION, GROCERY_SCAN_PROMPT
+        from integrations.ai.prompts import GROCERY_SCAN_PROMPT, SYSTEM_INSTRUCTION
 
         # Detection rule
         self.assertIn("detect every single distinct grocery item", SYSTEM_INSTRUCTION.lower())
         self.assertIn("detect every single distinct grocery item", GROCERY_SCAN_PROMPT.lower())
-        
+
         # Object detection cross check
         self.assertIn("object-detection hint", SYSTEM_INSTRUCTION.lower())
         self.assertIn("object-detection hint", GROCERY_SCAN_PROMPT.lower())

@@ -4,16 +4,16 @@ class UserModel {
   final String displayName;
   final String? avatarUrl;
   final bool emailVerified;
-  
+
   final String dietType;
   final String cuisinePref;
   final List<String> allergies;
   final int householdSize;
-  
+
   final bool notify3Days;
   final bool notify1Day;
   final bool notifyDailyRecipe;
-  
+
   final int totalTracked;
   final int savedFromWaste;
   final int recipesCooked;

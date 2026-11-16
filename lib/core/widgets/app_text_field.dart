@@ -45,9 +45,9 @@ class _AppTextFieldState extends State<AppTextField> {
       children: [
         Text(
           widget.label,
-          style: AppTextStyles.labelMedium(context).copyWith(
-            color: AppColors.textSecondary,
-          ),
+          style: AppTextStyles.labelMedium(
+            context,
+          ).copyWith(color: AppColors.textSecondary),
         ),
         AppGap.xs(context),
         TextFormField(
@@ -65,7 +65,9 @@ class _AppTextFieldState extends State<AppTextField> {
             suffixIcon: widget.isPassword
                 ? IconButton(
                     icon: Icon(
-                      _obscureText ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                      _obscureText
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
                       color: AppColors.textSecondary,
                     ),
                     onPressed: () {

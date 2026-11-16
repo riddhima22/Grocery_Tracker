@@ -1,7 +1,8 @@
 import os
 import sys
-from pathlib import Path
 from datetime import timedelta
+from pathlib import Path
+
 import environ
 from django.core.exceptions import ImproperlyConfigured
 
@@ -39,13 +40,13 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    
+
     # Third-party apps
     'rest_framework',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
-    
+
     # Local apps
     'apps.accounts.apps.AccountsConfig',
     'apps.groceries.apps.GroceriesConfig',
@@ -138,6 +139,7 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATIC_ROOT.mkdir(parents=True, exist_ok=True)
 
 STORAGES = {
     "default": {
@@ -183,6 +185,7 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_CLASSES': [
         'rest_framework.throttling.AnonRateThrottle',
         'rest_framework.throttling.UserRateThrottle',
+        'rest_framework.throttling.ScopedRateThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {
         'anon': '100/day',
@@ -267,7 +270,8 @@ GEMINI_FALLBACK_MODELS = env.list(
     'GEMINI_FALLBACK_MODELS',
     default=['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.8-flash']
 )
-GEMINI_TIMEOUT_SECONDS = env.int('GEMINI_TIMEOUT_SECONDS', default=25)
+AI_REQUEST_TIMEOUT_SECONDS = env.int('AI_REQUEST_TIMEOUT_SECONDS', default=45)
+GEMINI_TIMEOUT_SECONDS = env.int('GEMINI_TIMEOUT_SECONDS', default=AI_REQUEST_TIMEOUT_SECONDS)
 
 # OpenAI configuration
 OPENAI_API_KEY = env('OPENAI_API_KEY', default='')

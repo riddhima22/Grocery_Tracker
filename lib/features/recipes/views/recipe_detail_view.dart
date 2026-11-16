@@ -35,14 +35,18 @@ class _RecipeDetailViewState extends State<RecipeDetailView> {
   }
 
   Future<void> _markCooked() async {
-    final success = await context.read<RecipeProvider>().markAsCooked(widget.recipe.id);
+    final success = await context.read<RecipeProvider>().markAsCooked(
+      widget.recipe.id,
+    );
     if (success && mounted) {
       // Re-fetch profile to sync cooked count stats
       context.read<AuthProvider>().checkAuthStatus();
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Cook logged! Great job preparing ${widget.recipe.name}.'),
+          content: Text(
+            'Cook logged! Great job preparing ${widget.recipe.name}.',
+          ),
           backgroundColor: AppColors.success,
         ),
       );
@@ -55,8 +59,12 @@ class _RecipeDetailViewState extends State<RecipeDetailView> {
     return AppScaffold(
       appBar: AppBar(
         title: Text(
-          widget.recipe.name, 
-          style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold, fontSize: context.scaleFont(20.0)),
+          widget.recipe.name,
+          style: TextStyle(
+            fontFamily: 'Outfit',
+            fontWeight: FontWeight.bold,
+            fontSize: context.scaleFont(20.0),
+          ),
         ),
         backgroundColor: Colors.transparent,
       ),
@@ -74,7 +82,7 @@ class _RecipeDetailViewState extends State<RecipeDetailView> {
                 // Header stats block
                 _buildStatsHeader(),
                 AppGap.md(context),
-                
+
                 // Allergen Warning banner
                 if (widget.recipe.allergenWarning.isNotEmpty) ...[
                   _buildAllergenBanner(),
@@ -82,14 +90,20 @@ class _RecipeDetailViewState extends State<RecipeDetailView> {
                 ],
 
                 // Ingredients
-                Text('Ingredients Used', style: AppTextStyles.headingMedium(context)),
+                Text(
+                  'Ingredients Used',
+                  style: AppTextStyles.headingMedium(context),
+                ),
                 AppGap.xs(context),
                 _buildIngredientsList(),
                 AppGap.md(context),
 
                 // Other ingredients needed
                 if (widget.recipe.otherIngredients.isNotEmpty) ...[
-                  Text('Other Needed Ingredients', style: AppTextStyles.headingMedium(context)),
+                  Text(
+                    'Other Needed Ingredients',
+                    style: AppTextStyles.headingMedium(context),
+                  ),
                   AppGap.xs(context),
                   _buildOtherIngredientsList(),
                   AppGap.md(context),
@@ -98,12 +112,20 @@ class _RecipeDetailViewState extends State<RecipeDetailView> {
                     padding: EdgeInsets.all(AppSpacing.sm(context)),
                     decoration: BoxDecoration(
                       color: AppColors.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(AppRadius.card(context) * 0.75),
-                      border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
+                      borderRadius: BorderRadius.circular(
+                        AppRadius.card(context) * 0.75,
+                      ),
+                      border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.25),
+                      ),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.check_circle_outline_rounded, color: AppColors.primary, size: 20),
+                        const Icon(
+                          Icons.check_circle_outline_rounded,
+                          color: AppColors.primary,
+                          size: 20,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -126,13 +148,19 @@ class _RecipeDetailViewState extends State<RecipeDetailView> {
                     padding: EdgeInsets.all(AppSpacing.sm(context)),
                     decoration: BoxDecoration(
                       color: AppColors.card,
-                      borderRadius: BorderRadius.circular(AppRadius.card(context) * 0.75),
+                      borderRadius: BorderRadius.circular(
+                        AppRadius.card(context) * 0.75,
+                      ),
                       border: Border.all(color: AppColors.cardBorder),
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.tips_and_updates_outlined, color: AppColors.warning, size: 20),
+                        const Icon(
+                          Icons.tips_and_updates_outlined,
+                          color: AppColors.warning,
+                          size: 20,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Column(
@@ -140,10 +168,11 @@ class _RecipeDetailViewState extends State<RecipeDetailView> {
                             children: [
                               Text(
                                 'Chef & Fitness Tip',
-                                style: AppTextStyles.labelMedium(context).copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.warning,
-                                ),
+                                style: AppTextStyles.labelMedium(context)
+                                    .copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.warning,
+                                    ),
                               ),
                               const SizedBox(height: 2),
                               Text(
@@ -160,16 +189,16 @@ class _RecipeDetailViewState extends State<RecipeDetailView> {
                 ],
 
                 // Steps
-                Text('Preparation Steps', style: AppTextStyles.headingMedium(context)),
+                Text(
+                  'Preparation Steps',
+                  style: AppTextStyles.headingMedium(context),
+                ),
                 AppGap.sm(context),
                 _buildStepsList(),
                 AppGap.lg(context),
 
                 // Mark cooked button
-                AppButton(
-                  text: 'Mark Cooked',
-                  onPressed: _markCooked,
-                ),
+                AppButton(text: 'Mark Cooked', onPressed: _markCooked),
                 AppGap.lg(context),
               ],
             ),
@@ -183,11 +212,29 @@ class _RecipeDetailViewState extends State<RecipeDetailView> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceAround,
       children: [
-        Expanded(child: _buildStatItem('Prep Time', '${widget.recipe.prepTimeMins} mins', Icons.timer_outlined)),
+        Expanded(
+          child: _buildStatItem(
+            'Prep Time',
+            '${widget.recipe.prepTimeMins} mins',
+            Icons.timer_outlined,
+          ),
+        ),
         const SizedBox(width: 8.0),
-        Expanded(child: _buildStatItem('Calories', '${widget.recipe.caloriesPerServing} kcal', Icons.local_fire_department_outlined)),
+        Expanded(
+          child: _buildStatItem(
+            'Calories',
+            '${widget.recipe.caloriesPerServing} kcal',
+            Icons.local_fire_department_outlined,
+          ),
+        ),
         const SizedBox(width: 8.0),
-        Expanded(child: _buildStatItem('Servings', '${widget.recipe.servings} portions', Icons.restaurant_outlined)),
+        Expanded(
+          child: _buildStatItem(
+            'Servings',
+            '${widget.recipe.servings} portions',
+            Icons.restaurant_outlined,
+          ),
+        ),
       ],
     );
   }
@@ -208,13 +255,27 @@ class _RecipeDetailViewState extends State<RecipeDetailView> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: AppIconSizes.sm(context), color: AppColors.textSecondary),
+              Icon(
+                icon,
+                size: AppIconSizes.sm(context),
+                color: AppColors.textSecondary,
+              ),
               const SizedBox(width: 4.0),
-              Text(label, style: AppTextStyles.caption(context).copyWith(color: AppColors.textSecondary)),
+              Text(
+                label,
+                style: AppTextStyles.caption(
+                  context,
+                ).copyWith(color: AppColors.textSecondary),
+              ),
             ],
           ),
           const SizedBox(height: 4.0),
-          Text(value, style: AppTextStyles.labelMedium(context).copyWith(fontWeight: FontWeight.bold)),
+          Text(
+            value,
+            style: AppTextStyles.labelMedium(
+              context,
+            ).copyWith(fontWeight: FontWeight.bold),
+          ),
         ],
       ),
     );
@@ -230,12 +291,18 @@ class _RecipeDetailViewState extends State<RecipeDetailView> {
       ),
       child: Row(
         children: [
-          Icon(Icons.warning_amber_rounded, color: AppColors.danger, size: AppIconSizes.md(context)),
+          Icon(
+            Icons.warning_amber_rounded,
+            color: AppColors.danger,
+            size: AppIconSizes.md(context),
+          ),
           AppGap.sm(context),
           Expanded(
             child: Text(
               widget.recipe.allergenWarning,
-              style: AppTextStyles.bodyMedium(context).copyWith(color: AppColors.danger, fontWeight: FontWeight.bold),
+              style: AppTextStyles.bodyMedium(
+                context,
+              ).copyWith(color: AppColors.danger, fontWeight: FontWeight.bold),
             ),
           ),
         ],
@@ -260,7 +327,9 @@ class _RecipeDetailViewState extends State<RecipeDetailView> {
           ),
           child: Text(
             '✓ $i',
-            style: AppTextStyles.bodyMedium(context).copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
+            style: AppTextStyles.bodyMedium(
+              context,
+            ).copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
           ),
         );
       }).toList(),
@@ -284,7 +353,9 @@ class _RecipeDetailViewState extends State<RecipeDetailView> {
           ),
           child: Text(
             '+ $i',
-            style: AppTextStyles.bodyMedium(context).copyWith(color: AppColors.textSecondary),
+            style: AppTextStyles.bodyMedium(
+              context,
+            ).copyWith(color: AppColors.textSecondary),
           ),
         );
       }).toList(),
@@ -296,18 +367,26 @@ class _RecipeDetailViewState extends State<RecipeDetailView> {
       children: List.generate(widget.recipe.steps.length, (index) {
         final step = widget.recipe.steps[index];
         final isChecked = _checkedSteps.contains(index);
-        
+
         return Card(
-          color: isChecked ? AppColors.card.withValues(alpha: 0.4) : AppColors.card,
+          color: isChecked
+              ? AppColors.card.withValues(alpha: 0.4)
+              : AppColors.card,
           margin: EdgeInsets.symmetric(vertical: AppSpacing.xxs(context)),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.card(context) * 0.75),
-            side: BorderSide(color: isChecked ? AppColors.cardBorder.withValues(alpha: 0.5) : AppColors.cardBorder),
+            side: BorderSide(
+              color: isChecked
+                  ? AppColors.cardBorder.withValues(alpha: 0.5)
+                  : AppColors.cardBorder,
+            ),
           ),
           child: ListTile(
             leading: CircleAvatar(
               radius: 12.0,
-              backgroundColor: isChecked ? AppColors.primary.withValues(alpha: 0.2) : AppColors.surface,
+              backgroundColor: isChecked
+                  ? AppColors.primary.withValues(alpha: 0.2)
+                  : AppColors.surface,
               child: Text(
                 '${index + 1}',
                 style: TextStyle(
@@ -329,7 +408,9 @@ class _RecipeDetailViewState extends State<RecipeDetailView> {
               value: isChecked,
               onChanged: (_) => _toggleStep(index),
               activeColor: AppColors.primary,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4.0)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(4.0),
+              ),
             ),
           ),
         );

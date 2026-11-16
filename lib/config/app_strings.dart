@@ -1,6 +1,6 @@
-
 class AppStrings {
-  static String activeLanguage = 'en'; // default language, can be switched to 'hi'
+  static String activeLanguage =
+      'en'; // default language, can be switched to 'hi'
 
   static const Map<String, Map<String, String>> _localizedValues = {
     'en': {
@@ -15,19 +15,26 @@ class AppStrings {
       'pantry.markConsumed': 'Mark as Consumed',
       'pantry.markWasted': 'Mark as Wasted',
       'groceryList.suggestionReason': 'Suggested based on your history',
-      'errors.network': 'No internet connection. Check your network and try again.',
-      'errors.sessionExpired': 'Your session has expired. Please sign in again.',
-      'errors.unauthorized': 'Incorrect credentials. Please check and try again.',
-      'errors.rateLimit': 'Too many scan attempts. Please wait before trying again.',
+      'errors.network':
+          'No internet connection. Check your network and try again.',
+      'errors.sessionExpired':
+          'Your session has expired. Please sign in again.',
+      'errors.unauthorized':
+          'Incorrect credentials. Please check and try again.',
+      'errors.rateLimit':
+          'Too many scan attempts. Please wait before trying again.',
       'errors.generic': 'Something went wrong. Please try again.',
-      
+
       'onboarding.title1': 'Never waste groceries again',
-      'onboarding.desc1': 'Track your groceries and know what to use before it expires.',
+      'onboarding.desc1':
+          'Track your groceries and know what to use before it expires.',
       'onboarding.title2': 'Smart storage guidance',
-      'onboarding.desc2': 'Know where every grocery item belongs and help it stay fresh longer.',
+      'onboarding.desc2':
+          'Know where every grocery item belongs and help it stay fresh longer.',
       'onboarding.title3': 'Recipes from what you have',
-      'onboarding.desc3': 'Turn groceries already in your kitchen into useful meal ideas.',
-      
+      'onboarding.desc3':
+          'Turn groceries already in your kitchen into useful meal ideas.',
+
       'dashboard.expiringSoon': 'Expiring Soon',
       'dashboard.expired': 'Expired',
       'dashboard.fresh': 'Fresh',
@@ -36,7 +43,7 @@ class AppStrings {
       'dashboard.greetingMorning': 'Good morning',
       'dashboard.greetingAfternoon': 'Good afternoon',
       'dashboard.greetingEvening': 'Good evening',
-      
+
       'kitchen.fridge': 'FRIDGE',
       'kitchen.spices': 'SPICES',
       'kitchen.pantry': 'PANTRY',
@@ -57,19 +64,24 @@ class AppStrings {
       'pantry.markConsumed': 'उपभोग किया गया',
       'pantry.markWasted': 'बर्बाद चिह्नित करें',
       'groceryList.suggestionReason': 'आपके इतिहास के आधार पर सुझाया गया',
-      'errors.network': 'कोई इंटरनेट कनेक्शन नहीं। कृपया जाँचें और पुनः प्रयास करें।',
-      'errors.sessionExpired': 'आपका सत्र समाप्त हो गया है। कृपया पुनः साइन इन करें।',
+      'errors.network':
+          'कोई इंटरनेट कनेक्शन नहीं। कृपया जाँचें और पुनः प्रयास करें।',
+      'errors.sessionExpired':
+          'आपका सत्र समाप्त हो गया है। कृपया पुनः साइन इन करें।',
       'errors.unauthorized': 'गलत विवरण। कृपया पुनः जाँचें।',
       'errors.rateLimit': 'बहुत सारे प्रयास। कृपया बाद में प्रयास करें।',
       'errors.generic': 'कुछ गलत हो गया। कृपया पुनः प्रयास करें।',
-      
+
       'onboarding.title1': 'कभी भोजन बर्बाद न करें',
-      'onboarding.desc1': 'अपने राशन को ट्रैक करें और समाप्त होने से पहले उपयोग करना जानें।',
+      'onboarding.desc1':
+          'अपने राशन को ट्रैक करें और समाप्त होने से पहले उपयोग करना जानें।',
       'onboarding.title2': 'स्मार्ट स्टोरेज गाइड',
-      'onboarding.desc2': 'जानें कि राशन की हर वस्तु कहाँ रखी जानी चाहिए ताकि वह लंबे समय तक ताज़ा रहे।',
+      'onboarding.desc2':
+          'जानें कि राशन की हर वस्तु कहाँ रखी जानी चाहिए ताकि वह लंबे समय तक ताज़ा रहे।',
       'onboarding.title3': 'रसोई के सामान से रेसिपी',
-      'onboarding.desc3': 'अपनी रसोई में पहले से मौजूद सामान को स्वादिष्ट भोजन विचारों में बदलें।',
-      
+      'onboarding.desc3':
+          'अपनी रसोई में पहले से मौजूद सामान को स्वादिष्ट भोजन विचारों में बदलें।',
+
       'dashboard.expiringSoon': 'जल्द समाप्त',
       'dashboard.expired': 'समाप्त',
       'dashboard.fresh': 'ताज़ा',
@@ -78,7 +90,7 @@ class AppStrings {
       'dashboard.greetingMorning': 'सुप्रभात',
       'dashboard.greetingAfternoon': 'नमस्कार',
       'dashboard.greetingEvening': 'शुभ संध्या',
-      
+
       'kitchen.fridge': 'फ्रिज',
       'kitchen.spices': 'मसाले',
       'kitchen.pantry': 'रसोई भंडार',
@@ -86,7 +98,7 @@ class AppStrings {
       'kitchen.counter': 'काउंटर',
       'kitchen.basket': 'टोकरी',
       'kitchen.freezer': 'फ्रीजर',
-    }
+    },
   };
 
   static String get(String key) {

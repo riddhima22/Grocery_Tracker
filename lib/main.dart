@@ -34,7 +34,8 @@ void main() async {
     );
     // Pass all uncaught errors from the framework to Crashlytics if not running on Web.
     if (!kIsWeb) {
-      FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+      FlutterError.onError =
+          FirebaseCrashlytics.instance.recordFlutterFatalError;
     }
     // Initialize push and local notifications
     await NotificationService().initialize();

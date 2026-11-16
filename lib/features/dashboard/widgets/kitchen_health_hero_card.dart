@@ -82,11 +82,16 @@ class KitchenHealthHeroCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
                           decoration: BoxDecoration(
                             color: ratingColor.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: ratingColor.withValues(alpha: 0.35)),
+                            border: Border.all(
+                              color: ratingColor.withValues(alpha: 0.35),
+                            ),
                           ),
                           child: Text(
                             _healthRating,

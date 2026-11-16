@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
 import 'package:google_sign_in/google_sign_in.dart';
 import '../providers/auth_provider.dart';
 import '../../onboarding/providers/onboarding_provider.dart';
+import '../../scan/providers/scan_provider.dart';
 import '../../../config/app_colors.dart';
 import '../../../config/app_spacing.dart';
 import '../../../config/app_radius.dart';
@@ -47,6 +48,7 @@ class _LoginViewState extends State<LoginView> {
     );
 
     if (success && mounted) {
+      context.read<ScanProvider>().resetState();
       final onboarding = context.read<OnboardingProvider>();
       if (!onboarding.onboardingComplete) {
         Navigator.pushReplacementNamed(context, AppRoutes.onboarding);
@@ -76,9 +78,9 @@ class _LoginViewState extends State<LoginView> {
         try {
           final fb_auth.OAuthCredential credential =
               fb_auth.GoogleAuthProvider.credential(
-            accessToken: authDetails.accessToken,
-            idToken: authDetails.idToken,
-          );
+                accessToken: authDetails.accessToken,
+                idToken: authDetails.idToken,
+              );
           await fb_auth.FirebaseAuth.instance.signInWithCredential(credential);
         } catch (fbError) {
           debugPrint('Firebase sign in sync note: $fbError');
@@ -93,6 +95,7 @@ class _LoginViewState extends State<LoginView> {
         );
 
         if (success && mounted) {
+          context.read<ScanProvider>().resetState();
           final onboarding = context.read<OnboardingProvider>();
           if (!onboarding.onboardingComplete) {
             Navigator.pushReplacementNamed(context, AppRoutes.onboarding);
@@ -248,7 +251,6 @@ class _LoginViewState extends State<LoginView> {
                     icon: Icons.g_mobiledata_rounded,
                   ),
                   AppGap.xl(context),
-
 
                   // Sign Up link
                   Row(

@@ -7,7 +7,10 @@ import '../model/meal_log_model.dart';
 class MealRepository {
   final ApiClient _apiClient = ApiClient();
 
-  Future<MealLogModel> createMealLog({XFile? image, String? description}) async {
+  Future<MealLogModel> createMealLog({
+    XFile? image,
+    String? description,
+  }) async {
     final Map<String, dynamic> formMap = {};
     if (description != null && description.isNotEmpty) {
       formMap['description'] = description;
@@ -38,7 +41,10 @@ class MealRepository {
     return list?.map((m) => MealLogModel.fromJson(m)).toList() ?? const [];
   }
 
-  Future<MealLogModel> confirmDeduction(String mealId, List<Map<String, dynamic>> deductions) async {
+  Future<MealLogModel> confirmDeduction(
+    String mealId,
+    List<Map<String, dynamic>> deductions,
+  ) async {
     final response = await _apiClient.post(
       ApiEndpoints.confirmMealDeduction(mealId),
       data: {'candidate_deductions': deductions},

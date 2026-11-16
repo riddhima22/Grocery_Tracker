@@ -26,6 +26,7 @@ class ScanSessionModel {
   final int failedImageCount;
   final int candidateCount;
   final String? idempotencyKey;
+  final String errorMessage;
   final DateTime? completedAt;
   final List<ScanImageModel> images;
 
@@ -37,6 +38,7 @@ class ScanSessionModel {
     required this.failedImageCount,
     required this.candidateCount,
     this.idempotencyKey,
+    this.errorMessage = '',
     this.completedAt,
     required this.images,
   });
@@ -50,8 +52,15 @@ class ScanSessionModel {
       failedImageCount: json['failed_image_count'] ?? 0,
       candidateCount: json['candidate_count'] ?? 0,
       idempotencyKey: json['idempotency_key'],
-      completedAt: json['completed_at'] != null ? DateTime.tryParse(json['completed_at']) : null,
-      images: (json['images'] as List?)?.map((i) => ScanImageModel.fromJson(i)).toList() ?? const [],
+      errorMessage: json['error_message'] ?? '',
+      completedAt: json['completed_at'] != null
+          ? DateTime.tryParse(json['completed_at'])
+          : null,
+      images:
+          (json['images'] as List?)
+              ?.map((i) => ScanImageModel.fromJson(i))
+              .toList() ??
+          const [],
     );
   }
 }

@@ -1,5 +1,7 @@
 from rest_framework import serializers
-from .models import MealLog, MealIngredientCandidate
+
+from .models import MealIngredientCandidate, MealLog
+
 
 class MealIngredientCandidateSerializer(serializers.ModelSerializer):
     class Meta:

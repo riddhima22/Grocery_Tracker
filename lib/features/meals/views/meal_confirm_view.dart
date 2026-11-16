@@ -14,15 +14,21 @@ class MealConfirmView extends StatelessWidget {
   void _confirmAndDeduct(BuildContext context) async {
     final provider = context.read<MealProvider>();
     final success = await provider.confirmDeduction();
-    
+
     if (success && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Meal logged and pantry updated!'), backgroundColor: AppColors.success),
+        const SnackBar(
+          content: Text('Meal logged and pantry updated!'),
+          backgroundColor: AppColors.success,
+        ),
       );
       Navigator.pop(context);
     } else if (context.mounted && provider.errorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(provider.errorMessage!), backgroundColor: AppColors.danger),
+        SnackBar(
+          content: Text(provider.errorMessage!),
+          backgroundColor: AppColors.danger,
+        ),
       );
     }
   }
@@ -34,7 +40,9 @@ class MealConfirmView extends StatelessWidget {
     final isLoading = provider.uiState == MealUIState.analyzing;
 
     if (mealLog == null) {
-      return const AppScaffold(body: Center(child: Text('No meal data available.')));
+      return const AppScaffold(
+        body: Center(child: Text('No meal data available.')),
+      );
     }
 
     return AppScaffold(
@@ -55,22 +63,28 @@ class MealConfirmView extends StatelessWidget {
                     padding: const EdgeInsets.only(bottom: 16.0),
                     child: Text(
                       'We detected these ingredients in your meal. Review and adjust quantities to deduct from your pantry.',
-                      style: AppTextStyles.bodyMedium(context).copyWith(color: AppColors.textSecondary),
+                      style: AppTextStyles.bodyMedium(
+                        context,
+                      ).copyWith(color: AppColors.textSecondary),
                     ),
                   );
                 }
                 final candidate = mealLog.candidates[index - 1];
                 final editData = provider.deductionEdits[candidate.id] ?? {};
-                final isConfirmed = editData['confirmed'] ?? candidate.confirmed;
-                final quantity = editData['quantity'] ?? candidate.deductQuantity;
-                
+                final isConfirmed =
+                    editData['confirmed'] ?? candidate.confirmed;
+                final quantity =
+                    editData['quantity'] ?? candidate.deductQuantity;
+
                 final isMatched = candidate.pantryItemId != null;
 
                 return Card(
                   margin: const EdgeInsets.only(bottom: 12),
                   color: AppColors.card,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppRadius.card(context)),
+                    borderRadius: BorderRadius.circular(
+                      AppRadius.card(context),
+                    ),
                     side: const BorderSide(color: AppColors.cardBorder),
                   ),
                   child: Padding(
@@ -84,7 +98,10 @@ class MealConfirmView extends StatelessWidget {
                               value: isConfirmed,
                               onChanged: (val) {
                                 if (val != null) {
-                                  provider.updateCandidateConfirmation(candidate.id, val);
+                                  provider.updateCandidateConfirmation(
+                                    candidate.id,
+                                    val,
+                                  );
                                 }
                               },
                               activeColor: AppColors.primary,
@@ -95,20 +112,29 @@ class MealConfirmView extends StatelessWidget {
                                 children: [
                                   Text(
                                     candidate.name,
-                                    style: AppTextStyles.labelLarge(context).copyWith(
-                                      decoration: !isConfirmed ? TextDecoration.lineThrough : null,
-                                      color: !isConfirmed ? AppColors.textSecondary : AppColors.textPrimary,
-                                    ),
+                                    style: AppTextStyles.labelLarge(context)
+                                        .copyWith(
+                                          decoration: !isConfirmed
+                                              ? TextDecoration.lineThrough
+                                              : null,
+                                          color: !isConfirmed
+                                              ? AppColors.textSecondary
+                                              : AppColors.textPrimary,
+                                        ),
                                   ),
                                   if (isMatched)
                                     Text(
                                       'Matched with Pantry Item',
-                                      style: AppTextStyles.caption(context).copyWith(color: AppColors.success),
+                                      style: AppTextStyles.caption(
+                                        context,
+                                      ).copyWith(color: AppColors.success),
                                     )
                                   else
                                     Text(
                                       'Not found in pantry',
-                                      style: AppTextStyles.caption(context).copyWith(color: AppColors.warning),
+                                      style: AppTextStyles.caption(
+                                        context,
+                                      ).copyWith(color: AppColors.warning),
                                     ),
                                 ],
                               ),
@@ -119,12 +145,21 @@ class MealConfirmView extends StatelessWidget {
                           const SizedBox(height: 12),
                           Row(
                             children: [
-                              Text('Quantity (${candidate.unit}):', style: AppTextStyles.bodyMedium(context)),
+                              Text(
+                                'Quantity (${candidate.unit}):',
+                                style: AppTextStyles.bodyMedium(context),
+                              ),
                               const SizedBox(width: 16),
                               IconButton(
-                                icon: const Icon(Icons.remove_circle_outline, color: AppColors.primary),
-                                onPressed: quantity > 0.5 
-                                    ? () => provider.updateCandidateQuantity(candidate.id, quantity - 0.5)
+                                icon: const Icon(
+                                  Icons.remove_circle_outline,
+                                  color: AppColors.primary,
+                                ),
+                                onPressed: quantity > 0.5
+                                    ? () => provider.updateCandidateQuantity(
+                                        candidate.id,
+                                        quantity - 0.5,
+                                      )
                                     : null,
                               ),
                               Text(
@@ -132,12 +167,19 @@ class MealConfirmView extends StatelessWidget {
                                 style: AppTextStyles.labelLarge(context),
                               ),
                               IconButton(
-                                icon: const Icon(Icons.add_circle_outline, color: AppColors.primary),
-                                onPressed: () => provider.updateCandidateQuantity(candidate.id, quantity + 0.5),
+                                icon: const Icon(
+                                  Icons.add_circle_outline,
+                                  color: AppColors.primary,
+                                ),
+                                onPressed: () =>
+                                    provider.updateCandidateQuantity(
+                                      candidate.id,
+                                      quantity + 0.5,
+                                    ),
                               ),
                             ],
                           ),
-                        ]
+                        ],
                       ],
                     ),
                   ),
@@ -154,14 +196,18 @@ class MealConfirmView extends StatelessWidget {
                   backgroundColor: AppColors.primary,
                   minimumSize: const Size.fromHeight(56),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppRadius.card(context)),
+                    borderRadius: BorderRadius.circular(
+                      AppRadius.card(context),
+                    ),
                   ),
                 ),
                 child: isLoading
                     ? const CircularProgressIndicator(color: Colors.white)
                     : Text(
                         'Confirm & Deduct Pantry',
-                        style: AppTextStyles.labelLarge(context).copyWith(color: Colors.white),
+                        style: AppTextStyles.labelLarge(
+                          context,
+                        ).copyWith(color: Colors.white),
                       ),
               ),
             ),

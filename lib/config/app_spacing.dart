@@ -26,21 +26,19 @@ class AppSpacing {
   static double xxl(BuildContext context) =>
       context.scaleWidth(AppDimensions.spacingXxl);
 
-  static double pageHorizontal(BuildContext context) =>
-      context.responsiveValue(
-        compactPhone: context.scaleWidth(AppDimensions.pagePaddingCompact),
-        phone: context.scaleWidth(AppDimensions.pagePaddingPhone),
-        tablet: context.scaleWidth(AppDimensions.pagePaddingTablet),
-        largeTablet: context.scaleWidth(AppDimensions.pagePaddingLargeTablet),
-      );
+  static double pageHorizontal(BuildContext context) => context.responsiveValue(
+    compactPhone: context.scaleWidth(AppDimensions.pagePaddingCompact),
+    phone: context.scaleWidth(AppDimensions.pagePaddingPhone),
+    tablet: context.scaleWidth(AppDimensions.pagePaddingTablet),
+    largeTablet: context.scaleWidth(AppDimensions.pagePaddingLargeTablet),
+  );
 
-  static double pageVertical(BuildContext context) =>
-      context.responsiveValue(
-        compactPhone: context.scaleWidth(AppDimensions.pagePaddingCompact),
-        phone: context.scaleWidth(AppDimensions.pagePaddingPhone),
-        tablet: context.scaleWidth(AppDimensions.pagePaddingTablet),
-        largeTablet: context.scaleWidth(AppDimensions.pagePaddingLargeTablet),
-      );
+  static double pageVertical(BuildContext context) => context.responsiveValue(
+    compactPhone: context.scaleWidth(AppDimensions.pagePaddingCompact),
+    phone: context.scaleWidth(AppDimensions.pagePaddingPhone),
+    tablet: context.scaleWidth(AppDimensions.pagePaddingTablet),
+    largeTablet: context.scaleWidth(AppDimensions.pagePaddingLargeTablet),
+  );
 }
 
 class AppGap extends StatelessWidget {

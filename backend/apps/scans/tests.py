@@ -1,8 +1,25 @@
+import datetime
+import io
+import logging
+from unittest.mock import MagicMock, patch
+
+from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.utils import timezone
-import datetime
-from integrations.ocr.text_parser import parse_absolute_date, OCRDateParser
+from kombu.exceptions import OperationalError
+from PIL import Image
+from rest_framework.test import APITestCase
+
+from apps.groceries.models import GroceryItem
+from apps.groceries.serializers import GroceryItemSerializer
+from apps.scans import views as scan_views
+from apps.scans.models import ScanCandidate, ScanImage, ScanSession
 from integrations.ai.model_router import ModelRouter
+from integrations.ocr.text_parser import OCRDateParser, parse_absolute_date
+
+User = get_user_model()
+
 
 class OCRTextParserTests(TestCase):
     def test_parse_absolute_dates(self):
@@ -10,11 +27,11 @@ class OCRTextParserTests(TestCase):
         self.assertEqual(parse_absolute_date("18/07/2026"), datetime.date(2026, 7, 18))
         self.assertEqual(parse_absolute_date("15-05-2025"), datetime.date(2025, 5, 15))
         self.assertEqual(parse_absolute_date("01.12.2024"), datetime.date(2024, 12, 1))
-        
+
         # Test month name formats
         self.assertEqual(parse_absolute_date("15-JUL-2026"), datetime.date(2026, 7, 15))
         self.assertEqual(parse_absolute_date("20-October-2027"), datetime.date(2027, 10, 20))
-        
+
         # Test partial formats (MM/YYYY)
         self.assertEqual(parse_absolute_date("08/2026"), datetime.date(2026, 8, 1))
 
@@ -22,7 +39,7 @@ class OCRTextParserTests(TestCase):
         # Mock packaging text
         text = "PKD: 10/01/2026\nBEST BEFORE 6 MONTHS FROM PACKING\n"
         res = OCRDateParser.extract_dates(text)
-        
+
         # 10th Jan 2026 + 6 months (180 days) = 9th July 2026
         self.assertIsNotNone(res["expiry_date"])
         self.assertEqual(res["date_type"], "best_before")
@@ -33,7 +50,7 @@ class OCRTextParserTests(TestCase):
     def test_relative_date_parsing_days(self):
         text = "MFD: 15-07-2026\nBEST BEFORE 15 DAYS\n"
         res = OCRDateParser.extract_dates(text)
-        
+
         self.assertEqual(res["expiry_date"], datetime.date(2026, 7, 30))
         self.assertEqual(res["date_type"], "best_before")
         self.assertEqual(res["date_source"], "calculated_from_packaging")
@@ -41,7 +58,7 @@ class OCRTextParserTests(TestCase):
     def test_absolute_ocr_extraction(self):
         text = "EXPIRY DATE: 18/12/2026\nLOT 18273"
         res = OCRDateParser.extract_dates(text)
-        
+
         self.assertEqual(res["expiry_date"], datetime.date(2026, 12, 18))
         self.assertEqual(res["date_type"], "use_by")
         self.assertEqual(res["date_source"], "ocr_verified")
@@ -73,13 +90,7 @@ class ScanTaskRetryTests(TestCase):
         self.assertFalse(is_transient_error(Exception("Invalid argument: JSONDecodeError")))
 
 
-from rest_framework.test import APITestCase
-from django.contrib.auth import get_user_model
-from apps.scans.models import ScanSession, ScanCandidate
-from apps.groceries.models import GroceryItem
-from apps.groceries.serializers import GroceryItemSerializer
 
-User = get_user_model()
 
 class ScanConfirmationDateRegressionTests(APITestCase):
     def setUp(self):
@@ -136,7 +147,7 @@ class ScanConfirmationDateRegressionTests(APITestCase):
             unit="kg",
             expiry_date=datetime.date(2026, 11, 1),
         )
-        candidate.expiry_date = datetime.datetime(2026, 11, 1, 12, 0, 0, tzinfo=datetime.timezone.utc)
+        candidate.expiry_date = datetime.datetime(2026, 11, 1, 12, 0, 0, tzinfo=datetime.UTC)
         candidate.save()
 
         url = f"/api/v1/scans/sessions/{self.session.id}/confirm/"
@@ -164,11 +175,12 @@ class ScanConfirmationDateRegressionTests(APITestCase):
 
 class ScanUploadValidationTests(TestCase):
     def test_scan_upload_rejects_corrupted_or_mismatched_image(self):
-        from rest_framework.test import APIClient
-        from django.core.files.uploadedfile import SimpleUploadedFile
-        from django.contrib.auth import get_user_model
         import io
+
+        from django.contrib.auth import get_user_model
+        from django.core.files.uploadedfile import SimpleUploadedFile
         from PIL import Image
+        from rest_framework.test import APIClient
 
         user = get_user_model().objects.create_user(
             email='scan_validator@example.com',
@@ -261,7 +273,7 @@ class ScanCandidateExpirySemanticsTests(TestCase):
         Must succeed, not throw NOT NULL error, shift estimated date, and set is_expiry_estimated=True.
         """
         from apps.scans.serializers import ScanCandidateSerializer
-        
+
         # Test 1: Direct model creation
         candidate = ScanCandidate.objects.create(
             scan_session=self.session,
@@ -306,8 +318,9 @@ class ScanCandidateExpirySemanticsTests(TestCase):
 
     def test_tasks_processing_with_red_onion_item_data(self):
         """Simulate task processing loop with the exact AI dictionary for Red Onion."""
+        from unittest.mock import patch
+
         from apps.scans.tasks import process_scan_session_task
-        from unittest.mock import patch, MagicMock
 
         mock_router_result = {
             "success": True,
@@ -341,8 +354,9 @@ class ScanCandidateExpirySemanticsTests(TestCase):
             MockRouter.return_value = mock_instance
 
             # Create pending image for session
-            from apps.scans.models import ScanImage
             from django.core.files.uploadedfile import SimpleUploadedFile
+
+            from apps.scans.models import ScanImage
             img_file = SimpleUploadedFile("onion.jpg", b"fake-jpg", content_type="image/jpeg")
             ScanImage.objects.create(scan_session=self.session, image=img_file, status=ScanImage.Statuses.PENDING)
 
@@ -356,14 +370,166 @@ class ScanCandidateExpirySemanticsTests(TestCase):
             self.assertEqual(created_candidate.estimated_consumption_date, datetime.date(2026, 11, 7))
 
 
-import io
-import logging
-from PIL import Image
-from unittest.mock import patch, MagicMock
-from kombu.exceptions import OperationalError
-from django.core.files.uploadedfile import SimpleUploadedFile
-from apps.scans import views as scan_views
-from apps.scans.models import ScanImage, ScanSession
+class ScanFlowAsyncAndPollingTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="async_scan_user@example.com",
+            password="StrongPassword123!",
+            display_name="Async Scan Tester"
+        )
+        self.client.force_authenticate(user=self.user)
+
+    def _create_dummy_image_file(self, filename="groceries.jpg"):
+        import io
+
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from PIL import Image
+
+        buf = io.BytesIO()
+        img = Image.new("RGB", (300, 300), color="green")
+        img.save(buf, format="JPEG")
+        buf.seek(0)
+        return SimpleUploadedFile(filename, buf.read(), content_type="image/jpeg")
+
+    def test_post_scan_session_returns_201_or_202_and_queued_status(self):
+        """
+        POST /api/v1/scans/sessions/ returns HTTP 201/202 immediately
+        with session ID and queued status, without blocking the web worker.
+        """
+        from unittest.mock import patch
+
+        image_file = self._create_dummy_image_file()
+
+        with patch("apps.scans.views.process_scan_session_task.delay") as mock_delay:
+            mock_delay.return_value = None
+            response = self.client.post(
+                "/api/v1/scans/sessions/",
+                {"images": [image_file]},
+                format="multipart"
+            )
+
+        self.assertIn(response.status_code, [201, 202])
+        self.assertTrue(response.data.get("success"))
+        data = response.data.get("data", {})
+        session_id = data.get("id")
+        self.assertIsNotNone(session_id)
+        self.assertIn(data.get("status"), ["pending", "processing"])
+
+        # Verify session in database is in pending/processing status
+        session = ScanSession.objects.get(id=session_id)
+        self.assertIn(session.status, [ScanSession.Statuses.PENDING, ScanSession.Statuses.PROCESSING])
+        self.assertEqual(session.image_count, 1)
+
+    def test_polling_get_scan_session_endpoint(self):
+        """
+        GET /api/v1/scans/sessions/{id}/ returns session details in standard envelope.
+        """
+        session = ScanSession.objects.create(
+            user=self.user,
+            status=ScanSession.Statuses.PROCESSING,
+            image_count=1
+        )
+
+        response = self.client.get(f"/api/v1/scans/sessions/{session.id}/")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data.get("success"))
+        data = response.data.get("data", {})
+        self.assertEqual(data.get("id"), str(session.id))
+        self.assertEqual(data.get("status"), "processing")
+        self.assertEqual(data.get("error_message"), "")
+
+    def test_scan_task_failure_path_sets_failed_status_and_error_message(self):
+        """
+        When the AI/OCR pipeline encounters an unrecoverable failure,
+        the task sets session status='failed' and records error_message.
+        """
+        from unittest.mock import patch
+
+        from apps.scans.models import ScanImage
+        from apps.scans.tasks import process_scan_session_task
+
+        session = ScanSession.objects.create(
+            user=self.user,
+            status=ScanSession.Statuses.PROCESSING,
+            image_count=1
+        )
+        image_file = self._create_dummy_image_file()
+        ScanImage.objects.create(
+            scan_session=session,
+            image=image_file,
+            status=ScanImage.Statuses.PENDING
+        )
+
+        with patch("apps.scans.tasks.ModelRouter") as MockRouter:
+            mock_instance = MagicMock()
+            mock_instance.process_scan.return_value = {
+                "success": False,
+                "error": "Image resolution too low or corrupted."
+            }
+            MockRouter.return_value = mock_instance
+
+            # Execute task directly with mocked AI/OCR
+            process_scan_session_task(str(session.id))
+
+        session.refresh_from_db()
+        self.assertEqual(session.status, ScanSession.Statuses.FAILED)
+        self.assertIn("Image resolution too low or corrupted.", session.error_message)
+
+        # Polling endpoint reflects failed status and error message
+        response = self.client.get(f"/api/v1/scans/sessions/{session.id}/")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data.get("success"))
+        data = response.data.get("data", {})
+        self.assertEqual(data.get("status"), "failed")
+        self.assertIn("Image resolution too low or corrupted.", data.get("error_message"))
+
+    def test_gemini_timeout_falls_back_to_openai(self):
+        """
+        When Gemini raises a TimeoutError / deadline exceeded, AIService
+        falls back to OpenAI and returns candidates successfully.
+        """
+        from integrations.ai.ai_service import AIService
+
+        class TimeoutGeminiProvider:
+            def analyze_grocery_images(self, *args, **kwargs):
+                raise TimeoutError("Gemini request timed out after 45s")
+
+        class SuccessfulOpenAIProvider:
+            def analyze_grocery_images(self, *args, **kwargs):
+                return {
+                    "items": [
+                        {
+                            "name": "Organic Whole Milk",
+                            "quantity": 1.0,
+                            "unit": "bottle",
+                            "confidence": "High",
+                            "storage_zone": "fridge",
+                        }
+                    ]
+                }
+
+        service = AIService(
+            provider_order=["gemini", "openai"],
+            provider_instances={
+                "gemini": TimeoutGeminiProvider(),
+                "openai": SuccessfulOpenAIProvider(),
+            }
+        )
+
+        res = service.analyze_grocery_images(["/dummy/path.jpg"])
+        self.assertIn("items", res)
+        self.assertEqual(res["items"][0]["name"], "Organic Whole Milk")
+
+    def test_health_check_endpoints_return_200(self):
+        """Verify /health, /health/, and /api/v1/health/ all return 200 OK."""
+        for path in ["/health", "/health/", "/api/v1/health/"]:
+            res = self.client.get(path)
+            self.assertEqual(res.status_code, 200, f"Failed for {path}")
+            self.assertEqual(res.json().get("status"), "healthy")
+
+
+
+
 
 
 def create_test_image(filename="scan_test.jpg"):
@@ -457,8 +623,8 @@ class ScanDispatchAndLoggerTests(APITestCase):
 class CeleryBrokerConfigRegistrationTests(TestCase):
     def test_task_registered_in_celery_registry(self):
         """Task 5: Ensure process_scan_session_task is registered in Celery app registry."""
-        from config.celery import app as celery_app
         import apps.scans.tasks  # noqa: F401
+        from config.celery import app as celery_app
 
         task_name = "apps.scans.tasks.process_scan_session_task"
         self.assertIn(task_name, celery_app.tasks)

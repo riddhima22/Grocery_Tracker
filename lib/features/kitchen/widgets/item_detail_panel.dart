@@ -51,23 +51,63 @@ class _ItemDetailPanelState extends State<ItemDetailPanel> {
     }
   }
 
-  void _confirmDelete() {
-    showDialog(
+  bool _isDeleting = false;
+
+  Future<void> _handleDelete() async {
+    if (_isDeleting) return;
+
+    // 1. Show confirmation dialog and wait for user choice
+    final confirmed = await ConfirmDialog.show(
       context: context,
-      builder: (ctx) => ConfirmDialog(
-        title: 'Delete Item',
-        content: 'Are you sure you want to delete ${widget.item.name} from your pantry?',
-        confirmLabel: 'Delete',
-        cancelLabel: 'Cancel',
-        isDestructive: true,
-        onConfirm: () async {
-          final success = await context.read<KitchenProvider>().deleteItem(widget.item.id);
-          if (success && mounted) {
-            Navigator.pop(context); // close bottom sheet
-          }
-        },
-      ),
+      title: 'Delete Confirmation',
+      content:
+          'Are you sure you want to delete this item? This action cannot be undone.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      isDestructive: true,
     );
+
+    // If Cancel pressed or dialog dismissed, abort without API call
+    if (!mounted || confirmed != true) return;
+
+    // 2. User confirmed: Enter loading state
+    setState(() => _isDeleting = true);
+
+    try {
+      final kitchenProvider = context.read<KitchenProvider>();
+      final success = await kitchenProvider.deleteItem(widget.item.id);
+
+      if (!mounted) return;
+
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Item deleted successfully'),
+            backgroundColor: AppColors.success,
+            duration: Duration(seconds: 2),
+          ),
+        );
+        Navigator.pop(context); // close bottom sheet
+      } else {
+        setState(() => _isDeleting = false);
+        final errorMsg =
+            kitchenProvider.errorMessage ??
+            'Failed to delete item. Please try again.';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(errorMsg), backgroundColor: AppColors.danger),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isDeleting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to delete item: $e'),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
+    }
   }
 
   void _showConsumeQtySelector() {
@@ -80,33 +120,46 @@ class _ItemDetailPanelState extends State<ItemDetailPanel> {
           borderRadius: BorderRadius.circular(AppRadius.card(ctx)),
           side: const BorderSide(color: AppColors.cardBorder),
         ),
-        title: Text('Consume Quantity (${widget.item.unit})', style: AppTextStyles.headingMedium(ctx)),
+        title: Text(
+          'Consume Quantity (${widget.item.unit})',
+          style: AppTextStyles.headingMedium(ctx),
+        ),
         content: TextField(
           controller: controller,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           autofocus: true,
-          decoration: InputDecoration(
-            hintText: 'Max: ${widget.item.quantity}',
-          ),
+          decoration: InputDecoration(hintText: 'Max: ${widget.item.quantity}'),
           style: AppTextStyles.bodyLarge(ctx),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text('Cancel', style: AppTextStyles.labelMedium(ctx).copyWith(color: AppColors.textSecondary)),
+            child: Text(
+              'Cancel',
+              style: AppTextStyles.labelMedium(
+                ctx,
+              ).copyWith(color: AppColors.textSecondary),
+            ),
           ),
           TextButton(
             onPressed: () async {
               final double? val = double.tryParse(controller.text);
               if (val != null && val > 0 && val <= widget.item.quantity) {
                 Navigator.pop(ctx);
-                final success = await context.read<KitchenProvider>().consumeItem(widget.item.id, quantity: val);
+                final success = await context
+                    .read<KitchenProvider>()
+                    .consumeItem(widget.item.id, quantity: val);
                 if (success && mounted) {
                   Navigator.pop(context); // close bottom sheet
                 }
               }
             },
-            child: Text('Confirm', style: AppTextStyles.labelMedium(ctx).copyWith(color: AppColors.primary)),
+            child: Text(
+              'Confirm',
+              style: AppTextStyles.labelMedium(
+                ctx,
+              ).copyWith(color: AppColors.primary),
+            ),
           ),
         ],
       ),
@@ -114,14 +167,18 @@ class _ItemDetailPanelState extends State<ItemDetailPanel> {
   }
 
   Future<void> _consumeAll() async {
-    final success = await context.read<KitchenProvider>().consumeItem(widget.item.id);
+    final success = await context.read<KitchenProvider>().consumeItem(
+      widget.item.id,
+    );
     if (success && mounted) {
       Navigator.pop(context);
     }
   }
 
   Future<void> _markWasted() async {
-    final success = await context.read<KitchenProvider>().wasteItem(widget.item.id);
+    final success = await context.read<KitchenProvider>().wasteItem(
+      widget.item.id,
+    );
     if (success && mounted) {
       Navigator.pop(context);
     }
@@ -134,16 +191,20 @@ class _ItemDetailPanelState extends State<ItemDetailPanel> {
         ? DateHelpers.calendarDaysDifference(effectiveDate)
         : null;
     final int totalDays = effectiveDate != null
-        ? DateHelpers.calendarDaysDifference(effectiveDate, widget.item.purchaseDate)
+        ? DateHelpers.calendarDaysDifference(
+            effectiveDate,
+            widget.item.purchaseDate,
+          )
         : 0;
-    final int elapsedDays = DateHelpers.calendarDaysDifference(DateTime.now(), widget.item.purchaseDate);
+    final int elapsedDays = DateHelpers.calendarDaysDifference(
+      DateTime.now(),
+      widget.item.purchaseDate,
+    );
     final double timelineProgress = totalDays > 0
         ? (elapsedDays / totalDays).clamp(0.0, 1.0)
         : (daysLeft != null && daysLeft <= 0 ? 1.0 : 0.0);
 
     return Center(
-
-
       child: Container(
         constraints: const BoxConstraints(maxWidth: 550),
         padding: EdgeInsets.symmetric(
@@ -152,8 +213,12 @@ class _ItemDetailPanelState extends State<ItemDetailPanel> {
         ),
         decoration: BoxDecoration(
           color: AppColors.surface,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.panel(context))),
-          border: const Border(top: BorderSide(color: AppColors.cardBorder, width: 1.5)),
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(AppRadius.panel(context)),
+          ),
+          border: const Border(
+            top: BorderSide(color: AppColors.cardBorder, width: 1.5),
+          ),
         ),
         child: SingleChildScrollView(
           child: Column(
@@ -172,7 +237,7 @@ class _ItemDetailPanelState extends State<ItemDetailPanel> {
                 ),
               ),
               AppGap.md(context),
-              
+
               // Icon and details
               Row(
                 children: [
@@ -181,7 +246,9 @@ class _ItemDetailPanelState extends State<ItemDetailPanel> {
                     height: context.scaleWidth(64.0),
                     decoration: BoxDecoration(
                       color: AppColors.card,
-                      borderRadius: BorderRadius.circular(AppRadius.card(context)),
+                      borderRadius: BorderRadius.circular(
+                        AppRadius.card(context),
+                      ),
                       border: Border.all(color: AppColors.cardBorder),
                     ),
                     child: Center(
@@ -197,12 +264,17 @@ class _ItemDetailPanelState extends State<ItemDetailPanel> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(widget.item.name, style: AppTextStyles.headingLarge(context)),
+                        Text(
+                          widget.item.name,
+                          style: AppTextStyles.headingLarge(context),
+                        ),
                         if (widget.item.brand.isNotEmpty) ...[
                           const SizedBox(height: 2),
                           Text(
                             widget.item.brand,
-                            style: AppTextStyles.bodyMedium(context).copyWith(color: AppColors.textSecondary),
+                            style: AppTextStyles.bodyMedium(
+                              context,
+                            ).copyWith(color: AppColors.textSecondary),
                           ),
                         ],
                         const SizedBox(height: 6),
@@ -214,63 +286,83 @@ class _ItemDetailPanelState extends State<ItemDetailPanel> {
                                 vertical: context.scaleHeight(4.0),
                               ),
                               decoration: BoxDecoration(
-                                color: AppColors.primary.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(AppRadius.chip(context) * 0.75),
+                                color: AppColors.primary.withValues(
+                                  alpha: 0.12,
+                                ),
+                                borderRadius: BorderRadius.circular(
+                                  AppRadius.chip(context) * 0.75,
+                                ),
                               ),
                               child: Text(
                                 widget.item.storageZone.toUpperCase(),
-                                style: AppTextStyles.caption(context).copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
+                                style: AppTextStyles.caption(context).copyWith(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                             AppGap.xs(context),
                             ExpiryBadge(
                               expiryDate: widget.item.expiryDate,
-                              estimatedDate: widget.item.estimatedConsumptionDate ?? widget.item.predictedExpiry,
+                              estimatedDate:
+                                  widget.item.estimatedConsumptionDate ??
+                                  widget.item.predictedExpiry,
                               isEstimated: widget.item.isExpiryEstimated,
                             ),
                           ],
                         ),
                       ],
                     ),
-                  )
+                  ),
                 ],
               ),
               AppGap.md(context),
               const Divider(),
               AppGap.sm(context),
-              
+
               // Description
               if (widget.item.description.isNotEmpty) ...[
                 Text('Description', style: AppTextStyles.labelMedium(context)),
                 const SizedBox(height: 6),
                 Text(
                   widget.item.description,
-                  style: AppTextStyles.bodyLarge(context).copyWith(color: AppColors.textSecondary),
+                  style: AppTextStyles.bodyLarge(
+                    context,
+                  ).copyWith(color: AppColors.textSecondary),
                 ),
                 AppGap.md(context),
               ],
 
               // Expiry progress timeline
               if (effectiveDate != null) ...[
-                Text('Freshness Timeline', style: AppTextStyles.labelMedium(context)),
+                Text(
+                  'Freshness Timeline',
+                  style: AppTextStyles.labelMedium(context),
+                ),
                 const SizedBox(height: 10),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text('Purchased', style: AppTextStyles.caption(context)),
                     Text(
-                      widget.item.isExpiryEstimated ? 'Estimated Date' : 'Expiry Date',
+                      widget.item.isExpiryEstimated
+                          ? 'Estimated Date'
+                          : 'Expiry Date',
                       style: AppTextStyles.caption(context),
                     ),
                   ],
                 ),
                 const SizedBox(height: 4),
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(AppRadius.chip(context) * 0.5),
+                  borderRadius: BorderRadius.circular(
+                    AppRadius.chip(context) * 0.5,
+                  ),
                   child: LinearProgressIndicator(
                     value: timelineProgress,
                     backgroundColor: AppColors.card,
-                    color: (daysLeft != null && daysLeft <= 3) ? AppColors.danger : AppColors.success,
+                    color: (daysLeft != null && daysLeft <= 3)
+                        ? AppColors.danger
+                        : AppColors.success,
 
                     minHeight: 8.0,
                   ),
@@ -278,29 +370,43 @@ class _ItemDetailPanelState extends State<ItemDetailPanel> {
                 AppGap.md(context),
               ],
 
-
               // AI Storage Tips
               Container(
                 padding: EdgeInsets.all(AppSpacing.sm(context)),
                 decoration: BoxDecoration(
                   color: AppColors.primary.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(AppRadius.card(context) * 0.75),
-                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+                  borderRadius: BorderRadius.circular(
+                    AppRadius.card(context) * 0.75,
+                  ),
+                  border: Border.all(
+                    color: AppColors.primary.withValues(alpha: 0.2),
+                  ),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.tips_and_updates_outlined, color: AppColors.primary, size: AppIconSizes.md(context)),
+                    Icon(
+                      Icons.tips_and_updates_outlined,
+                      color: AppColors.primary,
+                      size: AppIconSizes.md(context),
+                    ),
                     AppGap.sm(context),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Storage Advice', style: AppTextStyles.labelMedium(context).copyWith(color: AppColors.primary)),
+                          Text(
+                            'Storage Advice',
+                            style: AppTextStyles.labelMedium(
+                              context,
+                            ).copyWith(color: AppColors.primary),
+                          ),
                           const SizedBox(height: 4),
                           Text(
                             _getStorageTip(),
-                            style: AppTextStyles.bodySmall(context).copyWith(color: AppColors.textPrimary),
+                            style: AppTextStyles.bodySmall(
+                              context,
+                            ).copyWith(color: AppColors.textPrimary),
                           ),
                         ],
                       ),
@@ -309,7 +415,7 @@ class _ItemDetailPanelState extends State<ItemDetailPanel> {
                 ),
               ),
               AppGap.lg(context),
-              
+
               // Actions
               Row(
                 children: [
@@ -343,7 +449,8 @@ class _ItemDetailPanelState extends State<ItemDetailPanel> {
                   Expanded(
                     child: AppButton(
                       text: 'Delete Item',
-                      onPressed: _confirmDelete,
+                      onPressed: _isDeleting ? null : _handleDelete,
+                      isLoading: _isDeleting,
                       style: AppButtonStyle.danger,
                     ),
                   ),

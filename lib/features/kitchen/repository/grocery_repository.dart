@@ -11,6 +11,11 @@ class GroceryRepository {
     return list?.map((i) => GroceryModel.fromJson(i)).toList() ?? const [];
   }
 
+  Future<GroceryModel> getGrocery(String id) async {
+    final response = await _apiClient.get(ApiEndpoints.groceryDetail(id));
+    return GroceryModel.fromJson(response.data['data']);
+  }
+
   Future<Map<String, dynamic>> lookupBarcode(String barcode) async {
     final response = await _apiClient.get(
       '${ApiEndpoints.groceries}barcode-lookup/',
@@ -24,8 +29,14 @@ class GroceryRepository {
     return GroceryModel.fromJson(response.data['data']);
   }
 
-  Future<GroceryModel> updateGrocery(String id, Map<String, dynamic> data) async {
-    final response = await _apiClient.patch(ApiEndpoints.groceryDetail(id), data: data);
+  Future<GroceryModel> updateGrocery(
+    String id,
+    Map<String, dynamic> data,
+  ) async {
+    final response = await _apiClient.patch(
+      ApiEndpoints.groceryDetail(id),
+      data: data,
+    );
     return GroceryModel.fromJson(response.data['data']);
   }
 

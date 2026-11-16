@@ -57,10 +57,7 @@ class _HomeShellState extends State<HomeShell> {
 
     return ResponsiveLayout(
       mobile: Scaffold(
-        body: IndexedStack(
-          index: _currentIndex,
-          children: _pages,
-        ),
+        body: IndexedStack(index: _currentIndex, children: _pages),
         bottomNavigationBar: BottomNavigationBar(
           currentIndex: _currentIndex,
           onTap: (index) {
@@ -72,8 +69,15 @@ class _HomeShellState extends State<HomeShell> {
           backgroundColor: AppColors.surface,
           selectedItemColor: AppColors.primary,
           unselectedItemColor: AppColors.textSecondary,
-          selectedLabelStyle: TextStyle(fontFamily: 'Outfit', fontSize: navLabelSize, fontWeight: FontWeight.bold),
-          unselectedLabelStyle: TextStyle(fontFamily: 'Outfit', fontSize: navLabelSize),
+          selectedLabelStyle: TextStyle(
+            fontFamily: 'Outfit',
+            fontSize: navLabelSize,
+            fontWeight: FontWeight.bold,
+          ),
+          unselectedLabelStyle: TextStyle(
+            fontFamily: 'Outfit',
+            fontSize: navLabelSize,
+          ),
           items: const [
             BottomNavigationBarItem(
               icon: Icon(Icons.dashboard_outlined),
@@ -115,10 +119,21 @@ class _HomeShellState extends State<HomeShell> {
               },
               backgroundColor: AppColors.surface,
               selectedIconTheme: const IconThemeData(color: AppColors.primary),
-              unselectedIconTheme: const IconThemeData(color: AppColors.textSecondary),
+              unselectedIconTheme: const IconThemeData(
+                color: AppColors.textSecondary,
+              ),
               labelType: NavigationRailLabelType.all,
-              selectedLabelTextStyle: TextStyle(fontFamily: 'Outfit', color: AppColors.primary, fontSize: navLabelSize, fontWeight: FontWeight.bold),
-              unselectedLabelTextStyle: TextStyle(fontFamily: 'Outfit', color: AppColors.textSecondary, fontSize: navLabelSize),
+              selectedLabelTextStyle: TextStyle(
+                fontFamily: 'Outfit',
+                color: AppColors.primary,
+                fontSize: navLabelSize,
+                fontWeight: FontWeight.bold,
+              ),
+              unselectedLabelTextStyle: TextStyle(
+                fontFamily: 'Outfit',
+                color: AppColors.textSecondary,
+                fontSize: navLabelSize,
+              ),
               destinations: const [
                 NavigationRailDestination(
                   icon: Icon(Icons.dashboard_outlined),
@@ -147,12 +162,13 @@ class _HomeShellState extends State<HomeShell> {
                 ),
               ],
             ),
-            const VerticalDivider(thickness: 1, width: 1, color: AppColors.cardBorder),
+            const VerticalDivider(
+              thickness: 1,
+              width: 1,
+              color: AppColors.cardBorder,
+            ),
             Expanded(
-              child: IndexedStack(
-                index: _currentIndex,
-                children: _pages,
-              ),
+              child: IndexedStack(index: _currentIndex, children: _pages),
             ),
           ],
         ),

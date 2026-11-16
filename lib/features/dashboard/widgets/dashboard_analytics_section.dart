@@ -64,9 +64,13 @@ class DashboardAnalyticsSection extends StatelessWidget {
         } else if (days == 0) {
           list.add('Consume ${firstExpiring.name} today to avoid spoilage.');
         } else if (days == 1) {
-          list.add('Consume ${firstExpiring.name} tomorrow (1 day left) to avoid spoilage.');
+          list.add(
+            'Consume ${firstExpiring.name} tomorrow (1 day left) to avoid spoilage.',
+          );
         } else {
-          list.add('Consume ${firstExpiring.name} within $days days to avoid spoilage.');
+          list.add(
+            'Consume ${firstExpiring.name} within $days days to avoid spoilage.',
+          );
         }
       } else {
         list.add('Consume ${firstExpiring.name} soon to avoid spoilage.');
@@ -82,7 +86,9 @@ class DashboardAnalyticsSection extends StatelessWidget {
 
     // Fallback if none available
     if (list.isEmpty) {
-      list.add('All items are fresh! Maintain current storage zones for longer shelf life.');
+      list.add(
+        'All items are fresh! Maintain current storage zones for longer shelf life.',
+      );
     }
 
     return list;
@@ -98,12 +104,18 @@ class DashboardAnalyticsSection extends StatelessWidget {
     final totalCount = kitchen.totalItems;
     final expiringCount = kitchen.expiringCount;
     final expiredCount = kitchen.expiredCount;
-    final freshCount = (totalCount - expiringCount - expiredCount).clamp(0, totalCount);
+    final freshCount = (totalCount - expiringCount - expiredCount).clamp(
+      0,
+      totalCount,
+    );
 
     // Dynamic Kitchen Health calculation
     int calculatedHealth = 100;
     if (kitchen.items.isNotEmpty) {
-      final sum = kitchen.items.fold<int>(0, (prev, el) => prev + el.freshnessScore);
+      final sum = kitchen.items.fold<int>(
+        0,
+        (prev, el) => prev + el.freshnessScore,
+      );
       calculatedHealth = (sum / kitchen.items.length).round().clamp(0, 100);
     }
     final effectiveHealth = (freshnessScore != 100 && freshnessScore > 0)
@@ -121,7 +133,8 @@ class DashboardAnalyticsSection extends StatelessWidget {
       wasteRiskColor = AppColors.warning;
     }
 
-    final savedItemsCount = context.watch<AuthProvider>().user?.savedFromWaste ?? 0;
+    final savedItemsCount =
+        context.watch<AuthProvider>().user?.savedFromWaste ?? 0;
     final wasteSubtitle = expiringCount > 0
         ? '$expiringCount item${expiringCount > 1 ? 's' : ''} near expiry'
         : 'Zero items at immediate risk';
@@ -222,9 +235,7 @@ class DashboardAnalyticsSection extends StatelessWidget {
         AppGap.sm(context),
 
         // 4. AI Recommendation Spotlight
-        AiRecommendationCard(
-          recommendations: recommendations,
-        ),
+        AiRecommendationCard(recommendations: recommendations),
       ],
     );
   }

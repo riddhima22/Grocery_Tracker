@@ -8,23 +8,35 @@ import '../../../data/models/scan_candidate_model.dart';
 import '../../../data/models/grocery_model.dart';
 import '../../../data/repositories/scan_repository.dart';
 import '../../../core/utils/app_logger.dart';
+import '../../../core/services/unit_classification_service.dart';
 import '../../kitchen/providers/kitchen_provider.dart';
 
-enum ScanUIState { idle, selecting, uploading, analyzing, review, success, error }
+enum ScanUIState {
+  idle,
+  selecting,
+  uploading,
+  analyzing,
+  review,
+  success,
+  error,
+}
 
 class ScanProvider extends ChangeNotifier {
-  final ScanRepository _scanRepository = ScanRepository();
+  final ScanRepository _scanRepository;
+
+  ScanProvider({ScanRepository? scanRepository})
+      : _scanRepository = scanRepository ?? ScanRepository();
 
   final List<XFile> _selectedImages = [];
   ScanUIState _uiState = ScanUIState.idle;
   String? _errorMessage;
   String _scanStageMessage = 'Uploading image...';
   double _scanProgress = 0.2;
-  
+
   ScanSessionModel? _currentSession;
   List<ScanCandidateModel> _candidates = [];
   List<GroceryModel> _confirmedGroceries = [];
-  
+
   // Selection map for confirming review candidates
   final Map<String, bool> _candidateSelection = {};
   Timer? _pollingTimer;
@@ -64,9 +76,19 @@ class ScanProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Resets scan provider state completely (e.g. on auth changes)
+  void resetState() => clearImages();
+
+  /// Clears any stale error state so opening the scan view starts in idle mode
+  void resetIfError() {
+    if (_uiState == ScanUIState.error) {
+      clearImages();
+    }
+  }
+
   Future<void> startAnalysis() async {
     if (_selectedImages.isEmpty) return;
-    
+
     _stopPolling();
     _uiState = ScanUIState.uploading;
     _errorMessage = null;
@@ -76,7 +98,9 @@ class ScanProvider extends ChangeNotifier {
 
     try {
       // 1. Upload files to backend and create session
-      _currentSession = await _scanRepository.createScanSession(_selectedImages);
+      _currentSession = await _scanRepository.createScanSession(
+        _selectedImages,
+      );
       _uiState = ScanUIState.analyzing;
       _scanStageMessage = 'Analyzing image...';
       _scanProgress = 0.50;
@@ -94,65 +118,91 @@ class ScanProvider extends ChangeNotifier {
 
   void _startPolling() {
     _stopPolling();
-    
+
     int attempts = 0;
-    const maxAttempts = 45; // Max 90 seconds (2s interval)
-    
+    const maxAttempts = 60; // Max 120 seconds / 2 minutes (2s interval)
+
     _pollingTimer = Timer.periodic(const Duration(seconds: 2), (timer) async {
       if (_currentSession == null) {
         timer.cancel();
         return;
       }
-      
+
       attempts++;
 
-      // Update progressive UI messages based on elapsed time
-      if (attempts == 3) {
-        _scanStageMessage = 'Identifying items...';
+      // Update progressive UI messages based on elapsed time, including server wakeup notice
+      if (attempts == 2) {
+        _scanStageMessage = 'Waking up server & preparing AI...';
+        _scanProgress = 0.55;
+        notifyListeners();
+      } else if (attempts == 6) {
+        _scanStageMessage = 'Analyzing images with vision model...';
         _scanProgress = 0.70;
         notifyListeners();
-      } else if (attempts == 7) {
-        _scanStageMessage = 'Almost done...';
-        _scanProgress = 0.88;
+      } else if (attempts == 12) {
+        _scanStageMessage = 'Identifying items and shelf life...';
+        _scanProgress = 0.85;
+        notifyListeners();
+      } else if (attempts == 20) {
+        _scanStageMessage = 'Almost ready, finalizing candidates...';
+        _scanProgress = 0.92;
         notifyListeners();
       }
 
       if (attempts > maxAttempts) {
         timer.cancel();
-        _errorMessage = "Analysis is taking longer than expected. Please try again.";
+        _errorMessage =
+            "Analysis is taking longer than expected. The server might be waking up — please try again.";
         _uiState = ScanUIState.error;
         notifyListeners();
         return;
       }
 
       try {
-        final session = await _scanRepository.getScanSession(_currentSession!.id);
+        final session = await _scanRepository.getScanSession(
+          _currentSession!.id,
+        );
         _currentSession = session;
-        
-        if (session.status == 'completed' || session.status == 'partial_success' || session.status == 'partial') {
+
+        if (session.status == 'completed' ||
+            session.status == 'partial_success' ||
+            session.status == 'partial') {
           timer.cancel();
           _scanProgress = 1.0;
-          
+
           // Load detected candidates
           _candidates = await _scanRepository.getCandidates(session.id);
-          AppLogger.info('Scan completed for session ${session.id}: found ${_candidates.length} item(s)');
-          
+          AppLogger.info(
+            'Scan completed for session ${session.id}: found ${_candidates.length} item(s)',
+          );
+
           // Default all candidates to selected
           for (var c in _candidates) {
             _candidateSelection[c.id] = c.selected;
           }
-          
+
           _uiState = ScanUIState.review;
           notifyListeners();
         } else if (session.status == 'failed') {
           timer.cancel();
-          final firstError = session.images.firstWhere(
-            (img) => img.errorMessage.isNotEmpty,
-            orElse: () => const ScanImageModel(id: '', status: '', errorMessage: ''),
-          ).errorMessage;
-          
-          _errorMessage = firstError.isNotEmpty 
-              ? firstError 
+          String failureMsg =
+              session.errorMessage.isNotEmpty ? session.errorMessage : '';
+          if (failureMsg.isEmpty) {
+            final firstError = session.images
+                .firstWhere(
+                  (img) => img.errorMessage.isNotEmpty,
+                  orElse: () => const ScanImageModel(
+                    id: '',
+                    status: '',
+                    errorMessage: '',
+                  ),
+                )
+                .errorMessage;
+            failureMsg = firstError;
+          }
+
+          _errorMessage = failureMsg.isNotEmpty
+              ? failureMsg
               : "Analysis could not identify grocery items. Please try a clearer picture.";
           _uiState = ScanUIState.error;
           notifyListeners();
@@ -192,15 +242,26 @@ class ScanProvider extends ChangeNotifier {
 
       double? newQty = old.quantity;
       if (data.containsKey('quantity')) {
-        newQty = double.tryParse(data['quantity']?.toString() ?? '') ?? old.quantity;
+        newQty =
+            double.tryParse(data['quantity']?.toString() ?? '') ?? old.quantity;
       }
 
       _candidates[index] = old.copyWith(
         name: data['name']?.toString(),
         brand: data['brand']?.toString(),
+        category: data['category']?.toString(),
         description: data['description']?.toString(),
         storageZone: data['storage_zone']?.toString(),
         quantity: newQty,
+        unit: data['unit']?.toString(),
+        unitCategory: data['unit_category']?.toString(),
+        packageType: data['package_type']?.toString(),
+        netContentValue: double.tryParse(
+          data['net_content_value']?.toString() ?? '',
+        ),
+        netContentUnit: data['net_content_unit']?.toString(),
+        unitConfidence: data['unit_confidence']?.toString(),
+        isUncertain: data['is_uncertain'] == true,
         expiryDate: newExpiry,
       );
       // Immediately notify UI for instant 0ms responsiveness
@@ -217,6 +278,32 @@ class ScanProvider extends ChangeNotifier {
     } catch (e) {
       AppLogger.error('Failed to update candidate details', e);
     }
+  }
+
+  void updateCandidateQuantity(String id, double newQty) {
+    updateCandidate(id, {'quantity': newQty});
+  }
+
+  void updateCandidateUnit(String id, String newUnit) {
+    final index = _candidates.indexWhere((c) => c.id == id);
+    if (index == -1) return;
+    final old = _candidates[index];
+    final convertedQty =
+        UnitClassificationService.convertQuantity(
+          old.quantity,
+          old.unit,
+          newUnit,
+        ) ??
+        old.quantity;
+    final cat =
+        UnitClassificationService.unitCategories[newUnit] ?? old.unitCategory;
+    updateCandidate(id, {
+      'unit': newUnit,
+      'quantity': convertedQty,
+      'unit_category': cat,
+      'unit_confidence': 'High',
+      'is_uncertain': false,
+    });
   }
 
   void removeCandidate(String id) {

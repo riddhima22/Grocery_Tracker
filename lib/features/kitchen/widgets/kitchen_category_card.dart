@@ -2,12 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../config/app_colors.dart';
 import '../../../config/app_text_styles.dart';
 
-enum CategoryStatus {
-  allGood,
-  expiringSoon,
-  expired,
-  empty,
-}
+enum CategoryStatus { allGood, expiringSoon, expired, empty }
 
 class KitchenCategoryCard extends StatefulWidget {
   final String name;
@@ -89,10 +84,7 @@ class _KitchenCategoryCardState extends State<KitchenCategoryCard>
         decoration: BoxDecoration(
           color: AppColors.card,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: AppColors.cardBorder,
-            width: 1.0,
-          ),
+          border: Border.all(color: AppColors.cardBorder, width: 1.0),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.035),
@@ -110,7 +102,10 @@ class _KitchenCategoryCardState extends State<KitchenCategoryCard>
             onTapCancel: () => _pressController.reverse(),
             onTap: widget.onTap,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 8.0),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 10.0,
+                vertical: 8.0,
+              ),
               child: Row(
                 children: [
                   // Large rounded icon container
