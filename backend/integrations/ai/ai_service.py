@@ -1,4 +1,5 @@
 import logging
+import os
 
 from django.conf import settings
 
@@ -10,8 +11,32 @@ logger = logging.getLogger('freshtrack.ai.service')
 
 class AIService(GroceryVisionService, RecipeGenerationService, MealInferenceService):
     def __init__(self, provider_order: list = None, provider_instances: dict = None):
-        self.provider_order = provider_order or getattr(settings, 'AI_PROVIDER_ORDER', ['gemini', 'openai'])
+        if provider_order is not None:
+            self.provider_order = list(provider_order)
+        else:
+            self.provider_order = self._resolve_default_provider_order()
         self.provider_instances = provider_instances
+
+    @staticmethod
+    def _resolve_default_provider_order() -> list:
+        """
+        Dynamically prioritizes OpenAI (gpt-4o-mini) as the primary provider
+        whenever OPENAI_API_KEY is configured and non-empty.
+        """
+        has_openai_key = bool(
+            getattr(settings, 'OPENAI_API_KEY', '') or os.environ.get('OPENAI_API_KEY', '').strip()
+        )
+        configured_order = getattr(settings, 'AI_PROVIDER_ORDER', None)
+        if configured_order:
+            order = list(configured_order)
+        else:
+            order = ['openai', 'gemini'] if has_openai_key else ['gemini', 'openai']
+
+        if has_openai_key and 'openai' in order:
+            # Place OpenAI first as primary provider
+            order = ['openai'] + [p for p in order if p != 'openai']
+
+        return order
 
     def _get_providers(self):
         if self.provider_instances is not None:
@@ -20,18 +45,18 @@ class AIService(GroceryVisionService, RecipeGenerationService, MealInferenceServ
         providers = []
         for name in self.provider_order:
             name_lower = name.lower().strip()
-            if name_lower == 'gemini':
-                client = GeminiClient()
-                if client.enabled:
-                    providers.append(('gemini', client))
-                else:
-                    logger.info("Gemini provider is disabled or missing credentials.")
-            elif name_lower == 'openai':
+            if name_lower == 'openai':
                 client = OpenAIClient()
                 if client.enabled:
                     providers.append(('openai', client))
                 else:
                     logger.info("OpenAI provider is disabled or missing credentials.")
+            elif name_lower == 'gemini':
+                client = GeminiClient()
+                if client.enabled:
+                    providers.append(('gemini', client))
+                else:
+                    logger.info("Gemini provider is disabled or missing credentials.")
             else:
                 logger.warning(f"Unknown AI provider name in AI_PROVIDER_ORDER: {name}")
 
@@ -41,7 +66,10 @@ class AIService(GroceryVisionService, RecipeGenerationService, MealInferenceServ
         providers = self._get_providers()
         if not providers:
             logger.error("No active AI providers available for image analysis.")
-            raise RuntimeError("No active AI providers available for image analysis.")
+            raise RuntimeError(
+                "No active AI providers available for image analysis. "
+                "Please configure a valid OPENAI_API_KEY or GEMINI_API_KEY."
+            )
 
         errors = []
         blocked_count = 0
@@ -56,16 +84,19 @@ class AIService(GroceryVisionService, RecipeGenerationService, MealInferenceServ
                 logger.warning(f"AI provider '{name}' content blocked during grocery scan: {e}")
                 errors.append(f"{name}: {e}")
                 blocked_count += 1
+                break
             except OpenAIAuthenticationError as e:
                 logger.critical(f"AI provider '{name}' authentication/configuration failure: {e}")
                 errors.append(f"{name}: Configuration error - invalid/incorrect API key (401)")
+                # Authentication failures are permanent configuration errors: do not mask with secondary fallback
+                raise
             except Exception as e:
                 logger.warning(f"AI provider '{name}' failed during grocery scan: {e}. Attempting fallback...")
                 errors.append(f"{name}: {e}")
 
         logger.error(f"All AI providers failed for analyze_grocery_images. Errors: {errors}")
-        if blocked_count == len(providers):
-            raise AIContentBlockedError(f"All AI providers content blocked: {', '.join(errors)}")
+        if blocked_count > 0:
+            raise AIContentBlockedError(f"AI content blocked: {', '.join(errors)}")
         raise RuntimeError(f"All AI providers failed for analyze_grocery_images: {', '.join(errors)}")
 
     def generate_recipes(self, available_items: list, preferences: dict) -> dict:

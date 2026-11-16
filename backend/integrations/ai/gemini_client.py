@@ -338,6 +338,26 @@ class GeminiClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
                 attempt_elapsed = time.time() - attempt_start
                 last_exception = e
                 err_msg = str(e).lower()
+
+                # Quota exhaustion detection:
+                # If Gemini returns 429 ResourceExhausted (rate limit / quota exceeded),
+                # this applies to the entire project / API key, not just this specific model.
+                # Abort the Gemini fallback model loop immediately instead of hammering remaining models.
+                is_quota_error = (
+                    '429' in err_msg or
+                    'resource_exhausted' in err_msg or
+                    'resourceexhausted' in err_msg or
+                    'quota' in err_msg or
+                    'rate limit' in err_msg
+                )
+                if is_quota_error:
+                    logger.warning(
+                        f"Gemini project quota/rate limit exhausted (429) on model '{model_name}' "
+                        f"after {attempt_elapsed:.2f}s: {e}. "
+                        f"Aborting Gemini model fallback loop immediately to avoid quota exhaustion delays."
+                    )
+                    break
+
                 if any(k in err_msg for k in ['503', '504', 'service unavailable', 'deadline exceeded', 'timed out', 'timeout']):
                     logger.warning(
                         f"Gemini model '{model_name}' encountered 503/504/timeout after {attempt_elapsed:.2f}s: {e}. "
@@ -428,6 +448,13 @@ class GeminiClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
             except Exception as e:
                 attempt_elapsed = time.time() - attempt_start
                 last_exception = e
+                err_msg = str(e).lower()
+                is_quota_error = '429' in err_msg or 'resource_exhausted' in err_msg or 'resourceexhausted' in err_msg or 'quota' in err_msg
+                if is_quota_error:
+                    logger.warning(
+                        f"Gemini project quota/rate limit exhausted (429) on model '{model_name}' during recipe generation. Aborting fallback loop."
+                    )
+                    break
                 logger.warning(f"Gemini model '{model_name}' failed recipe generation after {attempt_elapsed:.2f}s: {e}")
 
         total_elapsed = time.time() - overall_start
@@ -504,6 +531,13 @@ class GeminiClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
             except Exception as e:
                 attempt_elapsed = time.time() - attempt_start
                 last_exception = e
+                err_msg = str(e).lower()
+                is_quota_error = '429' in err_msg or 'resource_exhausted' in err_msg or 'resourceexhausted' in err_msg or 'quota' in err_msg
+                if is_quota_error:
+                    logger.warning(
+                        f"Gemini project quota/rate limit exhausted (429) on model '{model_name}' during meal inference. Aborting fallback loop."
+                    )
+                    break
                 logger.warning(f"Gemini model '{model_name}' failed meal inference after {attempt_elapsed:.2f}s: {e}")
 
         total_elapsed = time.time() - overall_start

@@ -313,7 +313,9 @@ _raw_openai_base_url = env('OPENAI_BASE_URL', default='')
 OPENAI_BASE_URL = _raw_openai_base_url.strip().strip('\'"') if isinstance(_raw_openai_base_url, str) and _raw_openai_base_url.strip() else None
 
 # AI Provider Fallback Order
-AI_PROVIDER_ORDER = env.list('AI_PROVIDER_ORDER', default=['gemini', 'openai'])
+# Prioritize OpenAI (gpt-4o-mini) as the primary provider whenever OPENAI_API_KEY is configured
+default_ai_provider_order = ['openai', 'gemini'] if OPENAI_API_KEY else ['gemini', 'openai']
+AI_PROVIDER_ORDER = env.list('AI_PROVIDER_ORDER', default=default_ai_provider_order)
 
 
 # OCR configurations

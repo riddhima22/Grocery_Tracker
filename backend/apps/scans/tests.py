@@ -565,6 +565,122 @@ class ScanFlowAsyncAndPollingTests(APITestCase):
         wrapped_err = Exception("All AI providers failed: openai: Configuration error - invalid/incorrect API key (401)")
         self.assertFalse(is_transient_error(wrapped_err))
 
+    def test_openai_primary_provider_selection_when_key_configured(self):
+        """Verify OpenAI is dynamically prioritized as the primary provider when OPENAI_API_KEY is configured."""
+        from django.test import override_settings
+
+        from integrations.ai.ai_service import AIService
+
+        with override_settings(OPENAI_API_KEY="sk-test-mock-valid-key"):
+            service = AIService()
+            self.assertEqual(service.provider_order[0], "openai")
+
+    def test_gemini_primary_when_openai_key_not_configured(self):
+        """Verify Gemini is primary when OPENAI_API_KEY is missing or empty."""
+        from django.test import override_settings
+
+        from integrations.ai.ai_service import AIService
+
+        with override_settings(OPENAI_API_KEY="", AI_PROVIDER_ORDER=None):
+            service = AIService()
+            self.assertEqual(service.provider_order[0], "gemini")
+
+    def test_openai_primary_success_does_not_call_gemini(self):
+        """Verify that when OpenAI succeeds as primary, Gemini fallback is never invoked."""
+        from integrations.ai.ai_service import AIService
+
+        mock_gemini = MagicMock()
+        mock_openai = MagicMock()
+        mock_openai.analyze_grocery_images.return_value = {
+            "items": [{"name": "Organic Bananas", "quantity": 6.0, "unit": "pcs"}]
+        }
+
+        service = AIService(
+            provider_order=["openai", "gemini"],
+            provider_instances={
+                "openai": mock_openai,
+                "gemini": mock_gemini,
+            }
+        )
+
+        res = service.analyze_grocery_images(["/dummy/bananas.jpg"])
+        self.assertIn("items", res)
+        self.assertEqual(res["items"][0]["name"], "Organic Bananas")
+        mock_openai.analyze_grocery_images.assert_called_once()
+        mock_gemini.analyze_grocery_images.assert_not_called()
+
+    def test_openai_retryable_error_falls_back_to_gemini(self):
+        """Verify that when OpenAI fails with a retryable error (timeout/500/503), it falls back to Gemini."""
+        from integrations.ai.ai_service import AIService
+
+        mock_openai = MagicMock()
+        mock_openai.analyze_grocery_images.side_effect = TimeoutError("OpenAI request timed out after 45s.")
+
+        mock_gemini = MagicMock()
+        mock_gemini.analyze_grocery_images.return_value = {
+            "items": [{"name": "Fresh Spinach", "quantity": 1.0, "unit": "bunch"}]
+        }
+
+        service = AIService(
+            provider_order=["openai", "gemini"],
+            provider_instances={
+                "openai": mock_openai,
+                "gemini": mock_gemini,
+            }
+        )
+
+        res = service.analyze_grocery_images(["/dummy/spinach.jpg"])
+        self.assertIn("items", res)
+        self.assertEqual(res["items"][0]["name"], "Fresh Spinach")
+        mock_openai.analyze_grocery_images.assert_called_once()
+        mock_gemini.analyze_grocery_images.assert_called_once()
+
+    def test_openai_401_auth_error_raises_and_does_not_call_gemini(self):
+        """Verify that permanent OpenAI 401 configuration errors raise immediately without Gemini fallback."""
+        from integrations.ai.ai_service import AIService
+        from integrations.ai.openai_client import OpenAIAuthenticationError
+
+        mock_openai = MagicMock()
+        mock_openai.analyze_grocery_images.side_effect = OpenAIAuthenticationError("401 Incorrect API key provided")
+
+        mock_gemini = MagicMock()
+
+        service = AIService(
+            provider_order=["openai", "gemini"],
+            provider_instances={
+                "openai": mock_openai,
+                "gemini": mock_gemini,
+            }
+        )
+
+        with self.assertRaises(OpenAIAuthenticationError):
+            service.analyze_grocery_images(["/dummy/item.jpg"])
+
+        mock_openai.analyze_grocery_images.assert_called_once()
+        mock_gemini.analyze_grocery_images.assert_not_called()
+
+    def test_gemini_429_quota_exceeded_aborts_fallback_loop(self):
+        """Verify that when Gemini encounters 429 quota exhaustion, it aborts immediately without looping models."""
+        from integrations.ai.gemini_client import GeminiClient
+
+        client = GeminiClient()
+        client.enabled = True
+        client.fallback_models = ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.8-flash"]
+
+        mock_genai_client = MagicMock()
+        mock_genai_client.models.generate_content.side_effect = RuntimeError(
+            "429 Resource has been exhausted (e.g. check quota)."
+        )
+        client.client = mock_genai_client
+
+        with patch.object(client, '_prepare_image', return_value=MagicMock()):
+            with self.assertRaises(RuntimeError) as ctx:
+                client.analyze_grocery_images(["/dummy/test.jpg"])
+
+            self.assertIn("Too many requests", str(ctx.exception))
+            # Critical: Verify generate_content was called ONLY ONCE and aborted immediately!
+            self.assertEqual(mock_genai_client.models.generate_content.call_count, 1)
+
     def test_health_check_endpoints_return_200(self):
         """Verify /health, /health/, and /api/v1/health/ all return 200 OK."""
         for path in ["/health", "/health/", "/api/v1/health/"]:

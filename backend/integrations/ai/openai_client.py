@@ -68,7 +68,12 @@ class OpenAIClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
         self.client = None
         if self.enabled:
             try:
-                client_kwargs = {'api_key': self.api_key}
+                timeout_sec = getattr(settings, 'AI_REQUEST_TIMEOUT_SECONDS', 45)
+                client_kwargs = {
+                    'api_key': self.api_key,
+                    'timeout': float(timeout_sec),
+                    'max_retries': 2,
+                }
                 if self.project:
                     client_kwargs['project'] = self.project
                 if self.organization:
@@ -130,13 +135,15 @@ class OpenAIClient(GroceryVisionService, RecipeGenerationService, MealInferenceS
                 })
 
             logger.info(f"Calling OpenAI ({self.model_name}) for scan analysis...")
+            timeout_sec = getattr(settings, 'AI_REQUEST_TIMEOUT_SECONDS', 45)
             response = self.client.chat.completions.create(
                 model=self.model_name,
                 messages=[
                     {"role": "system", "content": SYSTEM_INSTRUCTION},
                     {"role": "user", "content": content}
                 ],
-                response_format={"type": "json_object"}
+                response_format={"type": "json_object"},
+                timeout=float(timeout_sec)
             )
 
             text_response = response.choices[0].message.content
