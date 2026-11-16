@@ -251,6 +251,17 @@ CELERY_BROKER_TRANSPORT_OPTIONS = {
     'retry_on_timeout': True,
 }
 
+# Handle rediss:// TLS certificate requirements seamlessly for cloud Redis
+if CELERY_BROKER_URL and CELERY_BROKER_URL.startswith('rediss://'):
+    import ssl
+    cert_reqs = env('REDIS_SSL_CERT_REQS', default='none').lower()
+    cert_map = {
+        'none': ssl.CERT_NONE,
+        'optional': ssl.CERT_OPTIONAL,
+        'required': ssl.CERT_REQUIRED,
+    }
+    CELERY_BROKER_TRANSPORT_OPTIONS['ssl_cert_reqs'] = cert_map.get(cert_reqs, ssl.CERT_NONE)
+
 from celery.schedules import crontab
 
 # Celery Beat Periodic Schedules

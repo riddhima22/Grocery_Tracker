@@ -6,6 +6,7 @@ django-environ>=0.11.0
 psycopg2-binary>=2.9.9
 celery>=5.3.6
 redis>=5.0.1
+packaging>=23.2
 setuptools>=69.0.0
 google-api-core>=2.15.0
 google-auth>=2.25.0

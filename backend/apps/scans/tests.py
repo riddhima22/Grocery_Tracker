@@ -628,3 +628,18 @@ class CeleryBrokerConfigRegistrationTests(TestCase):
 
         task_name = "apps.scans.tasks.process_scan_session_task"
         self.assertIn(task_name, celery_app.tasks)
+
+    def test_packaging_dependency_imported_by_kombu_redis(self):
+        """Verify packaging is installed and kombu.transport.redis can resolve version check."""
+        import packaging
+        import packaging.version
+        from kombu.transport.redis import Transport
+
+        self.assertIsNotNone(packaging.__version__)
+        self.assertTrue(hasattr(Transport, 'driver_version'))
+
+    def test_check_packaging_installed_for_kombu(self):
+        """Verify the Django deploy check for packaging passes in production environment."""
+        from config.checks import check_packaging_installed_for_kombu
+        errors = check_packaging_installed_for_kombu(None)
+        self.assertEqual(errors, [])

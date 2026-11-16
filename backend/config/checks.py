@@ -38,3 +38,18 @@ def check_celery_broker_in_production(app_configs, **kwargs):
                 )
             )
     return warnings
+
+@register(Tags.compatibility, deploy=True)
+def check_packaging_installed_for_kombu(app_configs, **kwargs):
+    errors = []
+    try:
+        import packaging  # noqa: F401
+    except ImportError:
+        errors.append(
+            Error(
+                'The "packaging" package is not installed. Celery Kombu Redis transport requires "packaging".',
+                hint='Ensure packaging>=23.2 is installed in your production environment.',
+                id='freshtrack.E003',
+            )
+        )
+    return errors
